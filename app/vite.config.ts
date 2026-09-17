@@ -9,6 +9,11 @@ import { resolve } from 'node:path';
 // (advisor guidance — file:.. still keeps tests/embed.test.ts's published-consumer
 // contract meaningful; this alias is dev-only ergonomics, not a substitute for it).
 export default defineConfig({
+  // GitHub Pages project sites are served from https://<user>.github.io/<repo>/,
+  // so asset URLs need a `/<repo>/` base — Cloudflare Pages/Vercel serve from the
+  // domain root and want '/' (the default). Set FORMA_BASE at build time; see
+  // app/README.md's deployment section for exact per-host commands.
+  base: process.env.FORMA_BASE ?? '/',
   resolve: {
     dedupe: ['three'],
     alias:

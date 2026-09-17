@@ -63,6 +63,28 @@ core.
       was not exhaustively repeated by hand; the automated leak-check button already
       exercises every shape×material×environment combination programmatically and
       reports PASS/FAIL, which is stronger evidence than a manual subset.
+| 2026-09-17 | M4 executed (docs-only, per `.expansion-roadmap.md` M4 + this task's
+      brief): `app/README.md` (new) — local dev, the `file:..`/`dist` resolve gotcha,
+      production build, deployment walkthroughs for GitHub Pages/Cloudflare
+      Pages/Vercel, browser support, known limitations. `CONTRIBUTING.md` (new) —
+      annotated `sphere`/`matte` registry-entry walkthrough, registration mechanism,
+      `generateEmbedCode()`/`embed.ts` explainer, testing philosophy (real
+      headless-browser verification required for UI/render claims), PR expectations.
+      Root `README.md` extended (not duplicated) with Deployment/Browser
+      support & performance/Contributing sections and a pointer from deviation #7 to
+      `CONTRIBUTING.md`'s embed-code walkthrough. Config change: `app/vite.config.ts`
+      gained `base: process.env.FORMA_BASE ?? '/'` — no `base` config existed
+      before, and a GitHub Pages project-site deploy would have 404'd on asset
+      URLs without it; verified by building with `FORMA_BASE=/forma/` and
+      confirming `dist/index.html` emitted `/forma/assets/...` paths, then
+      rebuilt with the default before committing. `.github/workflows/deploy-gh-pages.yml`
+      added — builds library then app and publishes `app/dist/` via
+      `actions/deploy-pages`; validated for YAML syntax only (`npx js-yaml`), not
+      executed — no live Actions runner available. Confirmed both `npm run build`
+      (library, `Projects/Forma/`) and `npm run build` (app) still pass after the
+      `vite.config.ts` change (812.08 kB / 219.20 kB gzip single JS chunk, same
+      pre-existing >500KB warning — documented in README as an explicit non-goal,
+      not new regression). No other source changes.
 - [x] Fixed the broken "Copy Code" export: `embed.ts` previously imported
       `forma/harness-content`, a subpath absent from `package.json`'s `exports` map.
       Content relocated from `harness/*.ts` to `src/content/**` (published, `./content`
@@ -103,14 +125,14 @@ core.
 - [x] Searchable `ControlPanel`, keyboard shortcuts, full mobile touch support.
 - [x] Onboarding flow for first-time users.
 
-### M4 — Self-hosting docs
-- [ ] Deployment guide (static hosting — Vite build is fully client-side).
-- [ ] Contribution docs: "how to add a shape/material/environment/effect" (points at
+### M4 — Self-hosting docs (COMPLETE)
+- [x] Deployment guide (static hosting — Vite build is fully client-side).
+- [x] Contribution docs: "how to add a shape/material/environment/effect" (points at
       `src/content/**`'s registry-entry pattern).
-- [ ] Browser support notes.
+- [x] Browser support notes.
 
 ## Status
-**M0, M1, M2, M3 complete.**
+**M0, M1, M2, M3, M4 complete. All roadmap milestones closed out.**
 
 `npm run typecheck` / `typecheck:harness` / `test` (17/17) / `build` all pass. Embed
 code generation confirmed genuinely working end-to-end (resolves through the real

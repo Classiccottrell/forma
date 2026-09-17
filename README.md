@@ -36,6 +36,50 @@ cd app && npm install   # editor product app — its own package.json, React + f
 - **Onboarding**: a small dismissible hint ("drag to orbit…") shows on first load only, tracked via `localStorage`.
 - Verification: `app/e2e/verify-m3.mjs` is a real headless-Playwright script (not a checked-in test framework — no e2e harness existed before this pass) covering all six items above. Run `npm run dev -- --port 5183 --strictPort` in `app/`, then `node e2e/verify-m3.mjs` in a second shell.
 
+## Deployment
+
+`app/` builds to a static site (`npm run build` -> `app/dist/`, no server-side
+code). See `app/README.md`'s "Deployment" section for full walkthroughs
+(GitHub Pages, Cloudflare Pages, Vercel), including the `FORMA_BASE` env var
+GitHub Pages *project* sites need (`app/vite.config.ts` sets
+`base: process.env.FORMA_BASE ?? '/'` — a config addition made in the M4 docs
+pass, since no `base` config existed before and a project-site deploy would
+have 404'd on assets). A GitHub Actions workflow
+(`.github/workflows/deploy-gh-pages.yml`) is included but **unverified beyond
+local YAML-syntax validation** — no live Actions runner was available to test
+it; the manual per-host steps in `app/README.md` are the verified path.
+
+## Browser support & performance
+
+- **WebGL2 required.** `three` is pinned to `^0.185.1`;
+  `src/scene/createFormaScene.ts` constructs a plain `THREE.WebGLRenderer` with
+  no WebGL1 fallback. Any evergreen desktop/mobile browser with WebGL2 works.
+- **Mobile**: verified working in M3 (touch orbit/zoom via OrbitControls,
+  responsive collapsed panel under 640px — see "Editor UX (M3)" above).
+- **Bundle size**: `app/`'s production build is a single ~812 KB JS chunk
+  (~219 KB gzipped), which triggers Vite/Rollup's default >500KB chunk-size
+  warning. This is a single-page tool with one route and no lazy-loadable
+  sub-pages — the whole app *is* "above the fold." Code-splitting (dynamic
+  `import()`, `manualChunks`) would add complexity (loading states, waterfall
+  requests) for a tool where the user already waits once on first load and
+  then interacts entirely client-side with no navigation. Treated as an
+  explicit non-goal, not deferred work.
+- **SVG extrusion cap**: uploaded SVGs over 100KB are rejected in favor of the
+  built-in default glyph (M2) — prevents pathological `ExtrudeGeometry` cost
+  from adversarial input.
+- **`svg-extrude` test coverage gap**: excluded from `tests/leak-check.test.ts`
+  and `tests/content-smoke.test.ts`'s automated shape lists because happy-dom's
+  `DOMParser` doesn't support `image/svg+xml` parsing (returns a null
+  `documentElement` — a happy-dom limitation, not a Forma bug). Covered instead
+  by real headless-browser Playwright checks (see M2 log entry in `BRIEF.md`).
+
+## Contributing
+
+See `CONTRIBUTING.md` — local setup, the `defineShape`/`defineMaterial`/
+`defineEnvironment`/`defineEffect` + registry pattern for adding content,
+testing philosophy (real headless-browser verification required for UI/render
+claims, not just typecheck), and PR expectations. MIT licensed (`LICENSE`).
+
 ## Known deviations from `.architect-blueprint.md`
 
 1. **PNG export mechanism (§5.4).** The blueprint's literal mechanism — enqueue a
@@ -75,7 +119,9 @@ cd app && npm install   # editor product app — its own package.json, React + f
    `registerAllContent()` call — not a side-effect import, since
    `package.json`'s `"sideEffects": false` would let a bundler drop a bare
    `import 'forma/content'` with no observable effect. `harness/main.ts` and any
-   generated embed snippet both call `registerAllContent()` explicitly.
+   generated embed snippet both call `registerAllContent()` explicitly. See
+   `CONTRIBUTING.md`'s "How code export works" section for the full
+   `generateEmbedCode()`/`embed.ts` walkthrough.
 
 ## Manual verification checklist (harness, `npm run dev`)
 
