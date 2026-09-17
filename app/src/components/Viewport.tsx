@@ -61,6 +61,29 @@ export function Viewport({ hostRef, scene }: ViewportProps) {
         >
           {autoSpin ? '⟳ Spin: On' : '⟳ Spin: Off'}
         </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            const controls = controlsRef.current;
+            if (!controls) return;
+            // OrbitControls.reset() snaps the camera position/target back, but does
+            // NOT clear residual rotation momentum accumulated from damping
+            // (`_sphericalDelta`/`_panOffset`) — that momentum still fully applies
+            // over the following frames regardless of damping factor, dragging the
+            // camera away from the reset position again. These fields are
+            // intentionally private (no public API for this) — zeroing them directly
+            // is the documented workaround for this known OrbitControls behavior.
+            const internals = controls as unknown as { _sphericalDelta?: { set(t: number, p: number, r: number): void }; _panOffset?: { set(x: number, y: number, z: number): void } };
+            internals._sphericalDelta?.set(0, 0, 0);
+            internals._panOffset?.set(0, 0, 0);
+            controls.reset();
+          }}
+          title="Reset camera to default orbit"
+          data-testid="reset-camera"
+        >
+          ⌂ Reset view
+        </button>
       </div>
     </>
   );

@@ -44,6 +44,18 @@ export function ControlPanel(props: ControlPanelProps) {
   const shapeDef = shapeRegistry.require(composition.shapeId);
   const materialDef = materialRegistry.require(composition.materialId);
 
+  // While searching, force-open any section with a match instead of mutating `open`
+  // (keeps the user's manual collapse/expand choices intact once search clears).
+  const q = search.trim().toLowerCase();
+  function matches(entries: { label: string; category: string }[]): boolean {
+    return entries.some((e) => e.label.toLowerCase().includes(q) || e.category.toLowerCase().includes(q));
+  }
+  const isOpen = (id: SectionId, entries?: { label: string; category: string }[]) =>
+    open[id] || (q.length > 0 && !!entries && matches(entries));
+
+  const effectEntries = effectRegistry.list().map((d) => ({ label: d.label, category: 'effect' }));
+  const visibleEffects = q ? effectRegistry.list().filter((d) => d.label.toLowerCase().includes(q)) : effectRegistry.list();
+
   return (
     <div className={`control-panel${collapsed ? ' collapsed' : ''}`} data-testid="control-panel">
       <input
@@ -59,7 +71,7 @@ export function ControlPanel(props: ControlPanelProps) {
         <PresetGallery presets={presets} onSelect={(p) => onApplyComposition(p.composition)} />
       </Section>
 
-      <Section id="shape" title="Shape" open={open.shape} onToggle={toggle}>
+      <Section id="shape" title="Shape" open={isOpen('shape', shapeRegistry.list())} onToggle={toggle}>
         <DefinitionPicker
           entries={shapeRegistry.list()}
           selectedId={composition.shapeId}
@@ -74,7 +86,7 @@ export function ControlPanel(props: ControlPanelProps) {
         </div>
       </Section>
 
-      <Section id="material" title="Material" open={open.material} onToggle={toggle}>
+      <Section id="material" title="Material" open={isOpen('material', materialRegistry.list())} onToggle={toggle}>
         <DefinitionPicker
           entries={materialRegistry.list()}
           selectedId={composition.materialId}
@@ -90,7 +102,7 @@ export function ControlPanel(props: ControlPanelProps) {
         </div>
       </Section>
 
-      <Section id="environment" title="Environment" open={open.environment} onToggle={toggle}>
+      <Section id="environment" title="Environment" open={isOpen('environment', environmentRegistry.list())} onToggle={toggle}>
         <DefinitionPicker
           entries={environmentRegistry.list()}
           selectedId={composition.environmentId}
@@ -99,8 +111,8 @@ export function ControlPanel(props: ControlPanelProps) {
         />
       </Section>
 
-      <Section id="effects" title="Effects" open={open.effects} onToggle={toggle}>
-        {effectRegistry.list().map((def) => {
+      <Section id="effects" title="Effects" open={isOpen('effects', effectEntries)} onToggle={toggle}>
+        {visibleEffects.map((def) => {
           const enabled = composition.effectIds.includes(def.id);
           return (
             <div key={def.id} style={{ marginBottom: 10 }}>

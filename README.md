@@ -26,6 +26,16 @@ cd app && npm install   # editor product app — its own package.json, React + f
 
 `app/` is a separate consumer of the published `forma` package (`"forma": "file:.."` in `app/package.json`) — `src/` itself stays framework-agnostic, no React dependency inside the library.
 
+### Editor UX (M3)
+
+- **Search** (`ControlPanel`'s search box) filters shape/material/environment/effect picker grids live; a section with a match auto-expands while searching, without disturbing the user's manual collapse/expand state.
+- **Keyboard shortcut**: `H` toggles the control panel. Inert while a text input/textarea/select/contenteditable has focus (search box, SVG-paste textarea) and requires no modifier keys (so it never collides with a browser/OS shortcut).
+- **Reset actions**: "↺ Reset" (topbar) restores the default sphere/matte/studio composition; "⌂ Reset view" (viewport toolbelt) restores the default camera orbit — including clearing residual OrbitControls damping momentum, which `OrbitControls.reset()` alone does not do (see code comment in `app/src/components/Viewport.tsx`).
+- **Mobile**: panel defaults collapsed under 640px width, goes full-width when opened; topbar wraps; OrbitControls' built-in touch handling drives orbit/zoom.
+- **`prefers-reduced-motion`**: auto-spin toggle is disabled outright when the OS preference is set (`app/src/hooks/useReducedMotion.ts`).
+- **Onboarding**: a small dismissible hint ("drag to orbit…") shows on first load only, tracked via `localStorage`.
+- Verification: `app/e2e/verify-m3.mjs` is a real headless-Playwright script (not a checked-in test framework — no e2e harness existed before this pass) covering all six items above. Run `npm run dev -- --port 5183 --strictPort` in `app/`, then `node e2e/verify-m3.mjs` in a second shell.
+
 ## Known deviations from `.architect-blueprint.md`
 
 1. **PNG export mechanism (§5.4).** The blueprint's literal mechanism — enqueue a

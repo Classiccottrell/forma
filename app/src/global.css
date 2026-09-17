@@ -293,4 +293,61 @@ body {
   z-index: 5;
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  max-width: calc(100vw - 32px);
+}
+
+.onboarding-hint {
+  position: absolute;
+  left: 16px;
+  bottom: 64px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 11px;
+  color: var(--text-dim);
+  backdrop-filter: blur(12px);
+  max-width: calc(100vw - 32px);
+}
+.onboarding-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.onboarding-dismiss:hover {
+  color: var(--text);
+}
+
+/* Mobile / narrow viewports — M3 item 4. Panel goes full-width and slides fully
+   off-screen when collapsed; topbar wraps instead of overflowing. */
+@media (max-width: 640px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .brand {
+    flex: 1 0 100%;
+    margin-right: 0;
+  }
+  .search-input {
+    width: 100%;
+  }
+  .control-panel {
+    width: 100%;
+    padding-top: 96px;
+  }
+  .onboarding-hint {
+    bottom: 60px;
+    font-size: 10px;
+  }
 }

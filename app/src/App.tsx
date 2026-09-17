@@ -1,18 +1,45 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Composition, ParamValue } from 'forma';
 import { shapeRegistry, materialRegistry, effectRegistry } from 'forma';
 const SVG_EXTRUDE_SHAPE_ID = 'svg-extrude';
-import { useFormaRuntime } from './hooks/useFormaRuntime';
+import { useFormaRuntime, defaultComposition } from './hooks/useFormaRuntime';
 import { Viewport } from './components/Viewport';
 import { ControlPanel } from './components/ControlPanel';
 import { SurpriseMeButton } from './components/SurpriseMeButton';
+import { OnboardingHint } from './components/OnboardingHint';
+
+/** True while a shortcut should NOT fire — focus is in a text input, textarea,
+ * select, or contenteditable element (search box, SVG-paste textarea, etc.). */
+function isTypingTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  return !!el?.closest?.('input, textarea, select, [contenteditable]');
+}
 
 /** Top-level layout: viewport + ControlPanel + top bar (roadmap §6). Holds
  * Composition state via useFormaRuntime, passes apply(patch) down. */
 export default function App() {
   const hostRef = useRef<HTMLDivElement>(null);
   const { scene, apply, current } = useFormaRuntime(hostRef);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 640);
+
+  // `H` toggles the control panel. No modifiers (Cmd/Ctrl+H would hide the browser
+  // window on macOS), and never fires while a text input/textarea/select has focus
+  // (search box, SVG-paste textarea) — roadmap M3 item 2.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key.toLowerCase() !== 'h' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isTypingTarget(e.target)) return;
+      setCollapsed((c) => !c);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  // Debug hook for real (non-DOM-proxy) camera-state verification — app layer only,
+  // not published in `forma`'s package.
+  useEffect(() => {
+    (window as unknown as { __formaDebug?: unknown }).__formaDebug = scene ? { camera: scene.camera } : undefined;
+  }, [scene]);
 
   function onSlotSelect(slot: 'shapeId' | 'materialId' | 'environmentId', id: string) {
     if (slot === 'shapeId') {
@@ -58,13 +85,29 @@ export default function App() {
   return (
     <div className="app-shell">
       <Viewport hostRef={hostRef} scene={scene} />
+      <OnboardingHint />
 
       <div className="topbar">
         <div className="brand">
           for<em>ma</em>
         </div>
         <SurpriseMeButton onApply={applyComposition} />
-        <button type="button" className="btn panel-collapse-btn" onClick={() => setCollapsed((c) => !c)} data-testid="panel-toggle">
+        <button
+          type="button"
+          className="btn"
+          onClick={() => applyComposition(defaultComposition())}
+          title="Reset composition to the default sphere/matte/studio setup"
+          data-testid="reset-composition"
+        >
+          ↺ Reset
+        </button>
+        <button
+          type="button"
+          className="btn panel-collapse-btn"
+          onClick={() => setCollapsed((c) => !c)}
+          title="Toggle panel (H)"
+          data-testid="panel-toggle"
+        >
           {collapsed ? '☰ Panel' : '✕ Panel'}
         </button>
       </div>
