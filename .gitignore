@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.architect-blueprint.md
+.expansion-roadmap.md
+*.log
+.DS_Store
+app/node_modules/
+app/dist/

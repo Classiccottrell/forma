@@ -1,0 +1,67 @@
+import { useEffect, useRef, useState } from 'react';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import type { FormaScene } from 'forma';
+import { useReducedMotion } from '../hooks/useReducedMotion';
+
+export interface ViewportProps {
+  hostRef: React.RefObject<HTMLDivElement>;
+  scene: FormaScene | null;
+}
+
+/** Mounts the canvas host div, wires OrbitControls (pointer+touch) + auto-spin once
+ * `scene` is ready. `prefers-reduced-motion` forces auto-spin off regardless of the
+ * toggle state (roadmap §6). */
+export function Viewport({ hostRef, scene }: ViewportProps) {
+  const reducedMotion = useReducedMotion();
+  const [autoSpin, setAutoSpin] = useState(false);
+  const controlsRef = useRef<OrbitControls | null>(null);
+
+  useEffect(() => {
+    if (!scene) return;
+    const controls = new OrbitControls(scene.camera, scene.renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controlsRef.current = controls;
+    return () => {
+      controls.dispose();
+      controlsRef.current = null;
+    };
+  }, [scene]);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    controls.autoRotate = autoSpin && !reducedMotion;
+    controls.autoRotateSpeed = 2.2;
+  }, [autoSpin, reducedMotion, scene]);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      controls.update();
+    };
+    tick();
+    return () => cancelAnimationFrame(raf);
+  }, [scene]);
+
+  return (
+    <>
+      <div ref={hostRef} className="viewport-host" data-testid="viewport-host" />
+      <div className="toolbelt">
+        <button
+          type="button"
+          className={`btn${autoSpin ? ' toggle-on' : ''}`}
+          onClick={() => setAutoSpin((v) => !v)}
+          disabled={reducedMotion}
+          title={reducedMotion ? 'Disabled — prefers-reduced-motion is on' : 'Toggle auto-spin'}
+          data-testid="auto-spin-toggle"
+        >
+          {autoSpin ? '⟳ Spin: On' : '⟳ Spin: Off'}
+        </button>
+      </div>
+    </>
+  );
+}
