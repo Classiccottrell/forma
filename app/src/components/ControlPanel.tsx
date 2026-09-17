@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { shapeRegistry, materialRegistry, environmentRegistry, effectRegistry, type Composition } from 'forma';
+import { builtInPresets } from 'forma/content';
 import { DefinitionPicker } from './DefinitionPicker';
 import { ParamGroup } from './ParamGroup';
 import { ExportPanel } from './ExportPanel';
 import { SvgImport } from './SvgImport';
+import { PresetGallery } from './PresetGallery';
 import type { FormaScene } from 'forma';
 
 export interface ControlPanelProps {
@@ -15,15 +17,17 @@ export interface ControlPanelProps {
   onEffectToggle(id: string, enabled: boolean): void;
   onEffectParamChange(id: string, key: string, value: Composition['shapeParams'][string]): void;
   onSvgImport(svgText: string): void;
+  onApplyComposition(composition: Composition): void;
 }
 
-type SectionId = 'shape' | 'material' | 'environment' | 'effects' | 'export';
+type SectionId = 'presets' | 'shape' | 'material' | 'environment' | 'effects' | 'export';
 
 /** Collapsible sections container: Shape / Material / Environment / Effects / Export.
  * Search box filters visible definitions by label/category (roadmap §6). */
 export function ControlPanel(props: ControlPanelProps) {
-  const { collapsed, composition, scene, onSlotSelect, onParamChange, onEffectToggle, onEffectParamChange, onSvgImport } = props;
+  const { collapsed, composition, scene, onSlotSelect, onParamChange, onEffectToggle, onEffectParamChange, onSvgImport, onApplyComposition } = props;
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
+    presets: false,
     shape: true,
     material: true,
     environment: false,
@@ -31,6 +35,7 @@ export function ControlPanel(props: ControlPanelProps) {
     export: false,
   });
   const [search, setSearch] = useState('');
+  const presets = useMemo(() => builtInPresets(), []);
 
   function toggle(id: SectionId) {
     setOpen((o) => ({ ...o, [id]: !o[id] }));
@@ -49,6 +54,10 @@ export function ControlPanel(props: ControlPanelProps) {
         style={{ width: '100%', marginBottom: 14 }}
         data-testid="search-input"
       />
+
+      <Section id="presets" title="Presets" open={open.presets} onToggle={toggle}>
+        <PresetGallery presets={presets} onSelect={(p) => onApplyComposition(p.composition)} />
+      </Section>
 
       <Section id="shape" title="Shape" open={open.shape} onToggle={toggle}>
         <DefinitionPicker

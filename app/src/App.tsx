@@ -5,6 +5,7 @@ const SVG_EXTRUDE_SHAPE_ID = 'svg-extrude';
 import { useFormaRuntime } from './hooks/useFormaRuntime';
 import { Viewport } from './components/Viewport';
 import { ControlPanel } from './components/ControlPanel';
+import { SurpriseMeButton } from './components/SurpriseMeButton';
 
 /** Top-level layout: viewport + ControlPanel + top bar (roadmap §6). Holds
  * Composition state via useFormaRuntime, passes apply(patch) down. */
@@ -41,6 +42,10 @@ export default function App() {
     });
   }
 
+  function applyComposition(composition: Composition) {
+    apply(composition);
+  }
+
   function onEffectParamChange(id: string, key: string, value: ParamValue) {
     apply({
       effectParams: {
@@ -58,6 +63,7 @@ export default function App() {
         <div className="brand">
           for<em>ma</em>
         </div>
+        <SurpriseMeButton onApply={applyComposition} />
         <button type="button" className="btn panel-collapse-btn" onClick={() => setCollapsed((c) => !c)} data-testid="panel-toggle">
           {collapsed ? '☰ Panel' : '✕ Panel'}
         </button>
@@ -72,6 +78,7 @@ export default function App() {
         onEffectToggle={onEffectToggle}
         onEffectParamChange={onEffectParamChange}
         onSvgImport={onSvgImport}
+        onApplyComposition={applyComposition}
       />
     </div>
   );

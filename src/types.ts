@@ -134,3 +134,18 @@ export interface EffectDefinition<S extends ParamSchemaMap = ParamSchemaMap> ext
   create(params: ParamsOf<S>, ctx: EffectCreateContext): EffectHandle;
   update?(handle: EffectHandle, params: ParamsOf<S>): void;
 }
+
+// --- Preset (M2 addition — roadmap §5) --------------------------------------
+
+/** A named, versioned, serialized `Composition`. No new serialization mechanism —
+ * wraps `Composition` one layer up via `serializeComposition`/`deserializeComposition`
+ * (`runtime/serialize.ts`). `version` lets the app show a clear "preset needs
+ * migration" message instead of a raw error if a future `Composition` shape change
+ * makes an old preset's keys no longer match a registry's `parameterSchema`. */
+export interface Preset {
+  version: number;
+  id: string;
+  name: string;
+  composition: Composition;
+  tags?: string[];
+}
