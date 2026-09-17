@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 import { defineShape, shapeRegistry } from '../registry/instances.js';
 
 // Four shape definitions (blueprint §5.1). All params are rebuild:true — geometry
@@ -253,8 +254,259 @@ const star = defineShape({
   },
 });
 
+const cone = defineShape({
+  id: 'cone',
+  label: 'Cone',
+  category: 'primitive',
+  parameterSchema: {
+    radius: { kind: 'number', min: 0.2, max: 1.5, step: 0.05, default: 0.8, rebuild: true },
+    height: { kind: 'number', min: 0.3, max: 3, step: 0.05, default: 1.4, rebuild: true },
+    radialSegments: { kind: 'number', min: 3, max: 32, step: 1, default: 24, rebuild: true },
+  },
+  defaultParameters: { radius: 0.8, height: 1.4, radialSegments: 24 },
+  create(params, ctx) {
+    const geometry = new THREE.ConeGeometry(params.radius, params.height, params.radialSegments);
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+const cylinder = defineShape({
+  id: 'cylinder',
+  label: 'Cylinder',
+  category: 'primitive',
+  parameterSchema: {
+    radius: { kind: 'number', min: 0.2, max: 1.5, step: 0.05, default: 0.7, rebuild: true },
+    height: { kind: 'number', min: 0.3, max: 3, step: 0.05, default: 1.4, rebuild: true },
+    radialSegments: { kind: 'number', min: 3, max: 32, step: 1, default: 24, rebuild: true },
+  },
+  defaultParameters: { radius: 0.7, height: 1.4, radialSegments: 24 },
+  create(params, ctx) {
+    const geometry = new THREE.CylinderGeometry(params.radius, params.radius, params.height, params.radialSegments);
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+const octahedron = defineShape({
+  id: 'octahedron',
+  label: 'Octahedron',
+  category: 'primitive',
+  parameterSchema: {
+    radius: { kind: 'number', min: 0.3, max: 2, step: 0.05, default: 1, rebuild: true },
+    detail: { kind: 'number', min: 0, max: 3, step: 1, default: 0, rebuild: true },
+  },
+  defaultParameters: { radius: 1, detail: 0 },
+  create(params, ctx) {
+    const geometry = new THREE.OctahedronGeometry(params.radius, params.detail);
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+const dodecahedron = defineShape({
+  id: 'dodecahedron',
+  label: 'Dodecahedron',
+  category: 'primitive',
+  parameterSchema: {
+    radius: { kind: 'number', min: 0.3, max: 2, step: 0.05, default: 1, rebuild: true },
+    detail: { kind: 'number', min: 0, max: 2, step: 1, default: 0, rebuild: true },
+  },
+  defaultParameters: { radius: 1, detail: 0 },
+  create(params, ctx) {
+    const geometry = new THREE.DodecahedronGeometry(params.radius, params.detail);
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+const tetrahedron = defineShape({
+  id: 'tetrahedron',
+  label: 'Tetrahedron',
+  category: 'primitive',
+  parameterSchema: {
+    radius: { kind: 'number', min: 0.3, max: 2, step: 0.05, default: 1.1, rebuild: true },
+    detail: { kind: 'number', min: 0, max: 2, step: 1, default: 0, rebuild: true },
+  },
+  defaultParameters: { radius: 1.1, detail: 0 },
+  create(params, ctx) {
+    const geometry = new THREE.TetrahedronGeometry(params.radius, params.detail);
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+function makeRingShape(outerRadius: number, innerRadius: number): THREE.Shape {
+  const shape = new THREE.Shape();
+  shape.absarc(0, 0, outerRadius, 0, Math.PI * 2, false);
+  const hole = new THREE.Path();
+  hole.absarc(0, 0, innerRadius, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  return shape;
+}
+
+const ring = defineShape({
+  id: 'ring',
+  label: 'Ring',
+  category: 'extruded',
+  parameterSchema: {
+    outerRadius: { kind: 'number', min: 0.4, max: 1.5, step: 0.05, default: 1, rebuild: true },
+    innerRadius: { kind: 'number', min: 0.1, max: 1.2, step: 0.05, default: 0.6, rebuild: true },
+    depth: { kind: 'number', min: 0.05, max: 0.8, step: 0.05, default: 0.25, rebuild: true },
+    bevelEnabled: { kind: 'boolean', default: true, rebuild: true },
+  },
+  defaultParameters: { outerRadius: 1, innerRadius: 0.6, depth: 0.25, bevelEnabled: true },
+  create(params, ctx) {
+    const shape = makeRingShape(params.outerRadius, params.innerRadius);
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: params.depth,
+      bevelEnabled: params.bevelEnabled,
+      bevelSize: 0.03,
+      bevelThickness: 0.03,
+      steps: 1,
+      curveSegments: 32,
+    });
+    geometry.center();
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+function makeCrossShape(armWidth: number, armLength: number): THREE.Shape {
+  const w = armWidth / 2;
+  const l = armLength / 2;
+  const shape = new THREE.Shape();
+  shape.moveTo(-w, -l);
+  shape.lineTo(w, -l);
+  shape.lineTo(w, -w);
+  shape.lineTo(l, -w);
+  shape.lineTo(l, w);
+  shape.lineTo(w, w);
+  shape.lineTo(w, l);
+  shape.lineTo(-w, l);
+  shape.lineTo(-w, w);
+  shape.lineTo(-l, w);
+  shape.lineTo(-l, -w);
+  shape.lineTo(-w, -w);
+  shape.closePath();
+  return shape;
+}
+
+const cross = defineShape({
+  id: 'cross',
+  label: 'Cross',
+  category: 'extruded',
+  parameterSchema: {
+    armWidth: { kind: 'number', min: 0.2, max: 1, step: 0.05, default: 0.5, rebuild: true },
+    armLength: { kind: 'number', min: 0.6, max: 2.5, step: 0.05, default: 1.6, rebuild: true },
+    depth: { kind: 'number', min: 0.05, max: 1, step: 0.05, default: 0.3, rebuild: true },
+    bevelEnabled: { kind: 'boolean', default: true, rebuild: true },
+  },
+  defaultParameters: { armWidth: 0.5, armLength: 1.6, depth: 0.3, bevelEnabled: true },
+  create(params, ctx) {
+    const shape = makeCrossShape(params.armWidth, params.armLength);
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: params.depth,
+      bevelEnabled: params.bevelEnabled,
+      bevelSize: 0.03,
+      bevelThickness: 0.03,
+      steps: 1,
+    });
+    geometry.center();
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+// Small built-in glyph (a rounded square with a notch) — the svg-extrude default. Kept
+// tiny and always-valid so a freshly-selected shape (before any file is imported) and
+// the leak-check's defaultParameters pass never hit an empty/garbage SVG path.
+const DEFAULT_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+  '<path d="M20 20 L80 20 L80 60 L60 60 L60 80 L20 80 Z" /></svg>';
+
+const svgExtrude = defineShape({
+  id: 'svg-extrude',
+  label: 'SVG Import',
+  category: 'svg',
+  parameterSchema: {
+    svg: { kind: 'string', default: DEFAULT_SVG, rebuild: true, multiline: true },
+    size: { kind: 'number', min: 0.5, max: 3, step: 0.1, default: 1.5, rebuild: true },
+    depth: { kind: 'number', min: 0.02, max: 1, step: 0.02, default: 0.25, rebuild: true },
+    bevelEnabled: { kind: 'boolean', default: true, rebuild: true },
+    bevelSize: { kind: 'number', min: 0, max: 0.15, step: 0.005, default: 0.02, rebuild: true },
+    curveSegments: { kind: 'number', min: 4, max: 32, step: 1, default: 12, rebuild: true },
+  },
+  defaultParameters: { svg: DEFAULT_SVG, size: 1.5, depth: 0.25, bevelEnabled: true, bevelSize: 0.02, curveSegments: 12 },
+  create(params, ctx) {
+    let geometry: THREE.BufferGeometry;
+    try {
+      const loader = new SVGLoader();
+      const parsed = loader.parse(params.svg);
+      const shapes: THREE.Shape[] = [];
+      for (const path of parsed.paths) {
+        shapes.push(...path.toShapes());
+      }
+      if (shapes.length === 0) throw new Error('no paths parsed from SVG');
+      geometry = new THREE.ExtrudeGeometry(shapes, {
+        depth: params.depth,
+        bevelEnabled: params.bevelEnabled,
+        bevelSize: params.bevelSize,
+        bevelThickness: params.bevelSize,
+        curveSegments: params.curveSegments,
+        steps: 1,
+      });
+      // Normalize: SVG's Y axis points down and imported artwork can be arbitrarily
+      // large/small relative to the scene's ~1-unit-radius shapes — scale to `size`
+      // and flip Y, then recompute normals (the negative-axis scale inverts winding).
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox!;
+      const extent = Math.max(box.max.x - box.min.x, box.max.y - box.min.y, 1e-6);
+      const scale = params.size / extent;
+      geometry.scale(scale, -scale, scale);
+      geometry.center();
+      geometry.computeVertexNormals();
+    } catch {
+      // Never white-screen on bad user input — fall back to the built-in glyph.
+      const loader = new SVGLoader();
+      const parsed = loader.parse(DEFAULT_SVG);
+      const shapes: THREE.Shape[] = [];
+      for (const path of parsed.paths) shapes.push(...path.toShapes());
+      geometry = new THREE.ExtrudeGeometry(shapes, { depth: 0.25, bevelEnabled: true, bevelSize: 0.02, bevelThickness: 0.02, steps: 1 });
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox!;
+      const extent = Math.max(box.max.x - box.min.x, box.max.y - box.min.y, 1e-6);
+      const scale = params.size / extent;
+      geometry.scale(scale, -scale, scale);
+      geometry.center();
+      geometry.computeVertexNormals();
+    }
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
 export function registerShapes(): void {
-  for (const def of [sphere, box, torus, icosahedron, softBlob, capsule, gem, knot, spiral, star]) {
+  for (const def of [
+    sphere,
+    box,
+    torus,
+    icosahedron,
+    softBlob,
+    capsule,
+    gem,
+    knot,
+    spiral,
+    star,
+    cone,
+    cylinder,
+    octahedron,
+    dodecahedron,
+    tetrahedron,
+    ring,
+    cross,
+    svgExtrude,
+  ]) {
     if (!shapeRegistry.get(def.id)) shapeRegistry.register(def);
   }
 }

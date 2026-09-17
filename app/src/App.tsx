@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { Composition, ParamValue } from 'forma';
 import { shapeRegistry, materialRegistry, effectRegistry } from 'forma';
+const SVG_EXTRUDE_SHAPE_ID = 'svg-extrude';
 import { useFormaRuntime } from './hooks/useFormaRuntime';
 import { Viewport } from './components/Viewport';
 import { ControlPanel } from './components/ControlPanel';
@@ -33,6 +34,13 @@ export default function App() {
     apply({ effectIds, effectParams });
   }
 
+  function onSvgImport(svgText: string) {
+    apply({
+      shapeId: SVG_EXTRUDE_SHAPE_ID,
+      shapeParams: { ...shapeRegistry.require(SVG_EXTRUDE_SHAPE_ID).defaultParameters, svg: svgText },
+    });
+  }
+
   function onEffectParamChange(id: string, key: string, value: ParamValue) {
     apply({
       effectParams: {
@@ -63,6 +71,7 @@ export default function App() {
         onParamChange={onParamChange}
         onEffectToggle={onEffectToggle}
         onEffectParamChange={onEffectParamChange}
+        onSvgImport={onSvgImport}
       />
     </div>
   );

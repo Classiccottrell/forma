@@ -88,8 +88,134 @@ const duotone = defineEffect({
   },
 });
 
+const grayscale = defineEffect({
+  id: 'grayscale',
+  label: 'Grayscale',
+  category: 'post',
+  parameterSchema: {
+    intensity: { kind: 'number', min: 0, max: 1, step: 0.05, default: 1, rebuild: false },
+  },
+  defaultParameters: { intensity: 1 },
+  create(params, ctx) {
+    const pass = new ShaderPass({
+      uniforms: { tDiffuse: { value: null }, intensity: { value: params.intensity } },
+      vertexShader: duotoneShader.vertexShader,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float intensity;
+        varying vec2 vUv;
+        void main() {
+          vec4 texel = texture2D(tDiffuse, vUv);
+          float luma = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
+          vec3 gray = mix(texel.rgb, vec3(luma), intensity);
+          gl_FragColor = vec4(gray, texel.a);
+        }
+      `,
+    });
+    ctx.composer?.addPass(pass);
+    let disposed = false;
+    const handle: EffectHandle = {
+      pass,
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        ctx.composer?.removePass(pass);
+        pass.dispose();
+      },
+    };
+    return handle;
+  },
+  update(handle, params) {
+    const pass = handle.pass as InstanceType<typeof ShaderPass> | undefined;
+    if (!pass) return;
+    pass.uniforms.intensity!.value = params.intensity;
+  },
+});
+
+const vignette = defineEffect({
+  id: 'vignette',
+  label: 'Vignette',
+  category: 'post',
+  parameterSchema: {
+    darkness: { kind: 'number', min: 0, max: 1.5, step: 0.05, default: 0.8, rebuild: false },
+    radius: { kind: 'number', min: 0.2, max: 1.2, step: 0.05, default: 0.7, rebuild: false },
+  },
+  defaultParameters: { darkness: 0.8, radius: 0.7 },
+  create(params, ctx) {
+    const pass = new ShaderPass({
+      uniforms: { tDiffuse: { value: null }, darkness: { value: params.darkness }, radius: { value: params.radius } },
+      vertexShader: duotoneShader.vertexShader,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float darkness;
+        uniform float radius;
+        varying vec2 vUv;
+        void main() {
+          vec4 texel = texture2D(tDiffuse, vUv);
+          float d = distance(vUv, vec2(0.5));
+          float vig = smoothstep(radius, radius - 0.4, d);
+          vec3 shaded = mix(texel.rgb * (1.0 - darkness), texel.rgb, vig);
+          gl_FragColor = vec4(shaded, texel.a);
+        }
+      `,
+    });
+    ctx.composer?.addPass(pass);
+    let disposed = false;
+    const handle: EffectHandle = {
+      pass,
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        ctx.composer?.removePass(pass);
+        pass.dispose();
+      },
+    };
+    return handle;
+  },
+  update(handle, params) {
+    const pass = handle.pass as InstanceType<typeof ShaderPass> | undefined;
+    if (!pass) return;
+    pass.uniforms.darkness!.value = params.darkness;
+    pass.uniforms.radius!.value = params.radius;
+  },
+});
+
+const invert = defineEffect({
+  id: 'invert',
+  label: 'Invert',
+  category: 'post',
+  parameterSchema: {},
+  defaultParameters: {},
+  create(_params, ctx) {
+    const pass = new ShaderPass({
+      uniforms: { tDiffuse: { value: null } },
+      vertexShader: duotoneShader.vertexShader,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        varying vec2 vUv;
+        void main() {
+          vec4 texel = texture2D(tDiffuse, vUv);
+          gl_FragColor = vec4(1.0 - texel.rgb, texel.a);
+        }
+      `,
+    });
+    ctx.composer?.addPass(pass);
+    let disposed = false;
+    const handle: EffectHandle = {
+      pass,
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        ctx.composer?.removePass(pass);
+        pass.dispose();
+      },
+    };
+    return handle;
+  },
+});
+
 export function registerEffects(): void {
-  for (const def of [none, duotone]) {
+  for (const def of [none, duotone, grayscale, vignette, invert]) {
     if (!effectRegistry.get(def.id)) effectRegistry.register(def);
   }
 }

@@ -246,8 +246,183 @@ const carbon = defineMaterial({
   },
 });
 
+const velvet = defineMaterial({
+  id: 'velvet',
+  label: 'Velvet',
+  category: 'stylized',
+  parameterSchema: {
+    color: { kind: 'color', default: '#8a1c3a', rebuild: false },
+    roughness: { kind: 'number', min: 0.5, max: 1, step: 0.05, default: 0.95, rebuild: false },
+  },
+  defaultParameters: { color: '#8a1c3a', roughness: 0.95 },
+  create(params, ctx) {
+    const material = new THREE.MeshPhysicalMaterial({ color: params.color, roughness: params.roughness, metalness: 0, sheen: 1 });
+    ctx.registry.track(material);
+    return material;
+  },
+  update(material, params) {
+    const m = material as THREE.MeshStandardMaterial;
+    m.color.set(params.color);
+    m.roughness = params.roughness;
+    m.needsUpdate = true;
+  },
+});
+
+const gold = defineMaterial({
+  id: 'gold',
+  label: 'Gold',
+  category: 'pbr',
+  parameterSchema: {
+    color: { kind: 'color', default: '#d4af37', rebuild: false },
+    roughness: { kind: 'number', min: 0, max: 0.5, step: 0.02, default: 0.2, rebuild: false },
+  },
+  defaultParameters: { color: '#d4af37', roughness: 0.2 },
+  create(params, ctx) {
+    const material = new THREE.MeshStandardMaterial({ color: params.color, metalness: 1, roughness: params.roughness });
+    ctx.registry.track(material);
+    return material;
+  },
+  update(material, params) {
+    const m = material as THREE.MeshStandardMaterial;
+    m.color.set(params.color);
+    m.roughness = params.roughness;
+    m.needsUpdate = true;
+  },
+});
+
+const copper = defineMaterial({
+  id: 'copper',
+  label: 'Copper',
+  category: 'pbr',
+  parameterSchema: {
+    color: { kind: 'color', default: '#b5643a', rebuild: false },
+    roughness: { kind: 'number', min: 0, max: 0.6, step: 0.02, default: 0.3, rebuild: false },
+  },
+  defaultParameters: { color: '#b5643a', roughness: 0.3 },
+  create(params, ctx) {
+    const material = new THREE.MeshStandardMaterial({ color: params.color, metalness: 0.85, roughness: params.roughness });
+    ctx.registry.track(material);
+    return material;
+  },
+  update(material, params) {
+    const m = material as THREE.MeshStandardMaterial;
+    m.color.set(params.color);
+    m.roughness = params.roughness;
+    m.needsUpdate = true;
+  },
+});
+
+const clay = defineMaterial({
+  id: 'clay',
+  label: 'Clay',
+  category: 'pbr',
+  parameterSchema: {
+    color: { kind: 'color', default: '#c98a5e', rebuild: false },
+    roughness: { kind: 'number', min: 0.4, max: 1, step: 0.05, default: 0.85, rebuild: false },
+  },
+  defaultParameters: { color: '#c98a5e', roughness: 0.85 },
+  create(params, ctx) {
+    const material = new THREE.MeshStandardMaterial({ color: params.color, roughness: params.roughness, metalness: 0 });
+    ctx.registry.track(material);
+    return material;
+  },
+  update(material, params) {
+    const m = material as THREE.MeshStandardMaterial;
+    m.color.set(params.color);
+    m.roughness = params.roughness;
+    m.needsUpdate = true;
+  },
+});
+
+const neonPlastic = defineMaterial({
+  id: 'neon-plastic',
+  label: 'Neon Plastic',
+  category: 'stylized',
+  parameterSchema: {
+    color: { kind: 'color', default: '#39ff88', rebuild: false },
+    emissiveIntensity: { kind: 'number', min: 0, max: 3, step: 0.1, default: 1.2, rebuild: false },
+  },
+  defaultParameters: { color: '#39ff88', emissiveIntensity: 1.2 },
+  create(params, ctx) {
+    const material = new THREE.MeshStandardMaterial({
+      color: params.color,
+      emissive: new THREE.Color(params.color),
+      emissiveIntensity: params.emissiveIntensity,
+      roughness: 0.3,
+      metalness: 0,
+    });
+    ctx.registry.track(material);
+    return material;
+  },
+  update(material, params) {
+    const m = material as THREE.MeshStandardMaterial;
+    m.color.set(params.color);
+    m.emissive.set(params.color);
+    m.emissiveIntensity = params.emissiveIntensity;
+    m.needsUpdate = true;
+  },
+});
+
+const wireframe = defineMaterial({
+  id: 'wireframe',
+  label: 'Wireframe',
+  category: 'stylized',
+  parameterSchema: {
+    color: { kind: 'color', default: '#7f78ff', rebuild: false },
+  },
+  defaultParameters: { color: '#7f78ff' },
+  create(params, ctx) {
+    const material = new THREE.MeshBasicMaterial({ color: params.color, wireframe: true });
+    ctx.registry.track(material);
+    return material;
+  },
+  update(material, params) {
+    const m = material as THREE.MeshBasicMaterial;
+    m.color.set(params.color);
+    m.needsUpdate = true;
+  },
+});
+
+const obsidian = defineMaterial({
+  id: 'obsidian',
+  label: 'Obsidian',
+  category: 'pbr',
+  parameterSchema: {
+    color: { kind: 'color', default: '#0c0c12', rebuild: false },
+    roughness: { kind: 'number', min: 0, max: 0.4, step: 0.02, default: 0.1, rebuild: false },
+  },
+  defaultParameters: { color: '#0c0c12', roughness: 0.1 },
+  create(params, ctx) {
+    const material = new THREE.MeshStandardMaterial({ color: params.color, roughness: params.roughness, metalness: 0.4 });
+    ctx.registry.track(material);
+    return material;
+  },
+  update(material, params) {
+    const m = material as THREE.MeshStandardMaterial;
+    m.color.set(params.color);
+    m.roughness = params.roughness;
+    m.needsUpdate = true;
+  },
+});
+
 export function registerMaterials(): void {
-  for (const def of [matte, metal, glass, toon, chrome, frostedGlass, ice, carbon]) {
+  for (const def of [
+    matte,
+    metal,
+    glass,
+    toon,
+    chrome,
+    frostedGlass,
+    ice,
+    carbon,
+    velvet,
+    gold,
+    copper,
+    clay,
+    neonPlastic,
+    wireframe,
+    obsidian,
+  ]) {
     if (!materialRegistry.get(def.id)) materialRegistry.register(def);
   }
 }

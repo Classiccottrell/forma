@@ -14,7 +14,7 @@ export interface ParamControlProps {
  * union, NOT `ParamsOf<S>` — the latter narrows to literal types per-definition
  * (e.g. `'3' | '5'`), which is unusable for a component meant to be generic across
  * every definition (advisor guidance). */
-export function ParamControl({ id, label, schema, value, onChange }: ParamControlProps) {
+export function ParamControl({ id, label, schema, value, onChange }: ParamControlProps): JSX.Element {
   switch (schema.kind) {
     case 'number':
       return (
@@ -68,5 +68,25 @@ export function ParamControl({ id, label, schema, value, onChange }: ParamContro
           <input id={id} type="color" value={String(value)} onChange={(e) => onChange(e.target.value)} />
         </div>
       );
+    case 'string':
+      return (
+        <div className="param-row">
+          <div className="param-label">
+            <span>{label}</span>
+          </div>
+          <textarea
+            id={id}
+            className="param-textarea"
+            rows={schema.multiline === false ? 1 : 4}
+            defaultValue={String(value)}
+            onBlur={(e) => onChange(e.target.value)}
+            data-testid={`param-string-${id}`}
+          />
+        </div>
+      );
+    default: {
+      const _exhaustive: never = schema;
+      return _exhaustive;
+    }
   }
 }

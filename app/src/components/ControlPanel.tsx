@@ -3,6 +3,7 @@ import { shapeRegistry, materialRegistry, environmentRegistry, effectRegistry, t
 import { DefinitionPicker } from './DefinitionPicker';
 import { ParamGroup } from './ParamGroup';
 import { ExportPanel } from './ExportPanel';
+import { SvgImport } from './SvgImport';
 import type { FormaScene } from 'forma';
 
 export interface ControlPanelProps {
@@ -13,6 +14,7 @@ export interface ControlPanelProps {
   onParamChange(slot: 'shapeParams' | 'materialParams', key: string, value: Composition['shapeParams'][string]): void;
   onEffectToggle(id: string, enabled: boolean): void;
   onEffectParamChange(id: string, key: string, value: Composition['shapeParams'][string]): void;
+  onSvgImport(svgText: string): void;
 }
 
 type SectionId = 'shape' | 'material' | 'environment' | 'effects' | 'export';
@@ -20,7 +22,7 @@ type SectionId = 'shape' | 'material' | 'environment' | 'effects' | 'export';
 /** Collapsible sections container: Shape / Material / Environment / Effects / Export.
  * Search box filters visible definitions by label/category (roadmap §6). */
 export function ControlPanel(props: ControlPanelProps) {
-  const { collapsed, composition, scene, onSlotSelect, onParamChange, onEffectToggle, onEffectParamChange } = props;
+  const { collapsed, composition, scene, onSlotSelect, onParamChange, onEffectToggle, onEffectParamChange, onSvgImport } = props;
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     shape: true,
     material: true,
@@ -57,6 +59,9 @@ export function ControlPanel(props: ControlPanelProps) {
         />
         <div style={{ marginTop: 10 }}>
           <ParamGroup schema={shapeDef.parameterSchema} values={composition.shapeParams} onChange={(k, v) => onParamChange('shapeParams', k, v)} />
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <SvgImport onImport={onSvgImport} />
         </div>
       </Section>
 

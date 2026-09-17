@@ -48,7 +48,14 @@ export interface ColorParamSchema {
   rebuild: boolean;
 }
 
-export type ParamSchema = NumberParamSchema | EnumParamSchema | BooleanParamSchema | ColorParamSchema;
+export interface StringParamSchema {
+  kind: 'string'; // free-text, e.g. raw SVG markup (M2 addition — roadmap §4)
+  default: string;
+  rebuild: boolean;
+  multiline?: boolean;
+}
+
+export type ParamSchema = NumberParamSchema | EnumParamSchema | BooleanParamSchema | ColorParamSchema | StringParamSchema;
 
 export type ParamSchemaMap = Record<string, ParamSchema>;
 

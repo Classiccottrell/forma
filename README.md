@@ -14,7 +14,7 @@ cd app && npm install   # editor product app — its own package.json, React + f
 
 - `npm run dev` — serves `harness/` (live switching UI, JSON round-trip, PNG export, embed-code, leak-check button + HUD) at the printed localhost URL.
 - `npm run build` — `tsc --emitDeclarationOnly && vite build`, library output to `dist/`. Run this before `app/`'s typecheck/build — the app resolves `forma`/`forma/content` through `dist/` in production (dev mode aliases straight to `src/` for iteration speed, see `app/vite.config.ts`).
-- `npm test` — vitest (happy-dom, logic-only, no WebGL). Includes a real ≥50-cycle leak-check run (`tests/leak-check.test.ts`) against the full content set (10 shapes × 8 materials × 3 environments = 240 combinations, M1 scale), asserting the merged `FormaRuntime.report()` total returns to its post-warm-up baseline every cycle.
+- `npm test` — vitest (happy-dom, logic-only, no WebGL). Includes a ≥40-cycle leak-check run (`tests/leak-check.test.ts`) against a stratified 360-combo sample of the content set (18 shapes × 15 materials × 6 environments, M2 scale — a full cartesian product is 1620 combos, too slow to cycle repeatedly), asserting the merged `FormaRuntime.report()` total returns to its post-warm-up baseline every cycle. `svg-extrude` is excluded from the leak-check/smoke-test shape lists (happy-dom's `DOMParser` doesn't support `image/svg+xml`); it's covered instead by headless-browser Playwright checks. `tests/content-smoke.test.ts` separately guards that every shape/material creates cleanly from its own defaults.
 - `npm run typecheck` — `src/` only.
 - `npm run typecheck:harness` — `harness/` (excluded from the published package, mirrors `cc-webgl/example/`).
 

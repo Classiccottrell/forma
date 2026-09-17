@@ -230,6 +230,27 @@ body {
 .param-row input[type='checkbox'] {
   accent-color: var(--accent);
 }
+.param-textarea {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  resize: vertical;
+}
+.svg-import {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 4px 8px 10px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.svg-import.drag-over {
+  border-color: var(--accent);
+  background: rgba(255, 157, 92, 0.06);
+}
 .param-row input[type='color'] {
   width: 100%;
   height: 28px;
