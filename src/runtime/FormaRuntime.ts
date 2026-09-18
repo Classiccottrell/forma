@@ -22,6 +22,8 @@ export interface FormaRuntimeOptions {
    * Caller-supplied so it can be the same instance as a cc-webgl SceneContext's
    * ctx.resources; a fresh one is created if omitted (e.g. headless tests). */
   resources?: ResourceRegistry;
+  /** Optional owner cleanup for the scene/bootstrap paired with this runtime. */
+  disposeExternal?: () => void;
 }
 
 /** Orchestrates the four slots (shape/material/environment/effects) + the single
@@ -34,6 +36,7 @@ export class FormaRuntime {
   readonly composer?: EffectComposer;
   readonly resources: ResourceRegistry;
   readonly mesh: THREE.Mesh;
+  private readonly disposeExternal?: () => void;
 
   private shapeSlot: Slot<THREE.BufferGeometry> = { registry: new ResourceRegistry(), handle: null };
   private materialSlot: Slot<THREE.Material> = { registry: new ResourceRegistry(), handle: null };
@@ -48,6 +51,7 @@ export class FormaRuntime {
     this.renderer = opts.renderer;
     this.composer = opts.composer;
     this.resources = opts.resources ?? new ResourceRegistry();
+    this.disposeExternal = opts.disposeExternal;
     this.mesh = new THREE.Mesh();
     // THREE.Mesh's no-arg ctor defaults to a fresh BufferGeometry + MeshBasicMaterial.
     // applyComposition() reassigns both on first call, orphaning the defaults —
@@ -125,6 +129,7 @@ export class FormaRuntime {
     this.environmentSlot.registry.disposeAll();
     this.effectsSlot.registry.disposeAll();
     this.resources.disposeAll();
+    this.disposeExternal?.();
   }
 
   // --- shape ---------------------------------------------------------------
@@ -136,6 +141,17 @@ export class FormaRuntime {
     const geometry = def.create(next.shapeParams as any, { registry: this.shapeSlot.registry });
     this.shapeSlot.handle = geometry;
     this.mesh.geometry = geometry;
+    this.frameShape();
+  }
+
+  /** Keeps very different geometries legible in one viewport without per-shape UI tuning. */
+  private frameShape(): void {
+    this.mesh.geometry.computeBoundingSphere();
+    const sphere = this.mesh.geometry.boundingSphere;
+    if (!sphere || sphere.radius <= 0) return;
+    const scale = 1.2 / sphere.radius;
+    this.mesh.position.copy(sphere.center).multiplyScalar(-scale);
+    this.mesh.scale.setScalar(scale);
   }
 
   private updateShapeSlotIfHotParamsChanged(prev: Composition, next: Composition): void {

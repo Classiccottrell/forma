@@ -3,6 +3,9 @@
 Typed shape/material/environment/effect composition engine built on `cc-webgl`.
 Architecture: see `.architect-blueprint.md`.
 
+The product app uses `cc-webgl`'s `FrameScheduler` for its single render loop;
+the scheduler pauses hidden tabs and clamps post-background delta time.
+
 ## Setup
 
 ```bash
@@ -13,8 +16,8 @@ cd app && npm install   # editor product app — its own package.json, React + f
 ## Scripts (library — `Projects/Forma/`)
 
 - `npm run dev` — serves `harness/` (live switching UI, JSON round-trip, PNG export, embed-code, leak-check button + HUD) at the printed localhost URL.
-- `npm run build` — `tsc --emitDeclarationOnly && vite build`, library output to `dist/`. Run this before `app/`'s typecheck/build — the app resolves `forma`/`forma/content` through `dist/` in production (dev mode aliases straight to `src/` for iteration speed, see `app/vite.config.ts`).
-- `npm test` — vitest (happy-dom, logic-only, no WebGL). Includes a ≥40-cycle leak-check run (`tests/leak-check.test.ts`) against a stratified 360-combo sample of the content set (18 shapes × 15 materials × 6 environments, M2 scale — a full cartesian product is 1620 combos, too slow to cycle repeatedly), asserting the merged `FormaRuntime.report()` total returns to its post-warm-up baseline every cycle. `svg-extrude` is excluded from the leak-check/smoke-test shape lists (happy-dom's `DOMParser` doesn't support `image/svg+xml`); it's covered instead by headless-browser Playwright checks. `tests/content-smoke.test.ts` separately guards that every shape/material creates cleanly from its own defaults.
+- `npm run build` — emits the library plus bundled `dist/forma.browser.js` IIFE. Run this before `app/`'s typecheck/build — the app resolves `forma`/`forma/content` through `dist/` in production (dev mode aliases straight to `src/` for iteration speed, see `app/vite.config.ts`).
+- `npm test` — vitest (happy-dom, logic-only, no WebGL). Includes a ≥50-cycle leak-check run (`tests/leak-check.test.ts`) against a stratified 360-combo sample of the content set (18 shapes × 15 materials × 6 environments, M2 scale — a full cartesian product is 1620 combos, too slow to cycle repeatedly), asserting the merged `FormaRuntime.report()` total returns to its post-warm-up baseline every cycle. `svg-extrude` is excluded from the leak-check/smoke-test shape lists (happy-dom's `DOMParser` doesn't support `image/svg+xml`); it's covered instead by headless-browser Playwright checks. `tests/content-smoke.test.ts` separately guards that every shape/material creates cleanly from its own defaults.
 - `npm run typecheck` — `src/` only.
 - `npm run typecheck:harness` — `harness/` (excluded from the published package, mirrors `cc-webgl/example/`).
 
@@ -25,6 +28,9 @@ cd app && npm install   # editor product app — its own package.json, React + f
 - `npm run typecheck` — `app/` only.
 
 `app/` is a separate consumer of the published `forma` package (`"forma": "file:.."` in `app/package.json`) — `src/` itself stays framework-agnostic, no React dependency inside the library.
+
+Copy `dist/forma.browser.js` beside generated embed HTML, or pass a hosted URL
+with `generateEmbedCode(composition, { libraryUrl })`.
 
 ### Editor UX (M3)
 
@@ -110,10 +116,9 @@ claims, not just typecheck), and PR expectations. MIT licensed (`LICENSE`).
    `harness/main.ts` (browser HUD) and `tests/leak-check.test.ts` (real ≥50-cycle
    numeric proof, no mocking) — the same code path, not a reimplementation for tests.
 6. **`mountForma()`** (`src/index.ts`) — a convenience one-shot mount used by
-   `generateEmbedCode()`'s output — was added so the generated embed snippet is
-   directly runnable; not named in the blueprint's literal file list. Since M0 it
-   builds on the shared `createFormaScene()` bootstrap (`src/scene/`), the same one
-   `harness/main.ts` uses — see BRIEF.md Constraints.
+   `generateEmbedCode()`'s output. Disposing the returned runtime also disposes
+   the owned renderer and resize observer. Since M0 it builds on the shared
+   `createFormaScene()` bootstrap (`src/scene/`), the same path the harness uses.
 7. **Content lives in `src/content/**`** (shapes/materials/environments/effects),
    published via the `./content` `exports` subpath and consumed via an explicit
    `registerAllContent()` call — not a side-effect import, since
@@ -137,7 +142,7 @@ Confirmed via headless Playwright (chromium) against a live `npm run dev` server
       pixel was found in the exported blob (readout mechanism itself confirmed
       working — the `studio` environment's opaque background means `false` is the
       expected value for the default composition, not a failure).
-- [x] "Copy Embed Code" produces a real, runnable snippet (`mountForma` +
+- [x] "Copy Embed Code" produces a package-consumer snippet (`mountForma` +
       `registerAllContent` imports resolve through `package.json`'s `exports` map;
       no more broken `forma/harness-content` import).
 - [x] "Run Leak Check (>=50 cycles)" HUD reports `PASS` with `maxEndTotal === baseline`.

@@ -1,16 +1,23 @@
 import type { Composition } from '../types.js';
 import { serializeComposition } from './serialize.js';
 
-/** Pure string template (blueprint §5.4) — no live DOM/build step. */
-export function generateEmbedCode(c: Composition): string {
-  const json = serializeComposition(c);
-  return `<div id="forma-mount"></div>
-<script type="module">
-  import { mountForma } from 'forma';
-  import { registerAllContent } from 'forma/content';
+/** Plain-browser embed using the bundled IIFE output. */
+export interface EmbedOptions {
+  libraryUrl?: string;
+}
 
-  registerAllContent(); // registers shapes/materials/environments/effects used below
+export function generateEmbedCode(c: Composition, options: EmbedOptions = {}): string {
+  const json = serializeComposition(c);
+  const libraryUrl = escapeAttribute(options.libraryUrl ?? './forma.browser.js');
+  return `<div id="forma-mount"></div>
+<script src="${libraryUrl}"></script>
+<script>
+  Forma.registerAllContent();
   const composition = ${json};
-  mountForma(document.getElementById('forma-mount'), composition);
+  Forma.mountForma(document.getElementById('forma-mount'), composition);
 </script>`;
+}
+
+function escapeAttribute(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }

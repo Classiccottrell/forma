@@ -20,6 +20,7 @@ export function PresetGallery({ presets, onSelect }: PresetGalleryProps) {
           title={(p.tags ?? []).join(', ')}
           data-testid={`preset-${p.id}`}
         >
+          <span className="preset-thumb" data-preset={p.id} aria-hidden="true" />
           {p.name}
         </button>
       ))}

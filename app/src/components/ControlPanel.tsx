@@ -77,6 +77,7 @@ export function ControlPanel(props: ControlPanelProps) {
           selectedId={composition.shapeId}
           onSelect={(id) => onSlotSelect('shapeId', id)}
           filter={search}
+          kind="shape"
         />
         <div style={{ marginTop: 10 }}>
           <ParamGroup schema={shapeDef.parameterSchema} values={composition.shapeParams} onChange={(k, v) => onParamChange('shapeParams', k, v)} />
@@ -92,6 +93,7 @@ export function ControlPanel(props: ControlPanelProps) {
           selectedId={composition.materialId}
           onSelect={(id) => onSlotSelect('materialId', id)}
           filter={search}
+          kind="material"
         />
         <div style={{ marginTop: 10 }}>
           <ParamGroup
@@ -108,6 +110,7 @@ export function ControlPanel(props: ControlPanelProps) {
           selectedId={composition.environmentId}
           onSelect={(id) => onSlotSelect('environmentId', id)}
           filter={search}
+          kind="environment"
         />
       </Section>
 
@@ -117,7 +120,7 @@ export function ControlPanel(props: ControlPanelProps) {
           return (
             <div key={def.id} style={{ marginBottom: 10 }}>
               <label className="param-label" style={{ cursor: 'pointer' }}>
-                <span>{def.label}</span>
+                <span className="effect-label"><span className="effect-swatch" data-effect={def.id} aria-hidden="true" />{def.label}</span>
                 <input type="checkbox" checked={enabled} onChange={(e) => onEffectToggle(def.id, e.target.checked)} />
               </label>
               {enabled && (

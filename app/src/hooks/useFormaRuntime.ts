@@ -6,6 +6,7 @@ import {
   materialRegistry,
   type Composition,
   type FormaScene,
+  FrameScheduler,
 } from 'forma';
 import { registerAllContent } from 'forma/content';
 
@@ -33,6 +34,7 @@ export function defaultComposition(): Composition {
 export interface UseFormaRuntimeResult {
   runtime: FormaRuntime | null;
   scene: FormaScene | null;
+  scheduler: FrameScheduler | null;
   apply(patch: Partial<Composition>): void;
   current: Composition;
 }
@@ -43,6 +45,7 @@ export interface UseFormaRuntimeResult {
 export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>): UseFormaRuntimeResult {
   const [current, setCurrent] = useState<Composition>(() => defaultComposition());
   const [scene, setScene] = useState<FormaScene | null>(null);
+  const [scheduler, setScheduler] = useState<FrameScheduler | null>(null);
   const runtimeRef = useRef<FormaRuntime | null>(null);
   const currentRef = useRef(current);
   currentRef.current = current;
@@ -57,19 +60,18 @@ export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>): UseForma
     runtimeRef.current = runtime;
     setScene(formaScene);
 
-    let raf = 0;
-    const loop = () => {
-      raf = requestAnimationFrame(loop);
-      formaScene.render();
-    };
-    loop();
+    const scheduler = new FrameScheduler();
+    scheduler.addTask(() => formaScene.render());
+    setScheduler(scheduler);
+    scheduler.start();
 
     return () => {
-      cancelAnimationFrame(raf);
+      scheduler.stop();
       runtime.dispose();
       formaScene.dispose();
       runtimeRef.current = null;
       setScene(null);
+      setScheduler(null);
     };
     // Mount once — hostRef's element identity is stable for the component's life.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -82,5 +84,5 @@ export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>): UseForma
     runtimeRef.current?.applyComposition(next);
   }
 
-  return { runtime: runtimeRef.current, scene, apply, current };
+  return { runtime: runtimeRef.current, scene, scheduler, apply, current };
 }
