@@ -44,6 +44,7 @@ export class FormaRuntime {
   private effectsSlot: Slot<EffectHandle[]> = { registry: new ResourceRegistry(), handle: null };
 
   private _current: Composition | null = null;
+  private disposed = false;
 
   constructor(opts: FormaRuntimeOptions) {
     this.scene = opts.scene;
@@ -124,6 +125,8 @@ export class FormaRuntime {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.shapeSlot.registry.disposeAll();
     this.materialSlot.registry.disposeAll();
     this.environmentSlot.registry.disposeAll();

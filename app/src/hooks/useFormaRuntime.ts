@@ -55,7 +55,7 @@ export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>): UseForma
     const el = hostRef.current;
     if (!el) return;
     const formaScene = createFormaScene({ el, cameraZ: 3.2 });
-    const runtime = new FormaRuntime({ scene: formaScene.scene, camera: formaScene.camera, renderer: formaScene.renderer, composer: formaScene.composer });
+    const runtime = new FormaRuntime({ scene: formaScene.scene, camera: formaScene.camera, renderer: formaScene.renderer, composer: formaScene.composer, disposeExternal: formaScene.dispose });
     runtime.applyComposition(currentRef.current);
     runtimeRef.current = runtime;
     setScene(formaScene);
@@ -68,7 +68,6 @@ export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>): UseForma
     return () => {
       scheduler.stop();
       runtime.dispose();
-      formaScene.dispose();
       runtimeRef.current = null;
       setScene(null);
       setScheduler(null);

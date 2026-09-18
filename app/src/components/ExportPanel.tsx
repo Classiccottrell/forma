@@ -43,9 +43,11 @@ export function ExportPanel({ scene, composition }: ExportPanelProps) {
   return (
     <div className="section-body">
       <div className="export-row">
-        <input type="number" value={width} min={64} max={4096} onChange={(e) => setWidth(Number(e.target.value))} data-testid="export-width" />
-        <span style={{ alignSelf: 'center', color: 'var(--text-dim)' }}>×</span>
-        <input type="number" value={height} min={64} max={4096} onChange={(e) => setHeight(Number(e.target.value))} data-testid="export-height" />
+        <label className="sr-only" htmlFor="export-width">Export width</label>
+        <input id="export-width" type="number" aria-label="Export width" value={width} min={64} max={4096} onChange={(e) => setWidth(Number(e.target.value))} data-testid="export-width" />
+        <span style={{ alignSelf: 'center', color: 'var(--text-dim)' }} aria-hidden="true">by</span>
+        <label className="sr-only" htmlFor="export-height">Export height</label>
+        <input id="export-height" type="number" aria-label="Export height" value={height} min={64} max={4096} onChange={(e) => setHeight(Number(e.target.value))} data-testid="export-height" />
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <button type="button" className="btn primary" onClick={handleExportPNG} data-testid="export-png-btn">
@@ -55,7 +57,7 @@ export function ExportPanel({ scene, composition }: ExportPanelProps) {
           Copy Code
         </button>
       </div>
-      {status && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{status}</div>}
+      {status && <div className={`status-message ${status.startsWith('export failed') ? '' : 'success'}`} data-kind={status.startsWith('export failed') ? 'error' : 'success'} role="status">{status}</div>}
       {output && <textarea className="copy-output" readOnly value={output} data-testid="embed-output" />}
     </div>
   );

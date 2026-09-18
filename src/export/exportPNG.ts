@@ -45,37 +45,56 @@ export function exportPNG(target: ExportPNGTarget, opts: ExportPNGOptions = {}):
   const prevHeight = renderer.domElement.height;
   const prevPixelRatio = renderer.getPixelRatio();
   const prevAspect = camera.aspect;
+  const prevPosition = camera.position.clone();
+  const prevQuaternion = camera.quaternion.clone();
+  const prevZoom = camera.zoom;
   const prevBackground = scene.background;
 
   const targetW = width ?? Math.round(prevWidth / prevPixelRatio);
   const targetH = height ?? Math.round(prevHeight / prevPixelRatio);
   const resizing = targetW !== Math.round(prevWidth / prevPixelRatio) || targetH !== Math.round(prevHeight / prevPixelRatio);
 
-  if (transparentBackground) scene.background = null;
-  if (resizing) {
-    renderer.setSize(targetW, targetH);
-    composer?.setSize(targetW, targetH);
-    camera.aspect = targetW / targetH;
+  const restore = () => {
+    scene.background = prevBackground;
+    renderer.setPixelRatio(prevPixelRatio);
+    if (resizing) {
+      renderer.setSize(Math.round(prevWidth / prevPixelRatio), Math.round(prevHeight / prevPixelRatio));
+      composer?.setSize(Math.round(prevWidth / prevPixelRatio), Math.round(prevHeight / prevPixelRatio));
+    }
+    camera.position.copy(prevPosition);
+    camera.quaternion.copy(prevQuaternion);
+    camera.zoom = prevZoom;
+    camera.aspect = prevAspect;
     camera.updateProjectionMatrix();
-  }
+  };
 
-  if (composer) composer.render();
-  else renderer.render(scene, camera);
+  try {
+    if (transparentBackground) scene.background = null;
+    if (resizing) {
+      renderer.setSize(targetW, targetH);
+      composer?.setSize(targetW, targetH);
+      camera.aspect = targetW / targetH;
+      camera.updateProjectionMatrix();
+    }
 
-  const canvas = renderer.domElement;
+    if (composer) composer.render();
+    else renderer.render(scene, camera);
 
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      // Restore live state regardless of outcome.
-      if (transparentBackground) scene.background = prevBackground;
-      if (resizing) {
-        renderer.setSize(Math.round(prevWidth / prevPixelRatio), Math.round(prevHeight / prevPixelRatio));
-        composer?.setSize(Math.round(prevWidth / prevPixelRatio), Math.round(prevHeight / prevPixelRatio));
-        camera.aspect = prevAspect;
-        camera.updateProjectionMatrix();
+    const canvas = renderer.domElement;
+    return new Promise((resolve, reject) => {
+      try {
+        canvas.toBlob((blob) => {
+          restore();
+          if (blob) resolve(blob);
+          else reject(new Error('exportPNG: canvas.toBlob returned null'));
+        }, 'image/png');
+      } catch (error) {
+        restore();
+        reject(error);
       }
-      if (blob) resolve(blob);
-      else reject(new Error('exportPNG: canvas.toBlob returned null'));
-    }, 'image/png');
-  });
+    });
+  } catch (error) {
+    restore();
+    return Promise.reject(error);
+  }
 }

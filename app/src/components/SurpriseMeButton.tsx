@@ -9,7 +9,7 @@ export interface SurpriseMeButtonProps {
 export function SurpriseMeButton({ onApply }: SurpriseMeButtonProps) {
   return (
     <button type="button" className="btn" data-testid="surprise-me-btn" onClick={() => onApply(surpriseMe())}>
-      🎲 Surprise me
+      Surprise me
     </button>
   );
 }

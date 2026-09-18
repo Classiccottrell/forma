@@ -25,6 +25,7 @@ export function ParamControl({ id, label, schema, value, onChange }: ParamContro
           </div>
           <input
             id={id}
+            aria-label={label}
             type="range"
             min={schema.min}
             max={schema.max}
@@ -40,7 +41,7 @@ export function ParamControl({ id, label, schema, value, onChange }: ParamContro
           <div className="param-label">
             <span>{label}</span>
           </div>
-          <select id={id} value={String(value)} onChange={(e) => onChange(e.target.value)}>
+          <select id={id} aria-label={label} value={String(value)} onChange={(e) => onChange(e.target.value)}>
             {schema.options.map((opt) => (
               <option key={opt} value={opt}>
                 {opt}
@@ -54,7 +55,7 @@ export function ParamControl({ id, label, schema, value, onChange }: ParamContro
         <div className="param-row">
           <label className="param-label" htmlFor={id} style={{ cursor: 'pointer' }}>
             <span>{label}</span>
-            <input id={id} type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />
+            <input id={id} type="checkbox" aria-label={label} checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />
           </label>
         </div>
       );
@@ -65,7 +66,7 @@ export function ParamControl({ id, label, schema, value, onChange }: ParamContro
             <span>{label}</span>
             <span className="value">{String(value)}</span>
           </div>
-          <input id={id} type="color" value={String(value)} onChange={(e) => onChange(e.target.value)} />
+          <input id={id} type="color" aria-label={label} value={String(value)} onChange={(e) => onChange(e.target.value)} />
         </div>
       );
     case 'string':

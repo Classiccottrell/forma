@@ -71,7 +71,7 @@ export function SvgImport({ onImport }: SvgImportProps) {
           onChange={(e) => acceptFile(e.target.files?.[0])}
         />
         {error && (
-          <p style={{ color: '#ff6b6b', fontSize: 12, marginTop: 6 }} data-testid="svg-import-error">
+          <p className="status-message" data-kind="error" role="alert" data-testid="svg-import-error">
             {error}
           </p>
         )}
