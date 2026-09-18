@@ -19,7 +19,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
  * Composition state via useFormaRuntime, passes apply(patch) down. */
 export default function App() {
   const hostRef = useRef<HTMLDivElement>(null);
-  const { scene, apply, current } = useFormaRuntime(hostRef);
+  const { scene, scheduler, apply, current } = useFormaRuntime(hostRef);
   const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 640);
 
   // `H` toggles the control panel. No modifiers (Cmd/Ctrl+H would hide the browser
@@ -84,7 +84,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Viewport hostRef={hostRef} scene={scene} />
+      <Viewport hostRef={hostRef} scene={scene} scheduler={scheduler} />
       <OnboardingHint />
 
       <div className="topbar">

@@ -7,9 +7,6 @@ import { generateEmbedCode } from '../src/runtime/embed.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 
-// Regression test for the M0 bug: generateEmbedCode previously emitted an import
-// specifier (`forma/harness-content`) with no matching entry in package.json's
-// `exports` map, silently breaking "Copy Code" for any real consumer.
 describe('generateEmbedCode', () => {
   const code = generateEmbedCode({
     shapeId: 'sphere',
@@ -22,17 +19,9 @@ describe('generateEmbedCode', () => {
     effectParams: {},
   });
 
-  it('imports only specifiers declared in package.json exports', () => {
-    const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf-8'));
-    const specifiers = [...code.matchAll(/from '([^']+)'/g)].map((m) => m[1]);
-    for (const spec of specifiers) {
-      if (spec === 'forma') {
-        expect(pkg.exports['.']).toBeTruthy();
-      } else if (spec.startsWith('forma/')) {
-        const subpath = './' + spec.slice('forma/'.length);
-        expect(pkg.exports[subpath], `${spec} must have an exports map entry`).toBeTruthy();
-      }
-    }
+  it('uses the browser bundle without bare module imports', () => {
+    expect(code).toContain('<script src="./forma.browser.js"></script>');
+    expect(code).not.toMatch(/\bfrom ['"](?:forma|three)/);
   });
 
   it('every exports map target exists after build', () => {
@@ -44,8 +33,16 @@ describe('generateEmbedCode', () => {
   });
 
   it('does not import unresolvable content subpath, and registers content before mounting', () => {
-    expect(code).not.toContain('forma/harness-content');
-    expect(code).toContain("import { registerAllContent } from 'forma/content';");
-    expect(code.indexOf('registerAllContent()')).toBeLessThan(code.indexOf('mountForma('));
+    expect(code).toContain('Forma.registerAllContent()');
+    expect(code.indexOf('Forma.registerAllContent()')).toBeLessThan(code.indexOf('Forma.mountForma('));
+  });
+
+  it('escapes a custom browser bundle URL', () => {
+    expect(generateEmbedCode({
+      shapeId: 'sphere', shapeParams: {}, materialId: 'matte', materialParams: {},
+      environmentId: 'studio', environmentParams: {}, effectIds: [], effectParams: {},
+    }, { libraryUrl: 'https://cdn.example.test/a?x=1&y=2' })).toContain(
+      'https://cdn.example.test/a?x=1&amp;y=2'
+    );
   });
 });

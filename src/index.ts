@@ -15,6 +15,7 @@ export { exportPNG } from './export/exportPNG.js';
 
 export { createFormaScene } from './scene/createFormaScene.js';
 export type { CreateFormaSceneOptions, FormaScene } from './scene/createFormaScene.js';
+export { FrameScheduler } from 'cc-webgl';
 
 import type { Composition } from './types.js';
 import { FormaRuntime } from './runtime/FormaRuntime.js';
@@ -22,13 +23,13 @@ import { createFormaScene } from './scene/createFormaScene.js';
 
 /** Convenience one-shot mount for embed-code consumers (blueprint §5.4's generated
  * snippet calls this). Uses the shared scene bootstrap (`createFormaScene`) — same
- * path the harness uses — and applies `composition` immediately. Not part of the
- * blueprint's literal file list — added so generateEmbedCode's output is directly
- * runnable. Caller must have already registered any content the composition
- * references (see `registerAllContent` from `forma/content`). */
+ * path the harness uses — and applies `composition` immediately. Disposing the
+ * returned runtime also disposes the owned renderer and resize observer. Caller
+ * must have already registered referenced content. */
 export async function mountForma(el: HTMLElement, composition: Composition): Promise<FormaRuntime> {
-  const { scene, camera, renderer, composer, render } = createFormaScene({ el, cameraZ: 3 });
-  const runtime = new FormaRuntime({ scene, camera, renderer, composer });
+  const formaScene = createFormaScene({ el, cameraZ: 3 });
+  const { scene, camera, renderer, composer, render } = formaScene;
+  const runtime = new FormaRuntime({ scene, camera, renderer, composer, disposeExternal: formaScene.dispose });
   runtime.applyComposition(composition);
   render();
   return runtime;

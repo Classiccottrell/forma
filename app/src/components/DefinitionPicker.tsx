@@ -9,13 +9,14 @@ export interface DefinitionPickerProps {
   selectedId: string;
   onSelect(id: string): void;
   filter?: string;
+  kind: 'shape' | 'material' | 'environment';
 }
 
 /** Generic grid of registry entries for one slot — reused for shapes, materials,
  * environments, effects via a plain data prop (roadmap §6). Thumbnail is a label
  * glyph (no rendered preview asset in M1 — an acceptable scope narrowing; the
  * picker's job is fast switching, not gallery imagery). */
-export function DefinitionPicker({ entries, selectedId, onSelect, filter }: DefinitionPickerProps) {
+export function DefinitionPicker({ entries, selectedId, onSelect, filter, kind }: DefinitionPickerProps) {
   const visible = filter
     ? entries.filter((e) => e.label.toLowerCase().includes(filter.toLowerCase()) || e.category.toLowerCase().includes(filter.toLowerCase()))
     : entries;
@@ -29,7 +30,9 @@ export function DefinitionPicker({ entries, selectedId, onSelect, filter }: Defi
           onClick={() => onSelect(e.id)}
           title={e.category}
         >
-          {e.label}
+          <span className="picker-thumb" data-kind={kind} data-id={e.id} aria-hidden="true" />
+          <span className="picker-name">{e.label}</span>
+          <span className="picker-category">{e.category}</span>
         </button>
       ))}
     </div>

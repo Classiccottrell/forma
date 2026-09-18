@@ -115,19 +115,17 @@ list unless it's SVG-based (see "Known limitations" below for why
 
 ## How code export works (`Copy Code` button)
 
-`generateEmbedCode()` (`src/runtime/embed.ts`) is a pure string template — no
-DOM/build step involved. It serializes the current `Composition` to JSON
-(`serializeComposition`) and wraps it in a standalone ES-module `<script>` tag:
+`generateEmbedCode()` (`src/runtime/embed.ts`) serializes the current
+`Composition` to JSON (`serializeComposition`) and references the bundled
+`forma.browser.js` IIFE:
 
 ```html
 <div id="forma-mount"></div>
-<script type="module">
-  import { mountForma } from 'forma';
-  import { registerAllContent } from 'forma/content';
-
-  registerAllContent();
+<script src="./forma.browser.js"></script>
+<script>
+  Forma.registerAllContent();
   const composition = { /* ...serialized shape/material/environment/effect ids + params... */ };
-  mountForma(document.getElementById('forma-mount'), composition);
+  Forma.mountForma(document.getElementById('forma-mount'), composition);
 </script>
 ```
 
@@ -138,15 +136,8 @@ broken pre-work:
    effects.** `package.json` sets `"sideEffects": false` so bundlers are free
    to tree-shake a bare `import 'forma/content'` that appears to do nothing at
    the call site — an explicit function call survives tree-shaking.
-2. **Both imports resolve through real `package.json` `exports` entries** —
-   `"forma"` -> `./dist/index.js`, `"forma/content"` -> `./dist/content/index.js`.
-   Content used to live in `harness/`-only code and the generated snippet
-   imported a `forma/harness-content` subpath that didn't exist in `exports`,
-   so pasted embed code threw a module-resolution error in any real consumer's
-   browser. Content was relocated to `src/content/**` (published) specifically
-   to fix this. `tests/embed.test.ts` is a regression guard: it asserts every
-   import specifier in a freshly generated snippet has a real `exports` entry,
-   and that entry's build target exists on disk.
+2. **The browser IIFE contains Forma, content, Three.js, and cc-webgl.** No
+   bundler or import map is required on the consuming page.
 
 ## Testing philosophy
 

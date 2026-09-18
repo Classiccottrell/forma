@@ -134,6 +134,42 @@ core.
 ## Status
 **M0, M1, M2, M3, M4 complete. All roadmap milestones closed out.**
 
+## Product hardening roadmap
+
+### H1 — Lifecycle and delivery correctness (in progress)
+
+- Make every public mount disposable, including renderer and resize-observer ownership.
+- Remove duplicate context-loss wiring and define one recovery owner.
+- Make FALLBACK a real remount boundary; never leave a live WebGL scene mislabeled FALLBACK.
+- Use the shared `cc-webgl` `FrameScheduler` in the product app for visibility pause and delta clamping.
+- Keep OrbitControls updates inside that scheduler; no second product RAF loop.
+- Make generated embed output browser-runnable through a published browser bundle, not bare package imports.
+
+### H2 — Resource and export safety
+
+- Finish AssetLoader cancellation with request identity and underlying-load cancellation where supported.
+- Dispose complete GLTF ownership graphs, including material textures and shared-resource policy.
+- Restore renderer pixel ratio, composer size, camera state, and background on every export failure path.
+- Add browser tests for repeated mount/unmount, export failure cleanup, context loss, and high-DPI output.
+
+### H3 — Product completeness
+
+- **Polish slice (in progress):** prioritize a small set of visibly distinct shapes,
+  environments, materials, presets, and browser thumbnails before broad library expansion.
+- Add visual-reference cards to every picker so selection communicates appearance, not only labels.
+- Normalize shape framing automatically so geometry changes stay legible in one viewport.
+- Expand toward the source plan: 30–40 shapes, 20+ materials, 6–8 environments, 5–6 effects.
+- Use cc-webgl lifecycle/quality/reduced-motion contracts directly, or explicitly split Forma into a separate renderer package.
+- Add real empty-state/import UX, accessible controls, preset thumbnails, and mobile export verification.
+- Define composition/preset migrations and validate malformed user JSON at the input boundary.
+
+### H4 — Release readiness
+
+- Add browser support matrix and tested deployment targets.
+- Publish versioned browser bundles and embeddable examples.
+- Add performance budgets, bundle-size policy, and release checklist.
+- Re-run full browser QA before marking the project shipped.
+
 `npm run typecheck` / `typecheck:harness` / `test` (17/17) / `build` all pass. Embed
 code generation confirmed genuinely working end-to-end (resolves through the real
 `exports` map from an external `node_modules/forma` symlink, syntactically valid as

@@ -50,7 +50,7 @@ describe('leak-free repeated-switching stress test (blueprint §5.5)', () => {
       combos,
       (id) => shapeRegistry.require(id).defaultParameters,
       (id) => materialRegistry.require(id).defaultParameters,
-      40,
+      50,
       mulberry32(42)
     );
 
@@ -59,7 +59,7 @@ describe('leak-free repeated-switching stress test (blueprint §5.5)', () => {
       `[forma leak-check] pass=${result.pass} baseline=${result.baseline} maxEndTotal=${result.maxEndTotal} maxMidTotal=${result.maxMidTotal} maxSlotConcurrencyBound=${result.maxSlotConcurrency} cycles=${result.cycles.length} failures=${result.failures.length}`
     );
 
-    expect(result.cycles.length).toBe(40);
+    expect(result.cycles.length).toBe(50);
     expect(result.failures).toEqual([]);
     expect(result.maxEndTotal).toBe(result.baseline);
     expect(result.pass).toBe(true);

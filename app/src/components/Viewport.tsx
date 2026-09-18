@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { FormaScene } from 'forma';
+import type { FormaScene, FrameScheduler } from 'forma';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 export interface ViewportProps {
   hostRef: React.RefObject<HTMLDivElement>;
   scene: FormaScene | null;
+  scheduler: FrameScheduler | null;
 }
 
 /** Mounts the canvas host div, wires OrbitControls (pointer+touch) + auto-spin once
  * `scene` is ready. `prefers-reduced-motion` forces auto-spin off regardless of the
  * toggle state (roadmap §6). */
-export function Viewport({ hostRef, scene }: ViewportProps) {
+export function Viewport({ hostRef, scene, scheduler }: ViewportProps) {
   const reducedMotion = useReducedMotion();
   const [autoSpin, setAutoSpin] = useState(false);
   const controlsRef = useRef<OrbitControls | null>(null);
@@ -37,15 +38,9 @@ export function Viewport({ hostRef, scene }: ViewportProps) {
 
   useEffect(() => {
     const controls = controlsRef.current;
-    if (!controls) return;
-    let raf = 0;
-    const tick = () => {
-      raf = requestAnimationFrame(tick);
-      controls.update();
-    };
-    tick();
-    return () => cancelAnimationFrame(raf);
-  }, [scene]);
+    if (!controls || !scheduler) return;
+    return scheduler.addTask(() => controls.update());
+  }, [scene, scheduler]);
 
   return (
     <>
