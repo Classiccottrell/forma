@@ -52,6 +52,28 @@ any static host.
 `npm run preview` serves the built `app/dist/` locally for a final check before
 deploying.
 
+## Release checks
+
+Run from `app/` after the library has been built:
+
+```bash
+npm run build
+npm run check:bundle
+npm run typecheck
+cd .. && npm test && npm run typecheck && npm run typecheck:harness && npm run build
+```
+
+`check:bundle` measures the existing `dist/assets/*.js` output and fails above
+900,000 JavaScript bytes or 250,000 summed gzip bytes. It does not build.
+
+| Target | Status | Caveat |
+| --- | --- | --- |
+| Chrome / Edge / Firefox / Safari | Supported | Recent WebGL2-enabled versions |
+| GitHub Pages project site | Supported | Build with `FORMA_BASE=/<repo>/` |
+| Cloudflare Pages | Supported | Root directory must include library and app |
+| Vercel | Supported | Root directory must include library and app |
+| Browser QA | Required before release | Local Chromium is currently blocked by macOS `bootstrap_check_in` permissions |
+
 ## Deployment
 
 `app/vite.config.ts` sets `base: process.env.FORMA_BASE ?? '/'`. Most hosts

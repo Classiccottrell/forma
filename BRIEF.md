@@ -165,9 +165,9 @@ core.
 
 ### H4 — Release readiness
 
-- Add browser support matrix and tested deployment targets.
+- [x] Add browser support matrix and tested deployment targets.
 - Publish versioned browser bundles and embeddable examples.
-- Add performance budgets, bundle-size policy, and release checklist.
+- [x] Add executable performance budgets, bundle-size policy, and release checklist.
 - Re-run full browser QA before marking the project shipped.
 
 `npm run typecheck` / `typecheck:harness` / `test` (17/17) / `build` all pass. Embed
@@ -178,6 +178,7 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-09-17 | H4 release-readiness slice: added Node-stdlib-only `app/npm run check:bundle`, enforcing 900,000 JavaScript-byte and 250,000 summed-gzip-byte budgets against an existing build; documented release checks, deployment/browser matrix, and current browser-QA caveat. Current baseline: 823,283 JavaScript bytes / 221,807 summed gzip bytes. |
 | 2026-09-17 | H3 hardening: `deserializeComposition()` now validates the JSON object and required field/container types at the input boundary, prefixes parse/shape errors with `deserializeComposition:`, preserves registry and schema-key validation, and adds focused malformed-input coverage. Library/app verification passes. |
 | 2026-09-17 | H3 content expansion: added four registry-native shapes (`pyramid`, `bevelled-box`, `spring`, `vase`), three materials (`plastic`, `ceramic`, `holographic`), procedural `aurora-atmosphere` DataTexture environment, lightweight `chromatic-aberration` ShaderPass, three curated presets, and picker rules. Registry smoke coverage now creates/disposes every environment and effect from defaults; content totals are 22 shapes / 18 materials / 7 environments / 6 effects. |
 | 2026-09-17 | H2/H3 review slice: Studio now leaves the published scene background transparent so the app's default view can show `app/public/backgrounds/dusk-sky.png` as a restrained cover backdrop while alternate environments remain scene-owned. Hardened `exportPNG()` restoration for renderer pixel ratio/size, composer size, camera state, and scene background across success and encoding failure; added focused Vitest coverage. Library tests/typecheck/build and app typecheck/build pass. |
