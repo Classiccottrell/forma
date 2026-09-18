@@ -9,7 +9,14 @@ export function serializeComposition(c: Composition): string {
  * each *Id resolves in its registry and each params object's keys match that
  * definition's parameterSchema keys. Throws on mismatch. */
 export function deserializeComposition(s: string): Composition {
-  const c = JSON.parse(s) as Composition;
+  let value: unknown;
+  try {
+    value = JSON.parse(s);
+  } catch {
+    throw new Error('deserializeComposition: invalid JSON');
+  }
+  assertCompositionShape(value);
+  const c = value;
 
   const shapeDef = shapeRegistry.require(c.shapeId);
   assertKeysMatch('shapeParams', c.shapeParams, shapeDef.parameterSchema);
@@ -26,6 +33,44 @@ export function deserializeComposition(s: string): Composition {
   }
 
   return c;
+}
+
+function assertCompositionShape(value: unknown): asserts value is Composition {
+  if (!isRecord(value)) throw new Error('deserializeComposition: composition must be an object');
+
+  assertString(value, 'shapeId');
+  assertParams(value.shapeParams, 'shapeParams');
+  assertString(value, 'materialId');
+  assertParams(value.materialParams, 'materialParams');
+  assertString(value, 'environmentId');
+  assertParams(value.environmentParams, 'environmentParams');
+
+  if (!Array.isArray(value.effectIds)) {
+    throw new Error('deserializeComposition: effectIds must be an array');
+  }
+  if (value.effectIds.some((id) => typeof id !== 'string')) {
+    throw new Error('deserializeComposition: effectIds must contain only strings');
+  }
+  if (!isRecord(value.effectParams)) {
+    throw new Error('deserializeComposition: effectParams must be an object');
+  }
+  for (const [id, params] of Object.entries(value.effectParams)) {
+    assertParams(params, `effectParams.${id}`);
+  }
+}
+
+function assertString(record: Record<string, unknown>, key: string): void {
+  if (typeof record[key] !== 'string') {
+    throw new Error(`deserializeComposition: ${key} must be a string`);
+  }
+}
+
+function assertParams(value: unknown, label: string): asserts value is Record<string, unknown> {
+  if (!isRecord(value)) throw new Error(`deserializeComposition: ${label} must be an object`);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function assertKeysMatch(label: string, params: Record<string, unknown>, schema: Record<string, unknown>): void {
