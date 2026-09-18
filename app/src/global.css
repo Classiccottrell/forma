@@ -238,6 +238,10 @@ textarea:focus-visible {
 .picker-thumb[data-id='star']::after, .picker-thumb[data-id='cross']::after { clip-path: polygon(50% 0, 62% 36%, 100% 36%, 70% 58%, 82% 100%, 50% 74%, 18% 100%, 30% 58%, 0 36%, 38% 36%); }
 .picker-thumb[data-id='spiral']::after, .picker-thumb[data-id='knot']::after { border-radius: 48% 52% 45% 55%; transform: rotate(35deg) skewX(-18deg); }
 .picker-thumb[data-id='gem']::after, .picker-thumb[data-id='icosahedron']::after, .picker-thumb[data-id='octahedron']::after, .picker-thumb[data-id='dodecahedron']::after, .picker-thumb[data-id='tetrahedron']::after { clip-path: polygon(50% 0, 100% 36%, 78% 100%, 22% 100%, 0 36%); background: linear-gradient(135deg, #bdf2ff, #6a5cff); }
+.picker-thumb[data-id='pyramid']::after { clip-path: polygon(50% 0, 100% 100%, 0 100%); background: linear-gradient(135deg, #ffe0a6, #d45f48); }
+.picker-thumb[data-id='bevelled-box']::after { border-radius: 9px; transform: rotate(7deg) skewY(-7deg); }
+.picker-thumb[data-id='spring']::after { border-radius: 50%; background: transparent; border: 5px solid #73f5cf; box-shadow: inset 0 0 0 2px #221e28, 0 0 8px #73f5cf; transform: scaleY(.78) rotate(18deg); }
+.picker-thumb[data-id='vase']::after { clip-path: polygon(35% 0, 65% 0, 66% 25%, 88% 75%, 76% 100%, 24% 100%, 12% 75%, 34% 25%); background: linear-gradient(135deg, #ffe0a6, #a96bff 55%, #51e8d0); }
 .picker-thumb[data-kind='material'] { background: #221e28; }
 .picker-thumb[data-kind='material']::after { content: ''; position: absolute; inset: 8px; border-radius: 50%; background: linear-gradient(145deg, #fff, #777); box-shadow: inset -8px -6px 10px rgba(0,0,0,.45), 0 4px 9px rgba(0,0,0,.35); }
 .picker-thumb[data-id='matte']::after, .picker-thumb[data-id='clay']::after { background: #b984ff; }
@@ -248,6 +252,9 @@ textarea:focus-visible {
 .picker-thumb[data-id='neon-plastic']::after { background: #ff2ac8; box-shadow: 0 0 13px #ff2ac8; }
 .picker-thumb[data-id='wireframe']::after { background: transparent; border: 2px solid #7ff5ff; box-shadow: inset 0 0 0 3px #221e28, 0 0 8px #2be8ff; }
 .picker-thumb[data-id='obsidian']::after { background: linear-gradient(145deg, #596070, #050609 55%, #454a5a); }
+.picker-thumb[data-id='plastic']::after { background: linear-gradient(145deg, #a9c8ff, #3975ff 52%, #163b98); }
+.picker-thumb[data-id='ceramic']::after { background: #e7d7c8; box-shadow: inset -8px -6px 10px rgba(79, 47, 33, .22), 0 4px 9px rgba(0,0,0,.35); }
+.picker-thumb[data-id='holographic']::after { background: linear-gradient(120deg, #ff9ed8, #b8a1ff 35%, #6ff5d4 68%, #fff1a0); }
 .picker-thumb[data-kind='environment'] { border-radius: 10px; overflow: hidden; }
 .picker-thumb[data-kind='environment']::after { content: ''; position: absolute; inset: 0; background: linear-gradient(#343b55, #ee9360); }
 .picker-thumb[data-id='studio']::after { background: linear-gradient(#555b68, #252832); }
@@ -256,11 +263,13 @@ textarea:focus-visible {
 .picker-thumb[data-id='sunset']::after { background: linear-gradient(#2b1a3f, #ff8a3d); }
 .picker-thumb[data-id='midnight']::after { background: radial-gradient(circle at 70% 30%, #273a91, #05060c 70%); }
 .picker-thumb[data-id='softbox']::after { background: linear-gradient(#f5f6fa, #c5cad5); }
+.picker-thumb[data-id='aurora-atmosphere']::after { background: linear-gradient(160deg, #17215b, #39d6ad 48%, #604bd0 72%, #080d2e); }
 .effect-label { display: flex; align-items: center; gap: 7px; }
 .effect-swatch { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(135deg, #ff9d5c, #7f78ff); }
 .effect-swatch[data-effect='grayscale'] { filter: grayscale(1); }
 .effect-swatch[data-effect='invert'] { filter: invert(1); }
 .effect-swatch[data-effect='vignette'] { box-shadow: inset 0 0 7px #0a0710; }
+.effect-swatch[data-effect='chromatic-aberration'] { background: linear-gradient(90deg, #ff4b8b, #fff, #48d9ff); }
 .preset-thumb { width: 100%; height: 42px; border-radius: 7px; margin-bottom: 2px; background: linear-gradient(135deg, #7f78ff, #ff9d5c); }
 .preset-thumb[data-preset*='ice'] { background: linear-gradient(135deg, #8ee9ff, #18245e); }
 .preset-thumb[data-preset*='neon'] { background: linear-gradient(135deg, #ff2ac8, #1ae8ff); }

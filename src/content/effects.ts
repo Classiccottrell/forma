@@ -214,8 +214,53 @@ const invert = defineEffect({
   },
 });
 
+const chromaticAberration = defineEffect({
+  id: 'chromatic-aberration',
+  label: 'Chromatic Aberration',
+  category: 'post',
+  parameterSchema: {
+    offset: { kind: 'number', min: 0, max: 0.02, step: 0.001, default: 0.006, rebuild: false },
+  },
+  defaultParameters: { offset: 0.006 },
+  create(params, ctx) {
+    const pass = new ShaderPass({
+      uniforms: { tDiffuse: { value: null }, offset: { value: params.offset } },
+      vertexShader: duotoneShader.vertexShader,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float offset;
+        varying vec2 vUv;
+        void main() {
+          vec2 shift = vec2(offset, 0.0);
+          vec4 texel = texture2D(tDiffuse, vUv);
+          float red = texture2D(tDiffuse, vUv + shift).r;
+          float blue = texture2D(tDiffuse, vUv - shift).b;
+          gl_FragColor = vec4(red, texel.g, blue, texel.a);
+        }
+      `,
+    });
+    ctx.composer?.addPass(pass);
+    let disposed = false;
+    const handle: EffectHandle = {
+      pass,
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        ctx.composer?.removePass(pass);
+        pass.dispose();
+      },
+    };
+    return handle;
+  },
+  update(handle, params) {
+    const pass = handle.pass as InstanceType<typeof ShaderPass> | undefined;
+    if (!pass) return;
+    pass.uniforms.offset!.value = params.offset;
+  },
+});
+
 export function registerEffects(): void {
-  for (const def of [none, duotone, grayscale, vignette, invert]) {
+  for (const def of [none, duotone, grayscale, vignette, invert, chromaticAberration]) {
     if (!effectRegistry.get(def.id)) effectRegistry.register(def);
   }
 }

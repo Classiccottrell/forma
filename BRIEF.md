@@ -111,7 +111,7 @@ core.
 ### M2 — Full content + SVG extrusion (COMPLETE)
 - [x] Content expanded toward target scale (58 shapes / 63 materials / 18
       environments / 11 effects) — incremental, not required all-at-once. Landed:
-      18 shapes / 15 materials / 6 environments / 5 effects.
+      22 shapes / 18 materials / 7 environments / 6 effects.
 - [x] `svg-extrude` shape definition (registry entry, not a special case) per roadmap
       §4; drag-and-drop upload (+ file-input fallback) in `app/`.
 - [x] Preset system (`Preset` wrapper type, versioned) + curated preset gallery.
@@ -132,7 +132,7 @@ core.
 - [x] Browser support notes.
 
 ## Status
-**M0, M1, M2, M3, M4 complete. All roadmap milestones closed out.**
+**M0, M1, M2, M3, M4 complete. H3 content expansion remains active.**
 
 ## Product hardening roadmap
 
@@ -178,6 +178,7 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-09-17 | H3 content expansion: added four registry-native shapes (`pyramid`, `bevelled-box`, `spring`, `vase`), three materials (`plastic`, `ceramic`, `holographic`), procedural `aurora-atmosphere` DataTexture environment, lightweight `chromatic-aberration` ShaderPass, three curated presets, and picker rules. Registry smoke coverage now creates/disposes every environment and effect from defaults; content totals are 22 shapes / 18 materials / 7 environments / 6 effects. |
 | 2026-09-17 | H2/H3 review slice: Studio now leaves the published scene background transparent so the app's default view can show `app/public/backgrounds/dusk-sky.png` as a restrained cover backdrop while alternate environments remain scene-owned. Hardened `exportPNG()` restoration for renderer pixel ratio/size, composer size, camera state, and scene background across success and encoding failure; added focused Vitest coverage. Library tests/typecheck/build and app typecheck/build pass. |
 | 2026-09-17 | H1 lifecycle slice: made `FormaRuntime.dispose()` idempotent, ensured external scene cleanup runs once, and removed duplicate `formaScene.dispose()` from the React hook cleanup. Added a regression test for repeated disposal; library tests (31/31), typecheck, builds, and app typecheck/build pass. |
 | 2026-09-16 | Architecture blueprint written; pre-work implementation complete (registries, Composition, disposal, 4-shape/4-material/2-env harness, 75-cycle leak check). |
