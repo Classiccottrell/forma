@@ -11,7 +11,7 @@ describe('built-in presets', () => {
 
   it('ships a reasonable-sized curated set', () => {
     expect(presets.length).toBeGreaterThanOrEqual(8);
-    expect(presets.length).toBeLessThanOrEqual(12);
+    expect(presets.length).toBeLessThanOrEqual(15);
   });
 
   it('every preset id is unique', () => {

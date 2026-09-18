@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { shapeRegistry, materialRegistry } from '../src/index.js';
+import { shapeRegistry, materialRegistry, environmentRegistry, effectRegistry } from '../src/index.js';
 import { ensureHarnessContentRegistered } from './testUtils.js';
 
 // Registry-wide smoke test (M2 guard, advisor guidance): every shape's create() with
@@ -38,6 +38,24 @@ describe('content smoke test — every shape/material creates cleanly from defau
       const material = def.create(materialRegistry.require(def.id).defaultParameters, { registry: { track: () => {} } as never });
       expect(material, `material "${def.id}" did not return a THREE.Material`).toBeInstanceOf(THREE.Material);
       material.dispose();
+    }
+  });
+
+  it('every registered environment and effect creates and disposes from defaults', () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    for (const def of environmentRegistry.list()) {
+      const handle = def.create(def.defaultParameters, { registry: { track: () => {} } as never, scene });
+      handle.dispose();
+    }
+    for (const def of effectRegistry.list()) {
+      const handle = def.create(def.defaultParameters, {
+        registry: { track: () => {} } as never,
+        scene,
+        camera,
+        renderer: {} as THREE.WebGLRenderer,
+      });
+      handle.dispose();
     }
   });
 });

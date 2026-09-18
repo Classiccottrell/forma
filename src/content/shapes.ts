@@ -418,6 +418,100 @@ const cross = defineShape({
   },
 });
 
+const pyramid = defineShape({
+  id: 'pyramid',
+  label: 'Pyramid',
+  category: 'faceted',
+  parameterSchema: {
+    radius: { kind: 'number', min: 0.3, max: 1.8, step: 0.05, default: 1, rebuild: true },
+    height: { kind: 'number', min: 0.3, max: 2.6, step: 0.05, default: 1.6, rebuild: true },
+    sides: { kind: 'number', min: 3, max: 8, step: 1, default: 4, rebuild: true },
+  },
+  defaultParameters: { radius: 1, height: 1.6, sides: 4 },
+  create(params, ctx) {
+    const geometry = new THREE.ConeGeometry(params.radius, params.height, params.sides);
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+const bevelledBox = defineShape({
+  id: 'bevelled-box',
+  label: 'Bevelled Box',
+  category: 'extruded',
+  parameterSchema: {
+    size: { kind: 'number', min: 0.4, max: 2.4, step: 0.05, default: 1.2, rebuild: true },
+    depth: { kind: 'number', min: 0.2, max: 2.4, step: 0.05, default: 1.2, rebuild: true },
+    bevel: { kind: 'number', min: 0, max: 0.2, step: 0.01, default: 0.08, rebuild: true },
+  },
+  defaultParameters: { size: 1.2, depth: 1.2, bevel: 0.08 },
+  create(params, ctx) {
+    const half = params.size / 2;
+    const shape = new THREE.Shape()
+      .moveTo(-half, -half)
+      .lineTo(half, -half)
+      .lineTo(half, half)
+      .lineTo(-half, half)
+      .closePath();
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: params.depth,
+      bevelEnabled: params.bevel > 0,
+      bevelSize: params.bevel,
+      bevelThickness: params.bevel,
+      steps: 1,
+    });
+    geometry.center();
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+const spring = defineShape({
+  id: 'spring',
+  label: 'Spring',
+  category: 'parametric',
+  parameterSchema: {
+    turns: { kind: 'number', min: 2, max: 12, step: 0.5, default: 6, rebuild: true },
+    radius: { kind: 'number', min: 0.2, max: 1.1, step: 0.05, default: 0.55, rebuild: true },
+    height: { kind: 'number', min: 0.6, max: 3, step: 0.1, default: 1.8, rebuild: true },
+    tube: { kind: 'number', min: 0.02, max: 0.2, step: 0.01, default: 0.08, rebuild: true },
+  },
+  defaultParameters: { turns: 6, radius: 0.55, height: 1.8, tube: 0.08 },
+  create(params, ctx) {
+    const curve = new HelixCurve(params.turns, params.radius, params.height);
+    const geometry = new THREE.TubeGeometry(curve, Math.max(48, Math.round(params.turns * 24)), params.tube, 8, false);
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+const vase = defineShape({
+  id: 'vase',
+  label: 'Vase',
+  category: 'lathe',
+  parameterSchema: {
+    height: { kind: 'number', min: 0.6, max: 2.8, step: 0.1, default: 1.8, rebuild: true },
+    radius: { kind: 'number', min: 0.3, max: 1.2, step: 0.05, default: 0.75, rebuild: true },
+    neck: { kind: 'number', min: 0.15, max: 0.7, step: 0.05, default: 0.35, rebuild: true },
+  },
+  defaultParameters: { height: 1.8, radius: 0.75, neck: 0.35 },
+  create(params, ctx) {
+    const half = params.height / 2;
+    const points = [
+      new THREE.Vector2(0.18, -half),
+      new THREE.Vector2(params.radius * 0.82, -half + params.height * 0.08),
+      new THREE.Vector2(params.radius, -half + params.height * 0.35),
+      new THREE.Vector2(params.radius * 0.78, half - params.height * 0.2),
+      new THREE.Vector2(params.neck, half - params.height * 0.08),
+      new THREE.Vector2(params.neck, half),
+    ];
+    const geometry = new THREE.LatheGeometry(points, 48);
+    geometry.center();
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
 // Small built-in glyph (a rounded square with a notch) — the svg-extrude default. Kept
 // tiny and always-valid so a freshly-selected shape (before any file is imported) and
 // the leak-check's defaultParameters pass never hit an empty/garbage SVG path.
@@ -505,6 +599,10 @@ export function registerShapes(): void {
     tetrahedron,
     ring,
     cross,
+    pyramid,
+    bevelledBox,
+    spring,
+    vase,
     svgExtrude,
   ]) {
     if (!shapeRegistry.get(def.id)) shapeRegistry.register(def);

@@ -239,8 +239,61 @@ const softbox = defineEnvironment({
   },
 });
 
+function makeAuroraBackgroundTexture(): THREE.DataTexture {
+  const width = 64;
+  const height = 32;
+  const data = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    const t = y / (height - 1);
+    for (let x = 0; x < width; x++) {
+      const wave = Math.sin(x * 0.25 + y * 0.18) * 0.5 + 0.5;
+      const i = (y * width + x) * 4;
+      data[i] = Math.round(10 + 36 * wave + 22 * (1 - t));
+      data[i + 1] = Math.round(18 + 105 * wave + 30 * (1 - t));
+      data[i + 2] = Math.round(48 + 130 * (1 - t) + 34 * wave);
+      data[i + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+const aurora = defineEnvironment({
+  id: 'aurora-atmosphere',
+  label: 'Aurora Atmosphere',
+  category: 'backdrop',
+  parameterSchema: {},
+  defaultParameters: {},
+  create(_params, ctx) {
+    const texture = makeAuroraBackgroundTexture();
+    ctx.registry.track(texture);
+    ctx.scene.background = texture;
+    const ambient = new THREE.AmbientLight(0x8fd8ff, 0.45);
+    const green = new THREE.PointLight(0x62ffca, 5, 7);
+    green.position.set(-1.4, 1.2, 1.2);
+    const violet = new THREE.DirectionalLight(0x8b7dff, 1.2);
+    violet.position.set(0.8, 0.6, -0.6);
+    ctx.scene.add(ambient, green, violet);
+    const lights = [ambient, green, violet];
+    let disposed = false;
+    const handle: LightHandle = {
+      lights,
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        ctx.scene.remove(...lights);
+        ctx.scene.background = null;
+      },
+    };
+    return handle;
+  },
+});
+
 export function registerEnvironments(): void {
-  for (const def of [studio, gradientSky, neonRoom, sunset, midnight, softbox]) {
+  for (const def of [studio, gradientSky, neonRoom, sunset, midnight, softbox, aurora]) {
     if (!environmentRegistry.get(def.id)) environmentRegistry.register(def);
   }
 }

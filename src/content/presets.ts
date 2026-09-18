@@ -138,6 +138,24 @@ const BUILT_IN_PRESET_SPECS: PresetSpec[] = [
     tags: ['stylized', 'playful'],
     spec: { shapeId: 'icosahedron', materialId: 'toon', environmentId: 'gradient-sky' },
   },
+  {
+    id: 'holographic-vase-aurora',
+    name: 'Holographic Vase',
+    tags: ['iridescent', 'atmospheric', 'lathe'],
+    spec: { shapeId: 'vase', materialId: 'holographic', environmentId: 'aurora-atmosphere' },
+  },
+  {
+    id: 'ceramic-pyramid-sunset',
+    name: 'Ceramic Pyramid',
+    tags: ['chalk', 'faceted', 'warm'],
+    spec: { shapeId: 'pyramid', materialId: 'ceramic', environmentId: 'sunset' },
+  },
+  {
+    id: 'plastic-spring-chromatic',
+    name: 'Plastic Spring',
+    tags: ['playful', 'parametric', 'prismatic'],
+    spec: { shapeId: 'spring', materialId: 'plastic', environmentId: 'aurora-atmosphere', effectIds: ['chromatic-aberration'] },
+  },
 ];
 
 /** Builds the curated built-in preset list. Must be called after
