@@ -30,4 +30,14 @@ describe('FormaRuntime shape framing', () => {
     expect(Math.abs(runtime.mesh.scale.x - sphereScale)).toBeLessThan(0.5);
     runtime.dispose();
   });
+
+  it('disposes external ownership once when called repeatedly', () => {
+    let externalDisposals = 0;
+    const runtime = makeHeadlessRuntime(() => externalDisposals++);
+
+    runtime.dispose();
+    runtime.dispose();
+
+    expect(externalDisposals).toBe(1);
+  });
 });

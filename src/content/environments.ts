@@ -16,7 +16,8 @@ const studio = defineEnvironment({
   parameterSchema: {},
   defaultParameters: {},
   create(_params, ctx) {
-    ctx.scene.background = new THREE.Color(0x3a3d45);
+    // The app owns the Studio backdrop so the published library stays renderer-agnostic.
+    ctx.scene.background = null;
     const ambient = new THREE.AmbientLight(0xffffff, 0.5);
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
     keyLight.position.set(0.4, 0.6, 1);

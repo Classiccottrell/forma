@@ -21,7 +21,8 @@ export function DefinitionPicker({ entries, selectedId, onSelect, filter, kind }
     ? entries.filter((e) => e.label.toLowerCase().includes(filter.toLowerCase()) || e.category.toLowerCase().includes(filter.toLowerCase()))
     : entries;
   return (
-    <div className="picker-grid">
+    <div className="picker-grid" role="listbox" aria-label={`${kind} options`}>
+      {visible.length === 0 && <div className="empty-state">No {kind} options match this search.</div>}
       {visible.map((e) => (
         <button
           key={e.id}
@@ -29,6 +30,9 @@ export function DefinitionPicker({ entries, selectedId, onSelect, filter, kind }
           className={`picker-cell${e.id === selectedId ? ' selected' : ''}`}
           onClick={() => onSelect(e.id)}
           title={e.category}
+          role="option"
+          aria-selected={e.id === selectedId}
+          aria-label={`${e.label}, ${e.category}${e.id === selectedId ? ', selected' : ''}`}
         >
           <span className="picker-thumb" data-kind={kind} data-id={e.id} aria-hidden="true" />
           <span className="picker-name">{e.label}</span>

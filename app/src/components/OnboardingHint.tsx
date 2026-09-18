@@ -26,7 +26,7 @@ export function OnboardingHint() {
 
   return (
     <div className="onboarding-hint" data-testid="onboarding-hint">
-      <span>Drag to orbit · scroll to zoom · try ✨ Surprise Me</span>
+      <span>Drag to orbit · scroll to zoom · try Surprise Me</span>
       <button type="button" className="onboarding-dismiss" onClick={dismiss} aria-label="Dismiss hint" data-testid="onboarding-dismiss">
         ×
       </button>

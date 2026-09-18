@@ -99,16 +99,18 @@ export default function App() {
           title="Reset composition to the default sphere/matte/studio setup"
           data-testid="reset-composition"
         >
-          ↺ Reset
+          Reset composition
         </button>
         <button
           type="button"
           className="btn panel-collapse-btn"
           onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          aria-controls="forma-control-panel"
           title="Toggle panel (H)"
           data-testid="panel-toggle"
         >
-          {collapsed ? '☰ Panel' : '✕ Panel'}
+          {collapsed ? 'Open panel' : 'Close panel'}
         </button>
       </div>
 

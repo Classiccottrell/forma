@@ -54,7 +54,7 @@ export function Viewport({ hostRef, scene, scheduler }: ViewportProps) {
           title={reducedMotion ? 'Disabled — prefers-reduced-motion is on' : 'Toggle auto-spin'}
           data-testid="auto-spin-toggle"
         >
-          {autoSpin ? '⟳ Spin: On' : '⟳ Spin: Off'}
+          {autoSpin ? 'Auto-spin: On' : 'Auto-spin: Off'}
         </button>
         <button
           type="button"
@@ -77,7 +77,7 @@ export function Viewport({ hostRef, scene, scheduler }: ViewportProps) {
           title="Reset camera to default orbit"
           data-testid="reset-camera"
         >
-          ⌂ Reset view
+          Reset view
         </button>
       </div>
     </>

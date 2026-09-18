@@ -57,9 +57,11 @@ export function ControlPanel(props: ControlPanelProps) {
   const visibleEffects = q ? effectRegistry.list().filter((d) => d.label.toLowerCase().includes(q)) : effectRegistry.list();
 
   return (
-    <div className={`control-panel${collapsed ? ' collapsed' : ''}`} data-testid="control-panel">
+    <div id="forma-control-panel" className={`control-panel${collapsed ? ' collapsed' : ''}`} data-testid="control-panel">
       <input
         className="search-input"
+        type="search"
+        aria-label="Search shapes, materials, environments, and effects"
         placeholder="Search shapes, materials…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -115,7 +117,7 @@ export function ControlPanel(props: ControlPanelProps) {
       </Section>
 
       <Section id="effects" title="Effects" open={isOpen('effects', effectEntries)} onToggle={toggle}>
-        {visibleEffects.map((def) => {
+        {visibleEffects.length === 0 ? <div className="empty-state">No effects match “{search}”.</div> : visibleEffects.map((def) => {
           const enabled = composition.effectIds.includes(def.id);
           return (
             <div key={def.id} style={{ marginBottom: 10 }}>
@@ -157,11 +159,18 @@ function Section({
 }) {
   return (
     <div className="section">
-      <div className="section-header" onClick={() => onToggle(id)} data-testid={`section-header-${id}`}>
+      <button
+        type="button"
+        className="section-header"
+        onClick={() => onToggle(id)}
+        aria-expanded={open}
+        aria-controls={`section-body-${id}`}
+        data-testid={`section-header-${id}`}
+      >
         <span>{title}</span>
-        <span>{open ? '−' : '+'}</span>
-      </div>
-      {open && <div className="section-body">{children}</div>}
+        <span className="section-icon" aria-hidden="true">{open ? '−' : '+'}</span>
+      </button>
+      {open && <div className="section-body" id={`section-body-${id}`}>{children}</div>}
     </div>
   );
 }
