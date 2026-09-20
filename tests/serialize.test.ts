@@ -11,6 +11,8 @@ function baseComposition(): Composition {
     shapeParams: { radius: 0.8, tube: 0.3, radialSegments: 16 },
     materialId: 'glass',
     materialParams: { color: '#ffffff', transmission: 0.9 },
+    textureId: 'none',
+    textureParams: {},
     environmentId: 'gradient-sky',
     environmentParams: {},
     effectIds: ['none'],
@@ -28,6 +30,18 @@ describe('serialize round-trip', () => {
   it('rejects an unknown shapeId', () => {
     const s = serializeComposition({ ...baseComposition(), shapeId: 'nonexistent' });
     expect(() => deserializeComposition(s)).toThrow(/unknown id/);
+  });
+
+  it('normalizes legacy compositions without a texture slot', () => {
+    const legacy = { ...baseComposition() } as Record<string, unknown>;
+    delete legacy.textureId;
+    delete legacy.textureParams;
+    expect(deserializeComposition(JSON.stringify(legacy))).toMatchObject({ textureId: 'none', textureParams: {} });
+  });
+
+  it('rejects an unknown textureId and mismatched texture params', () => {
+    expect(() => deserializeComposition(serializeComposition({ ...baseComposition(), textureId: 'missing', textureParams: {} }))).toThrow(/unknown id/);
+    expect(() => deserializeComposition(serializeComposition({ ...baseComposition(), textureId: 'checker-normal', textureParams: {} }))).toThrow(/textureParams/);
   });
 
   it('rejects a params object with keys that do not match the schema', () => {

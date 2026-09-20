@@ -17,9 +17,8 @@ core.
 - A React *adapter subpath shipped inside the `forma` package itself* — still
   deferred. (Distinct from: the product's own editor app, which IS built in React,
   as a separate app layer consuming `forma`'s public API — see `app/` roadmap.)
-- IBL/HDRI environment lighting — deferred until an environment genuinely needs it
-  (e.g. `chrome` material's mirror quality); flat-lighting + gradient/DataTexture
-  environments remain the technique through MVP and full content-library phases.
+- IBL/HDRI environment lighting is now used by Studio/Softbox for reflective
+  materials; the restrained dusk-sky CSS backdrop remains visually separate from `scene.environment`.
 
 ## Constraints
 - `src/` (the published library) stays framework-agnostic — no React/UI framework
@@ -111,11 +110,11 @@ core.
 ### M2 — Full content + SVG extrusion (COMPLETE)
 - [x] Content expanded toward target scale (58 shapes / 63 materials / 18
       environments / 11 effects) — incremental, not required all-at-once. Landed:
-      22 shapes / 18 materials / 7 environments / 6 effects.
+      22 shapes / 20 materials / 7 environments / 6 effects.
 - [x] `svg-extrude` shape definition (registry entry, not a special case) per roadmap
       §4; drag-and-drop upload (+ file-input fallback) in `app/`.
 - [x] Preset system (`Preset` wrapper type, versioned) + curated preset gallery.
-      `src/types.ts` (`Preset`), `src/content/presets.ts` (12 curated presets built
+      `src/types.ts` (`Preset`), `src/content/presets.ts` (8 curated presets built
       from live registry defaults), `app/src/components/PresetGallery.tsx`.
 - [x] "Surprise me" coherent-random-combo button. `src/content/surpriseMe.ts`
       (material/environment compatibility rules, not uniform-random),
@@ -161,12 +160,59 @@ core.
 - Expand toward the source plan: 30–40 shapes, 20+ materials, 6–8 environments, 5–6 effects.
 - Use cc-webgl lifecycle/quality/reduced-motion contracts directly, or explicitly split Forma into a separate renderer package.
 - Add real empty-state/import UX, accessible controls, preset thumbnails, and mobile export verification.
+- [x] Add validated composition JSON import through the Export section with a 1 MB guard.
 - Define composition/preset migrations and validate malformed user JSON at the input boundary.
+- **Texture-layer slice (COMPLETE):** one optional first-class DataTexture slot between
+  material and post-processing; `none`, `checker-normal`, and `weave-roughness` are
+  registry-native definitions. No external loader, fetched asset, or multi-layer stack.
+- **Texture pack replacement (NEXT):** retire the procedural checker/weave visuals as
+  primary content. Curate a small CC0 PBR pack from Poly Haven at 1K review size:
+  `rough_linen` for clean textile detail, `metal_plate_02` for worn industrial contrast,
+  and `granular_concrete` for mineral matte breakup. Each pack entry should own a
+  color/normal/roughness bundle, use OpenGL normal maps, expose UV scale + intensity,
+  and load through one cancellable asset loader with an explicit `textureBaseUrl` for
+  both the editor and generated embeds. Keep procedural DataTextures as offline/test
+  fallbacks. Do not add a multi-layer stack until these three materials read well.
+- **UI texture selection rule:** prefer quiet, low-frequency surfaces that survive text
+  and controls over photoreal detail. First catalog should be `paper-fiber` (light
+  grain), `linen-blue` (cool woven accent), `glass-noise` (very subtle translucency),
+  and `brushed-metal` (one high-contrast accent). Reject busy concrete, rusty metal,
+  and obvious tiling for default UI backgrounds; reserve them for hero art or cards.
+- **Modular delivery rule:** ship texture metadata and no bytes in the core bundle.
+  A `TexturePackManifest` maps stable IDs to optional color/normal/roughness URLs,
+  license/source, recommended use, and default intensity. `loadTexturePack(id, baseUrl)`
+  lazy-loads only the selected pack, caches it per URL, aborts unused requests, and
+  keeps `none`/procedural fallbacks for offline tests. The embed API receives the same
+  `baseUrl` explicitly so website hosts control CDN/static asset placement.
+
+  **Implementation slice (2026-09-18):** `TexturePackManifest` and the staged
+  `texturePackCatalog` now live in the published library. `TexturePackLoader` uses
+  `ImageLoader`, loads only declared maps from an explicit base URL, caches by
+  resolved URL, supports caller abort signals where practical, and exposes pack
+  disposal plus cache clearing. The app now ships local 1K color/normal/roughness
+  packs for `linen-blue`, `brushed-metal`, and `mineral-matte`, with OpenGL
+  normal-map assignments and procedural fallback on failure. `paper-fiber` and
+  `glass-noise` remain metadata-only. Local review is documented in the root and
+  app READMEs; pack attribution points to the Poly Haven source URLs. No CDN bytes
+  are bundled.
+
+  **Texture quality decision (2026-09-19):** Pack color maps are material-aware:
+  Linen Blue may tint authored color, while Brushed Metal and Mineral Matte supply
+  only normal/roughness detail. Runtime shape creation fills missing UVs with stable
+  spherical coordinates without replacing authored UV attributes; pack scale defaults
+  to 2 for broader, quieter coverage.
+
+### Parked future ideas
+
+- Transparent PNG hero art for landing pages and product headers.
+- Responsive embeddable canvas for interactive website hero sections.
+- Lightweight 3D UI decoration for cards, empty states, and navigation moments.
+- Theme hooks for site tokens, color modes, motion preferences, and brand palettes.
 
 ### H4 — Release readiness
 
 - [x] Add browser support matrix and tested deployment targets.
-- Publish versioned browser bundles and embeddable examples.
+- [x] Publish versioned browser bundles and embeddable examples.
 - [x] Add executable performance budgets, bundle-size policy, and release checklist.
 - Re-run full browser QA before marking the project shipped.
 
@@ -178,6 +224,14 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-09-19 | H3 UI-shape slice: added registry-native Badge and Tab rounded panels plus a centered Notched Card ExtrudeGeometry path with typed rebuild parameters, safe radius/notch/bevel clamping, focused finite-geometry smoke coverage, and truthful CSS picker thumbnails. Content total is now 27 shapes / 20 materials / 7 environments / 6 effects. |
+| 2026-09-19 | H3 shape slice: added registry-native Pill and Card rounded panels with typed rebuild parameters, radius clamping, focused finite-geometry smoke coverage, and truthful CSS picker thumbnails. Content total is now 24 shapes / 20 materials / 7 environments / 6 effects. |
+| 2026-09-19 | H3 material slice: added registry-native Rubber and Pearl materials with in-place parameter updates, native Three physical shading, compatibility-aware Surprise Me biasing, and CSS picker thumbnails. Content total is now 22 shapes / 20 materials / 7 environments / 6 effects. |
+| 2026-09-18 | Reflective lighting slice: added Poly Haven's CC0 Studio Small 01 tonemapped image as the app-owned Studio/Softbox backdrop plus its staged 1K HDR. FormaRuntime now loads PMREM IBL through an explicit app `environmentBaseUrl`, with stale-load/disposal guards and headless light fallback. |
+| 2026-09-18 | Texture audit: current procedural checker/weave set is a placeholder, not a convincing material library. Selected Poly Haven's CC0 `rough_linen`, `metal_plate_02`, and `granular_concrete` as the first real PBR pack; replacement requires a cancellable loader and explicit asset base URL for embeds. |
+| 2026-09-18 | H3 texture polish: added instant CSS reference thumbnails for `none`, `checker-normal`, and `weave-roughness` so the texture layer reads visually in the shared picker without preview scenes or asset loading. App typecheck/build and bundle budget pass. |
+| 2026-09-18 | Texture-layer slice complete: added legacy-normalized `textureId`/`textureParams`, typed texture definitions/handles, isolated runtime texture lifecycle with hot/cold diffing and material-rebuild reapply, procedural DataTexture content (`none`, `checker-normal`, `weave-roughness`), serialization validation, app Texture picker/params, focused registry/serialization/isolation/leak coverage. Website/hero ideas remain parked. |
+| 2026-09-18 | H4 browser distribution slice: versioned the IIFE output as `dist/forma.browser.v<package-version>.js`, aligned generated embed code, added `examples/embed/index.html`, and documented the local review path. Library/app typecheck, tests (45/45), builds, bundle budget, and localhost static smoke check pass. |
 | 2026-09-17 | H4 release-readiness slice: added Node-stdlib-only `app/npm run check:bundle`, enforcing 900,000 JavaScript-byte and 250,000 summed-gzip-byte budgets against an existing build; documented release checks, deployment/browser matrix, and current browser-QA caveat. Current baseline: 823,283 JavaScript bytes / 221,807 summed gzip bytes. |
 | 2026-09-17 | H3 hardening: `deserializeComposition()` now validates the JSON object and required field/container types at the input boundary, prefixes parse/shape errors with `deserializeComposition:`, preserves registry and schema-key validation, and adds focused malformed-input coverage. Library/app verification passes. |
 | 2026-09-17 | H3 content expansion: added four registry-native shapes (`pyramid`, `bevelled-box`, `spring`, `vase`), three materials (`plastic`, `ceramic`, `holographic`), procedural `aurora-atmosphere` DataTexture environment, lightweight `chromatic-aberration` ShaderPass, three curated presets, and picker rules. Registry smoke coverage now creates/disposes every environment and effect from defaults; content totals are 22 shapes / 18 materials / 7 environments / 6 effects. |

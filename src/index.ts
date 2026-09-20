@@ -1,12 +1,15 @@
 // Public barrel: types, registries, runtime, serialize/embed, export.
 export * from './types.js';
+export { TexturePackLoader, loadTexturePack, clearTexturePackCache, resolveTextureUrl, assertTexturePackManifest } from './texture/loader.js';
+export type { LoadedTexturePack, TexturePackLoadOptions } from './texture/loader.js';
 
 export { DefinitionRegistry } from './registry/DefinitionRegistry.js';
-export { shapeRegistry, materialRegistry, environmentRegistry, effectRegistry, defineShape, defineMaterial, defineEnvironment, defineEffect } from './registry/instances.js';
+export { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry, defineShape, defineMaterial, defineTexture, defineEnvironment, defineEffect } from './registry/instances.js';
 
 export { FormaRuntime } from './runtime/FormaRuntime.js';
 export type { FormaRuntimeOptions } from './runtime/FormaRuntime.js';
 export { slotKey, changedHotKeys } from './runtime/diff.js';
+export { ensureGeometryUVs } from './runtime/uv.js';
 export type { SlotName } from './runtime/diff.js';
 export { serializeComposition, deserializeComposition } from './runtime/serialize.js';
 export { generateEmbedCode } from './runtime/embed.js';

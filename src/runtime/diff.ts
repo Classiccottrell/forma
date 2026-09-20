@@ -1,7 +1,7 @@
 import type { Composition, ParamSchemaMap, ParamValue } from '../types.js';
-import { shapeRegistry, materialRegistry, environmentRegistry, effectRegistry } from '../registry/instances.js';
+import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry } from '../registry/instances.js';
 
-export type SlotName = 'shape' | 'material' | 'environment' | 'effects';
+export type SlotName = 'shape' | 'material' | 'texture' | 'environment' | 'effects';
 
 /** Deterministic hash: sorted keys, JSON.stringify. Only `rebuild:true` params are
  * included — a change to a rebuild:false (hot) param must NOT change the slot key,
@@ -36,6 +36,11 @@ export function slotKey(slot: SlotName, c: Composition): string {
     case 'material': {
       const def = materialRegistry.require(c.materialId);
       return `${c.materialId}:${stableHash(c.materialParams, def.parameterSchema)}`;
+    }
+    case 'texture': {
+      const id = c.textureId ?? 'none';
+      const def = textureRegistry.require(id);
+      return `${id}:${stableHash(c.textureParams ?? {}, def.parameterSchema)}`;
     }
     case 'environment': {
       const def = environmentRegistry.require(c.environmentId);

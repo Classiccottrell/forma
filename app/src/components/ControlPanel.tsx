@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { shapeRegistry, materialRegistry, environmentRegistry, effectRegistry, type Composition } from 'forma';
+import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry, type Composition } from 'forma';
 import { builtInPresets } from 'forma/content';
 import { DefinitionPicker } from './DefinitionPicker';
 import { ParamGroup } from './ParamGroup';
@@ -12,24 +12,26 @@ export interface ControlPanelProps {
   collapsed: boolean;
   composition: Composition;
   scene: FormaScene | null;
-  onSlotSelect(slot: 'shapeId' | 'materialId' | 'environmentId', id: string): void;
-  onParamChange(slot: 'shapeParams' | 'materialParams', key: string, value: Composition['shapeParams'][string]): void;
+  onSlotSelect(slot: 'shapeId' | 'materialId' | 'textureId' | 'environmentId', id: string): void;
+  onParamChange(slot: 'shapeParams' | 'materialParams' | 'textureParams', key: string, value: Composition['shapeParams'][string]): void;
   onEffectToggle(id: string, enabled: boolean): void;
   onEffectParamChange(id: string, key: string, value: Composition['shapeParams'][string]): void;
   onSvgImport(svgText: string): void;
   onApplyComposition(composition: Composition): void;
+  onImportComposition(composition: Composition): void;
 }
 
-type SectionId = 'presets' | 'shape' | 'material' | 'environment' | 'effects' | 'export';
+type SectionId = 'presets' | 'shape' | 'material' | 'texture' | 'environment' | 'effects' | 'export';
 
 /** Collapsible sections container: Shape / Material / Environment / Effects / Export.
  * Search box filters visible definitions by label/category (roadmap §6). */
 export function ControlPanel(props: ControlPanelProps) {
-  const { collapsed, composition, scene, onSlotSelect, onParamChange, onEffectToggle, onEffectParamChange, onSvgImport, onApplyComposition } = props;
+  const { collapsed, composition, scene, onSlotSelect, onParamChange, onEffectToggle, onEffectParamChange, onSvgImport, onApplyComposition, onImportComposition } = props;
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     presets: false,
     shape: true,
     material: true,
+    texture: false,
     environment: false,
     effects: false,
     export: false,
@@ -43,6 +45,7 @@ export function ControlPanel(props: ControlPanelProps) {
 
   const shapeDef = shapeRegistry.require(composition.shapeId);
   const materialDef = materialRegistry.require(composition.materialId);
+  const textureDef = textureRegistry.require(composition.textureId ?? 'none');
 
   // While searching, force-open any section with a match instead of mutating `open`
   // (keeps the user's manual collapse/expand choices intact once search clears).
@@ -61,7 +64,7 @@ export function ControlPanel(props: ControlPanelProps) {
       <input
         className="search-input"
         type="search"
-        aria-label="Search shapes, materials, environments, and effects"
+        aria-label="Search shapes, materials, textures, environments, and effects"
         placeholder="Search shapes, materials…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -73,9 +76,16 @@ export function ControlPanel(props: ControlPanelProps) {
         <PresetGallery presets={presets} onSelect={(p) => onApplyComposition(p.composition)} />
       </Section>
 
+      <Section id="texture" title="Texture" open={isOpen('texture', textureRegistry.list())} onToggle={toggle}>
+        <DefinitionPicker entries={textureRegistry.list()} selectedId={composition.textureId ?? 'none'} onSelect={(id) => onSlotSelect('textureId', id)} filter={search} kind="texture" />
+        <div style={{ marginTop: 10 }}>
+          <ParamGroup schema={textureDef.parameterSchema} values={composition.textureParams ?? {}} onChange={(k, v) => onParamChange('textureParams', k, v)} />
+        </div>
+      </Section>
+
       <Section id="shape" title="Shape" open={isOpen('shape', shapeRegistry.list())} onToggle={toggle}>
         <DefinitionPicker
-          entries={shapeRegistry.list()}
+          entries={shapeRegistry.list().filter((entry) => entry.id !== 'svg-extrude')}
           selectedId={composition.shapeId}
           onSelect={(id) => onSlotSelect('shapeId', id)}
           filter={search}
@@ -138,7 +148,7 @@ export function ControlPanel(props: ControlPanelProps) {
       </Section>
 
       <Section id="export" title="Export" open={open.export} onToggle={toggle}>
-        <ExportPanel scene={scene} composition={composition} />
+        <ExportPanel scene={scene} composition={composition} onImportComposition={onImportComposition} />
       </Section>
     </div>
   );

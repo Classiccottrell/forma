@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import * as THREE from 'three';
 import { slotKey } from '../src/index.js';
-import type { Composition } from '../src/index.js';
+import { FormaRuntime } from '../src/index.js';
+import type { Composition, LoadedTexturePack } from '../src/index.js';
 import { makeHeadlessRuntime, ensureHarnessContentRegistered } from './testUtils.js';
 
 ensureHarnessContentRegistered();
@@ -37,9 +39,50 @@ describe('slotKey stability', () => {
     const b = { ...a, shapeId: 'box', shapeParams: { size: 1, segments: 1 } };
     expect(slotKey('shape', a)).not.toBe(slotKey('shape', b));
   });
+
+  it('keeps texture hot params stable and rebuild params distinct', () => {
+    const a = { ...baseComposition(), textureId: 'checker-normal', textureParams: { scale: 4, strength: 0.5 } };
+    const hot = { ...a, textureParams: { scale: 4, strength: 1 } };
+    const cold = { ...a, textureParams: { scale: 8, strength: 0.5 } };
+    expect(slotKey('texture', a)).toBe(slotKey('texture', hot));
+    expect(slotKey('texture', a)).not.toBe(slotKey('texture', cold));
+  });
 });
 
 describe('applyComposition slot decoupling', () => {
+  it('does not let a stale texture pack replace the selected pack', async () => {
+    const pending: Array<(pack: LoadedTexturePack) => void> = [];
+    const loader = { loadTexturePack: () => new Promise<LoadedTexturePack>((resolve) => pending.push(resolve)) };
+    const scene = new THREE.Scene();
+    const runtime = new FormaRuntime({ scene, camera: new THREE.PerspectiveCamera(), renderer: {} as THREE.WebGLRenderer, textureBaseUrl: '/textures/', textureLoader: loader as never });
+    runtime.applyComposition({ ...baseComposition(), textureId: 'linen-blue', textureParams: { scale: 4, intensity: 1 } });
+    runtime.applyComposition({ ...baseComposition(), textureId: 'brushed-metal', textureParams: { scale: 4, intensity: 1 } });
+    const stale = new THREE.Texture();
+    const current = new THREE.Texture();
+    let staleDisposed = false;
+    pending[0]({ manifest: {} as never, intensity: 1, color: stale, dispose: () => { staleDisposed = true; } });
+    await Promise.resolve();
+    pending[1]({ manifest: {} as never, intensity: 1, color: current, dispose: () => {} });
+    await Promise.resolve();
+    expect(staleDisposed).toBe(true);
+    expect((runtime.mesh.material as THREE.MeshStandardMaterial).map).toBeNull();
+    runtime.dispose();
+  });
+
+  it('keeps headless environments on synchronous lights when no HDR base URL is supplied', () => {
+    let loads = 0;
+    const runtime = new FormaRuntime({
+      scene: new THREE.Scene(),
+      camera: new THREE.PerspectiveCamera(),
+      renderer: {} as THREE.WebGLRenderer,
+      environmentLoader: { load: () => { loads++; return {} as never; } },
+    });
+    runtime.applyComposition(baseComposition());
+    expect(loads).toBe(0);
+    expect(runtime.scene.environment).toBeNull();
+    runtime.dispose();
+  });
+
   it('never touches an unrelated slot on a partial change (material-only switch leaves shape registry identity unchanged)', () => {
     const runtime = makeHeadlessRuntime();
     runtime.applyComposition(baseComposition());
@@ -72,5 +115,16 @@ describe('applyComposition slot decoupling', () => {
     runtime.applyComposition({ ...baseComposition(), materialParams: { color: '#00ff00', roughness: 0.9 } });
 
     expect(runtime.getSlotRegistry('material')).toBe(materialRegistryBefore);
+  });
+
+  it('isolates and disposes the texture slot', () => {
+    const runtime = makeHeadlessRuntime();
+    runtime.applyComposition({ ...baseComposition(), textureId: 'checker-normal', textureParams: { scale: 4, strength: 0.5 } });
+    const textureRegistryBefore = runtime.getSlotRegistry('texture');
+    expect(textureRegistryBefore.report().some((entry) => entry.kind === 'texture')).toBe(true);
+    runtime.applyComposition({ ...baseComposition(), textureId: 'weave-roughness', textureParams: { scale: 3, contrast: 0.65 } });
+    expect(runtime.getSlotRegistry('texture')).not.toBe(textureRegistryBefore);
+    runtime.dispose();
+    expect(runtime.reportTotal()).toBe(0);
   });
 });

@@ -4,6 +4,7 @@ import {
   createFormaScene,
   shapeRegistry,
   materialRegistry,
+  textureRegistry,
   type Composition,
   type FormaScene,
   FrameScheduler,
@@ -24,6 +25,8 @@ export function defaultComposition(): Composition {
     shapeParams: { ...shapeRegistry.require('sphere').defaultParameters },
     materialId: 'matte',
     materialParams: { ...materialRegistry.require('matte').defaultParameters },
+    textureId: 'none',
+    textureParams: {},
     environmentId: 'studio',
     environmentParams: {},
     effectIds: [],
@@ -42,8 +45,8 @@ export interface UseFormaRuntimeResult {
 /** Mounts one `FormaRuntime` + owned scene bootstrap into `hostRef.current` (mount
  * once, per roadmap §6 hook list), exposes an `apply()` that merges a partial patch
  * into the live Composition and re-applies it (React-friendly wrapper). */
-export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>): UseFormaRuntimeResult {
-  const [current, setCurrent] = useState<Composition>(() => defaultComposition());
+export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>, initialComposition = defaultComposition()): UseFormaRuntimeResult {
+  const [current, setCurrent] = useState<Composition>(() => initialComposition);
   const [scene, setScene] = useState<FormaScene | null>(null);
   const [scheduler, setScheduler] = useState<FrameScheduler | null>(null);
   const runtimeRef = useRef<FormaRuntime | null>(null);
@@ -55,7 +58,9 @@ export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>): UseForma
     const el = hostRef.current;
     if (!el) return;
     const formaScene = createFormaScene({ el, cameraZ: 3.2 });
-    const runtime = new FormaRuntime({ scene: formaScene.scene, camera: formaScene.camera, renderer: formaScene.renderer, composer: formaScene.composer, disposeExternal: formaScene.dispose });
+    const textureBaseUrl = new URL('textures/', document.baseURI).href;
+    const environmentBaseUrl = new URL('environments/', document.baseURI).href;
+    const runtime = new FormaRuntime({ scene: formaScene.scene, camera: formaScene.camera, renderer: formaScene.renderer, composer: formaScene.composer, disposeExternal: formaScene.dispose, textureBaseUrl, environmentBaseUrl });
     runtime.applyComposition(currentRef.current);
     runtimeRef.current = runtime;
     setScene(formaScene);

@@ -7,15 +7,22 @@ export interface ViewportProps {
   hostRef: React.RefObject<HTMLDivElement>;
   scene: FormaScene | null;
   scheduler: FrameScheduler | null;
+  defaultAutoSpin?: boolean;
 }
 
 /** Mounts the canvas host div, wires OrbitControls (pointer+touch) + auto-spin once
  * `scene` is ready. `prefers-reduced-motion` forces auto-spin off regardless of the
  * toggle state (roadmap §6). */
-export function Viewport({ hostRef, scene, scheduler }: ViewportProps) {
+export function Viewport({ hostRef, scene, scheduler, defaultAutoSpin = false }: ViewportProps) {
   const reducedMotion = useReducedMotion();
-  const [autoSpin, setAutoSpin] = useState(false);
+  const [autoSpin, setAutoSpin] = useState(() => defaultAutoSpin && !reducedMotion);
+  const [spinSpeed, setSpinSpeed] = useState(2.2);
+  const wasAutoSpinning = useRef(false);
   const controlsRef = useRef<OrbitControls | null>(null);
+  const autoSpinRef = useRef(autoSpin);
+  const reducedMotionRef = useRef(reducedMotion);
+  autoSpinRef.current = autoSpin;
+  reducedMotionRef.current = reducedMotion;
 
   useEffect(() => {
     if (!scene) return;
@@ -23,7 +30,18 @@ export function Viewport({ hostRef, scene, scheduler }: ViewportProps) {
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controlsRef.current = controls;
+    const onStart = () => {
+      wasAutoSpinning.current = autoSpinRef.current && !reducedMotionRef.current;
+      controls.autoRotate = false;
+    };
+    const onEnd = () => {
+      controls.autoRotate = wasAutoSpinning.current && !reducedMotionRef.current;
+    };
+    controls.addEventListener('start', onStart);
+    controls.addEventListener('end', onEnd);
     return () => {
+      controls.removeEventListener('start', onStart);
+      controls.removeEventListener('end', onEnd);
       controls.dispose();
       controlsRef.current = null;
     };
@@ -33,8 +51,8 @@ export function Viewport({ hostRef, scene, scheduler }: ViewportProps) {
     const controls = controlsRef.current;
     if (!controls) return;
     controls.autoRotate = autoSpin && !reducedMotion;
-    controls.autoRotateSpeed = 2.2;
-  }, [autoSpin, reducedMotion, scene]);
+    controls.autoRotateSpeed = spinSpeed;
+  }, [autoSpin, reducedMotion, spinSpeed, scene]);
 
   useEffect(() => {
     const controls = controlsRef.current;
@@ -56,6 +74,19 @@ export function Viewport({ hostRef, scene, scheduler }: ViewportProps) {
         >
           {autoSpin ? 'Auto-spin: On' : 'Auto-spin: Off'}
         </button>
+        <label className="spin-speed" htmlFor="spin-speed">
+          <span>Speed {spinSpeed.toFixed(1)}</span>
+          <input
+            id="spin-speed"
+            type="range"
+            min="0"
+            max="5"
+            step="0.1"
+            value={spinSpeed}
+            aria-label="Auto-spin speed"
+            onChange={(e) => setSpinSpeed(Number(e.target.value))}
+          />
+        </label>
         <button
           type="button"
           className="btn"

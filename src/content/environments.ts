@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { defineEnvironment, environmentRegistry } from '../registry/instances.js';
 import type { EnvironmentHandle } from '../types.js';
 
-// Two environment definitions (blueprint §5.3). Both configure scene.background +
-// lights only — no IBL/PMREM in pre-work scope.
+// Environment definitions configure scene.background + lights; Studio/Softbox also
+// declare the app-hosted HDR used for reflective image-based lighting.
 
 interface LightHandle extends EnvironmentHandle {
   lights: THREE.Object3D[];
@@ -13,6 +13,7 @@ const studio = defineEnvironment({
   id: 'studio',
   label: 'Studio',
   category: 'lighting',
+  hdrPath: 'studio-small-01.hdr',
   parameterSchema: {},
   defaultParameters: {},
   create(_params, ctx) {
@@ -214,6 +215,7 @@ const softbox = defineEnvironment({
   id: 'softbox',
   label: 'Softbox',
   category: 'lighting',
+  hdrPath: 'studio-small-01.hdr',
   parameterSchema: {},
   defaultParameters: {},
   create(_params, ctx) {

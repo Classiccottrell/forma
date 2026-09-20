@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { defineMaterial, materialRegistry } from '../registry/instances.js';
 
-// Four material definitions (blueprint §5.2). Every `update()` mutates the live
+// Registry-native material definitions (blueprint §5.2). Every `update()` mutates the live
 // material in place (no disposeAll) — proves requirement 3's allocation-avoidance
 // path for hot color/roughness/metalness/transmission tweaks.
 
@@ -480,6 +480,66 @@ const holographic = defineMaterial({
   },
 });
 
+const rubber = defineMaterial({
+  id: 'rubber',
+  label: 'Rubber',
+  category: 'pbr',
+  parameterSchema: {
+    color: { kind: 'color', default: '#17191f', rebuild: false },
+    roughness: { kind: 'number', min: 0.7, max: 1, step: 0.05, default: 0.92, rebuild: false },
+  },
+  defaultParameters: { color: '#17191f', roughness: 0.92 },
+  create(params, ctx) {
+    const material = new THREE.MeshPhysicalMaterial({
+      color: params.color,
+      roughness: params.roughness,
+      metalness: 0,
+      specularIntensity: 0.22,
+    });
+    ctx.registry.track(material);
+    return material;
+  },
+  update(material, params) {
+    const m = material as THREE.MeshPhysicalMaterial;
+    m.color.set(params.color);
+    m.roughness = params.roughness;
+    m.needsUpdate = true;
+  },
+});
+
+const pearl = defineMaterial({
+  id: 'pearl',
+  label: 'Pearl',
+  category: 'pbr',
+  parameterSchema: {
+    color: { kind: 'color', default: '#fff4ea', rebuild: false },
+    iridescence: { kind: 'number', min: 0, max: 1, step: 0.05, default: 0.35, rebuild: false },
+    roughness: { kind: 'number', min: 0.05, max: 0.5, step: 0.05, default: 0.18, rebuild: false },
+  },
+  defaultParameters: { color: '#fff4ea', iridescence: 0.35, roughness: 0.18 },
+  create(params, ctx) {
+    const material = new THREE.MeshPhysicalMaterial({
+      color: params.color,
+      roughness: params.roughness,
+      metalness: 0,
+      iridescence: params.iridescence,
+      iridescenceIOR: 1.5,
+      iridescenceThicknessRange: [180, 520],
+      sheen: 0.25,
+      sheenColor: '#ffd9ed',
+    });
+    ctx.registry.track(material);
+    return material;
+  },
+  update(material, params) {
+    const m = material as THREE.MeshPhysicalMaterial;
+    m.color.set(params.color);
+    m.iridescence = params.iridescence;
+    m.roughness = params.roughness;
+    m.needsUpdate = true;
+  },
+});
+
 export function registerMaterials(): void {
   for (const def of [
     matte,
@@ -500,6 +560,8 @@ export function registerMaterials(): void {
     plastic,
     ceramic,
     holographic,
+    rubber,
+    pearl,
   ]) {
     if (!materialRegistry.get(def.id)) materialRegistry.register(def);
   }

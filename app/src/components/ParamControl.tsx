@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { ParamSchema, ParamValue } from 'forma';
 
 export interface ParamControlProps {
@@ -16,12 +17,46 @@ export interface ParamControlProps {
  * every definition (advisor guidance). */
 export function ParamControl({ id, label, schema, value, onChange }: ParamControlProps): JSX.Element {
   switch (schema.kind) {
-    case 'number':
+    case 'number': {
+      const numericValue = Number(value);
+      const [draft, setDraft] = useState(String(numericValue));
+      useEffect(() => setDraft(String(numericValue)), [numericValue]);
+      const commit = (raw: string) => {
+        if (raw.trim() === '') {
+          setDraft(String(numericValue));
+          return;
+        }
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) {
+          setDraft(String(numericValue));
+          return;
+        }
+        const clamped = Math.min(schema.max, Math.max(schema.min, parsed));
+        const stepped = schema.min + Math.round((clamped - schema.min) / schema.step) * schema.step;
+        const next = Math.min(schema.max, Math.max(schema.min, Number(stepped.toFixed(10))));
+        setDraft(String(next));
+        if (next !== numericValue) onChange(next);
+      };
       return (
         <div className="param-row">
           <div className="param-label">
             <span>{label}</span>
-            <span className="value">{Number(value).toFixed(2)}</span>
+            <input
+              className="param-number"
+              type="number"
+              aria-label={`${label} exact value`}
+              min={schema.min}
+              max={schema.max}
+              step={schema.step}
+              value={draft}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setDraft(raw);
+                if (raw.trim() !== '' && Number.isFinite(Number(raw))) commit(raw);
+              }}
+              onBlur={(e) => commit(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(e.currentTarget.value); } }}
+            />
           </div>
           <input
             id={id}
@@ -30,11 +65,13 @@ export function ParamControl({ id, label, schema, value, onChange }: ParamContro
             min={schema.min}
             max={schema.max}
             step={schema.step}
-            value={Number(value)}
+            value={numericValue}
+            style={{ '--range-pct': `${((numericValue - schema.min) / (schema.max - schema.min)) * 100}%` } as React.CSSProperties}
             onChange={(e) => onChange(Number(e.target.value))}
           />
         </div>
       );
+    }
     case 'enum':
       return (
         <div className="param-row">

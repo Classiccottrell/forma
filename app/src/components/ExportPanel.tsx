@@ -1,18 +1,40 @@
-import { useState } from 'react';
-import { exportPNG, generateEmbedCode, type Composition, type FormaScene } from 'forma';
+import { useRef, useState } from 'react';
+import { deserializeComposition, exportPNG, generateEmbedCode, type Composition, type FormaScene } from 'forma';
 
 export interface ExportPanelProps {
   scene: FormaScene | null;
   composition: Composition;
+  onImportComposition(composition: Composition): void;
 }
+
+const MAX_IMPORT_BYTES = 1024 * 1024;
 
 /** PNG export (size input + trigger) and Copy Code — calls `exportPNG`/
  * `generateEmbedCode` from Forma's public API (roadmap §6). */
-export function ExportPanel({ scene, composition }: ExportPanelProps) {
+export function ExportPanel({ scene, composition, onImportComposition }: ExportPanelProps) {
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
   const [status, setStatus] = useState('');
   const [output, setOutput] = useState('');
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImportChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    if (file.size > MAX_IMPORT_BYTES) {
+      setStatus('import failed: composition file must be 1 MB or smaller');
+      return;
+    }
+    try {
+      const imported = deserializeComposition(await file.text());
+      onImportComposition(imported);
+      setStatus(`imported ${file.name}`);
+    } catch (err) {
+      setStatus(`import failed: ${(err as Error).message}`);
+    }
+  }
 
   async function handleExportPNG() {
     if (!scene) return;
@@ -57,7 +79,22 @@ export function ExportPanel({ scene, composition }: ExportPanelProps) {
           Copy Code
         </button>
       </div>
-      {status && <div className={`status-message ${status.startsWith('export failed') ? '' : 'success'}`} data-kind={status.startsWith('export failed') ? 'error' : 'success'} role="status">{status}</div>}
+      <div className="import-row">
+        <button type="button" className="btn" onClick={() => importInputRef.current?.click()}>
+          Import JSON
+        </button>
+        <input
+          id="import-composition"
+          ref={importInputRef}
+          className="sr-only"
+          type="file"
+          accept="application/json,.json"
+          onChange={handleImportChange}
+          data-testid="import-composition"
+        />
+        <span className="field-help">Validated composition file, max 1 MB</span>
+      </div>
+      {status && <div className={`status-message ${status.includes('failed') ? '' : 'success'}`} data-kind={status.includes('failed') ? 'error' : 'success'} role={status.includes('failed') ? 'alert' : 'status'} aria-live="polite">{status}</div>}
       {output && <textarea className="copy-output" readOnly value={output} data-testid="embed-output" />}
     </div>
   );

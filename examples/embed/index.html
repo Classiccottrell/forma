@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Forma embed example</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #090b12; color: #e8eaf2; }
+      main { width: min(92vw, 760px); }
+      #forma-mount { height: min(72vh, 620px); min-height: 360px; border: 1px solid #2d3447; border-radius: 16px; overflow: hidden; }
+      p { color: #9ca5bb; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Forma embed</h1>
+      <p>Static browser bundle contract: <code>forma.browser.v0.1.0.js</code></p>
+      <div id="forma-mount"></div>
+    </main>
+    <script src="../../dist/forma.browser.v0.1.0.js"></script>
+    <script>
+      Forma.registerAllContent();
+      Forma.mountForma(document.getElementById('forma-mount'), {
+        shapeId: 'sphere',
+        shapeParams: { radius: 1, segments: 32 },
+        materialId: 'matte',
+        materialParams: { color: '#7f78ff', roughness: 0.8 },
+        environmentId: 'studio',
+        environmentParams: {},
+        effectIds: [],
+        effectParams: {}
+      });
+    </script>
+  </body>
+</html>

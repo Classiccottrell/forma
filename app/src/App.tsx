@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Composition, ParamValue } from 'forma';
-import { shapeRegistry, materialRegistry, effectRegistry } from 'forma';
+import { shapeRegistry, materialRegistry, textureRegistry, effectRegistry } from 'forma';
 const SVG_EXTRUDE_SHAPE_ID = 'svg-extrude';
 import { useFormaRuntime, defaultComposition } from './hooks/useFormaRuntime';
 import { Viewport } from './components/Viewport';
 import { ControlPanel } from './components/ControlPanel';
 import { SurpriseMeButton } from './components/SurpriseMeButton';
 import { OnboardingHint } from './components/OnboardingHint';
+import HomePage from './HomePage';
+import CreatorPanel from './components/CreatorPanel';
 
 /** True while a shortcut should NOT fire — focus is in a text input, textarea,
  * select, or contenteditable element (search box, SVG-paste textarea, etc.). */
@@ -18,9 +20,13 @@ function isTypingTarget(target: EventTarget | null): boolean {
 /** Top-level layout: viewport + ControlPanel + top bar (roadmap §6). Holds
  * Composition state via useFormaRuntime, passes apply(patch) down. */
 export default function App() {
+  if (typeof window !== 'undefined' && window.location.pathname !== '/editor') {
+    return <HomePage gallery={new URLSearchParams(window.location.search).get('variant') === 'gallery'} />;
+  }
   const hostRef = useRef<HTMLDivElement>(null);
   const { scene, scheduler, apply, current } = useFormaRuntime(hostRef);
   const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 640);
+  const [creatorMode, setCreatorMode] = useState(false);
 
   // `H` toggles the control panel. No modifiers (Cmd/Ctrl+H would hide the browser
   // window on macOS), and never fires while a text input/textarea/select has focus
@@ -41,17 +47,19 @@ export default function App() {
     (window as unknown as { __formaDebug?: unknown }).__formaDebug = scene ? { camera: scene.camera } : undefined;
   }, [scene]);
 
-  function onSlotSelect(slot: 'shapeId' | 'materialId' | 'environmentId', id: string) {
+  function onSlotSelect(slot: 'shapeId' | 'materialId' | 'textureId' | 'environmentId', id: string) {
     if (slot === 'shapeId') {
       apply({ shapeId: id, shapeParams: { ...shapeRegistry.require(id).defaultParameters } });
     } else if (slot === 'materialId') {
       apply({ materialId: id, materialParams: { ...materialRegistry.require(id).defaultParameters } });
+    } else if (slot === 'textureId') {
+      apply({ textureId: id, textureParams: { ...textureRegistry.require(id).defaultParameters } });
     } else {
       apply({ environmentId: id, environmentParams: {} });
     }
   }
 
-  function onParamChange(slot: 'shapeParams' | 'materialParams', key: string, value: ParamValue) {
+  function onParamChange(slot: 'shapeParams' | 'materialParams' | 'textureParams', key: string, value: ParamValue) {
     apply({ [slot]: { ...current[slot], [key]: value } } as Partial<Composition>);
   }
 
@@ -73,6 +81,10 @@ export default function App() {
     apply(composition);
   }
 
+  function importComposition(composition: Composition) {
+    apply(composition);
+  }
+
   function onEffectParamChange(id: string, key: string, value: ParamValue) {
     apply({
       effectParams: {
@@ -83,7 +95,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-environment={current.environmentId}>
       <Viewport hostRef={hostRef} scene={scene} scheduler={scheduler} />
       <OnboardingHint />
 
@@ -100,6 +112,9 @@ export default function App() {
           data-testid="reset-composition"
         >
           Reset composition
+        </button>
+        <button type="button" className={`btn${creatorMode ? ' toggle-on' : ''}`} onClick={() => setCreatorMode((v) => !v)} aria-pressed={creatorMode} data-testid="creator-mode-toggle">
+          Creator mode: {creatorMode ? 'On' : 'Off'}
         </button>
         <button
           type="button"
@@ -124,7 +139,9 @@ export default function App() {
         onEffectParamChange={onEffectParamChange}
         onSvgImport={onSvgImport}
         onApplyComposition={applyComposition}
+        onImportComposition={importComposition}
       />
+      {creatorMode && <CreatorPanel composition={current} />}
     </div>
   );
 }

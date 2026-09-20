@@ -1,8 +1,8 @@
 import type { Composition } from '../types.js';
-import { shapeRegistry, materialRegistry, environmentRegistry, effectRegistry } from '../registry/instances.js';
+import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry } from '../registry/instances.js';
 
 export function serializeComposition(c: Composition): string {
-  return JSON.stringify(c);
+  return JSON.stringify({ ...c, textureId: c.textureId ?? 'none', textureParams: c.textureParams ?? {} });
 }
 
 /** Shape-of-data check only (blueprint §5.4) — not a validation library. Confirms
@@ -24,6 +24,11 @@ export function deserializeComposition(s: string): Composition {
   const materialDef = materialRegistry.require(c.materialId);
   assertKeysMatch('materialParams', c.materialParams, materialDef.parameterSchema);
 
+  const textureId = c.textureId ?? 'none';
+  const textureParams = c.textureParams ?? {};
+  const textureDef = textureRegistry.require(textureId);
+  assertKeysMatch('textureParams', textureParams, textureDef.parameterSchema);
+
   const envDef = environmentRegistry.require(c.environmentId);
   assertKeysMatch('environmentParams', c.environmentParams, envDef.parameterSchema);
 
@@ -32,7 +37,7 @@ export function deserializeComposition(s: string): Composition {
     assertKeysMatch(`effectParams.${id}`, c.effectParams[id] ?? {}, def.parameterSchema);
   }
 
-  return c;
+  return { ...c, textureId, textureParams };
 }
 
 function assertCompositionShape(value: unknown): asserts value is Composition {
@@ -42,6 +47,8 @@ function assertCompositionShape(value: unknown): asserts value is Composition {
   assertParams(value.shapeParams, 'shapeParams');
   assertString(value, 'materialId');
   assertParams(value.materialParams, 'materialParams');
+  if (value.textureId !== undefined) assertString(value, 'textureId');
+  if (value.textureParams !== undefined) assertParams(value.textureParams, 'textureParams');
   assertString(value, 'environmentId');
   assertParams(value.environmentParams, 'environmentParams');
 
