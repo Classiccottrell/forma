@@ -275,9 +275,12 @@ const capsule = defineShape({
   },
 });
 
+// A faceted icosahedron, not a cut stone — `diamond` below is the real brilliant
+// cut. The label says so; the `id` stays `gem` because presets reference it and
+// serialized compositions are keyed by id.
 const gem = defineShape({
   id: 'gem',
-  label: 'Gem',
+  label: 'Faceted Gem',
   category: 'faceted',
   parameterSchema: {
     radius: { kind: 'number', min: 0.3, max: 2, step: 0.05, default: 1, rebuild: true },
@@ -663,10 +666,269 @@ const pyramid = defineShape({
   },
 });
 
+// --- designed solids -------------------------------------------------------
+//
+// The shapes above are math primitives, rounded boxes or 2D-profile extrusions.
+// These are built facet by facet from a named face list, because the thing that
+// makes a diamond read as a diamond (rather than as a lumpy sphere) is the
+// *pattern* of its facets, not just its silhouette.
+//
+// Two shared decisions, both deliberate:
+//
+// 1. `THREE.ConvexGeometry` looks like the obvious tool and is not usable here.
+//    In three r185 it walks each hull face's half-edge loop and pushes every
+//    vertex with no triangulation, so any face with more than three edges comes
+//    out as garbage; and `ConvexHull` silently discards points that sit within
+//    tolerance of an existing face plane, which is exactly what a brilliant
+//    cut's coplanar table corners and star points do. An explicit face list has
+//    no tolerance behaviour at all.
+// 2. Faces are emitted as a triangle soup and de-indexed by construction, so
+//    `computeVertexNormals()` gives one flat normal per triangle. That is the
+//    shape-side half of a faceted look — the same reason `gem` calls
+//    `toNonIndexed()` (a material's `flatShading` alone cannot facet a
+//    shared-vertex geometry).
+
+type Tri = [THREE.Vector3, THREE.Vector3, THREE.Vector3];
+
+/** Splits a planar quad `a-b-c-d` (in order around its rim) into two triangles. */
+function quad(out: Tri[], a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3): void {
+  out.push([a, b, c], [a, c, d]);
+}
+
+/** Point at `radius` from the Y axis, at height `y`, azimuth `angle`. */
+function polar(radius: number, y: number, angle: number): THREE.Vector3 {
+  return new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+}
+
+/**
+ * Builds a non-indexed, flat-shaded geometry from a triangle soup, flipping any
+ * triangle whose winding faces inward.
+ *
+ * Both solids below are convex with the origin strictly inside, so every face
+ * plane satisfies `normal · point > 0` for the outward normal — which makes
+ * "does this triangle's normal point away from the origin?" an exact test, not
+ * a heuristic. That in turn means the face lists can be written in whatever
+ * order reads clearest without tracking winding by hand, which is where
+ * hand-built geometry usually goes wrong (a back-facing facet is invisible
+ * under `side: FrontSide`, so it shows up as a hole, not as a wrong colour).
+ */
+function facetedGeometry(triangles: Tri[]): THREE.BufferGeometry {
+  const positions = new Float32Array(triangles.length * 9);
+  const ab = new THREE.Vector3();
+  const ac = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+  const centroid = new THREE.Vector3();
+  let i = 0;
+  for (const [a, b, c] of triangles) {
+    normal.crossVectors(ab.subVectors(b, a), ac.subVectors(c, a));
+    centroid.copy(a).add(b).add(c).multiplyScalar(1 / 3);
+    const flip = normal.dot(centroid) < 0;
+    const second = flip ? c : b;
+    const third = flip ? b : c;
+    positions[i++] = a.x; positions[i++] = a.y; positions[i++] = a.z;
+    positions[i++] = second.x; positions[i++] = second.y; positions[i++] = second.z;
+    positions[i++] = third.x; positions[i++] = third.y; positions[i++] = third.z;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/**
+ * A real round brilliant: 1 table + 8 bezels + 8 stars + 16 upper girdle halves
+ * + 8 pavilion mains + 16 lower girdle halves = the canonical 57 facets, plus a
+ * 16-sided girdle band, and a pointed culet (modern ideal cuts have no culet
+ * facet). Built at girdle radius 1 and scaled afterwards so the proportions are
+ * scale-invariant.
+ *
+ * Gemmology quotes every proportion as a percentage of the girdle *diameter*,
+ * which is how the parameters below are expressed and why each one is doubled
+ * on the way in. Defaults are the modern ideal cut: 55% table, 16.2% crown,
+ * 43.1% pavilion, 3% girdle.
+ *
+ * The one piece of real geometry here is where the star points go. A star point
+ * is the intersection of two adjacent bezel planes, so rather than guessing its
+ * height it is solved for: given the bezel plane through the table edge and the
+ * girdle (symmetric about its own meridian, so its normal lies in that
+ * meridian), a point at azimuth ±22.5° off that meridian and radius `starR`
+ * lies on the plane at exactly the height below. Doing it this way keeps every
+ * bezel kite perfectly planar, which is what makes the crown catch light in
+ * eight clean panels instead of eight subtly-warped ones. The pavilion mains
+ * are solved identically against the culet.
+ */
+function brilliantTriangles(p: {
+  tableRatio: number;
+  crownHeight: number;
+  pavilionDepth: number;
+  girdleThickness: number;
+  starRatio: number;
+  lowerRatio: number;
+}): Tri[] {
+  const SECTORS = 8;
+  const step = (Math.PI * 2) / SECTORS;
+  const half = step / 2;
+  const cosHalf = Math.cos(half);
+
+  const yGirdleTop = p.girdleThickness / 2;
+  const yGirdleBottom = -yGirdleTop;
+  const yTable = yGirdleTop + p.crownHeight;
+  const yCulet = yGirdleBottom - p.pavilionDepth;
+
+  // Bezel plane through (tableRatio, yTable) and (1, yGirdleTop) in meridian
+  // (radius, height) coordinates; `bezelSlope` is |dy|/dr, the normal's ratio.
+  const bezelSlope = (yTable - yGirdleTop) / (1 - p.tableRatio);
+  const starR = p.tableRatio + p.starRatio * (1 - p.tableRatio);
+  const yStar = yTable - bezelSlope * (starR * cosHalf - p.tableRatio);
+
+  // Pavilion main plane through the culet (0, yCulet) and (1, yGirdleBottom).
+  const pavR = p.lowerRatio;
+  const yPav = yCulet + p.pavilionDepth * pavR * cosHalf;
+
+  const A: THREE.Vector3[] = []; // table corners
+  const S: THREE.Vector3[] = []; // star / upper-girdle junctions
+  const Bt: THREE.Vector3[] = []; // girdle top, under a bezel
+  const Mt: THREE.Vector3[] = []; // girdle top, between bezels
+  const Bb: THREE.Vector3[] = [];
+  const Mb: THREE.Vector3[] = [];
+  const P: THREE.Vector3[] = []; // pavilion / lower-girdle junctions
+  for (let k = 0; k < SECTORS; k++) {
+    const a = k * step;
+    A.push(polar(p.tableRatio, yTable, a));
+    S.push(polar(starR, yStar, a + half));
+    Bt.push(polar(1, yGirdleTop, a));
+    Mt.push(polar(1, yGirdleTop, a + half));
+    Bb.push(polar(1, yGirdleBottom, a));
+    Mb.push(polar(1, yGirdleBottom, a + half));
+    P.push(polar(pavR, yPav, a + half));
+  }
+  const culet = new THREE.Vector3(0, yCulet, 0);
+  const next = (k: number) => (k + 1) % SECTORS;
+  const prev = (k: number) => (k + SECTORS - 1) % SECTORS;
+
+  const tris: Tri[] = [];
+  for (let k = 1; k < SECTORS - 1; k++) tris.push([A[0], A[k], A[k + 1]]); // table
+  for (let k = 0; k < SECTORS; k++) {
+    tris.push([A[k], A[next(k)], S[k]]); // star facet
+    quad(tris, A[k], S[k], Bt[k], S[prev(k)]); // bezel kite
+    tris.push([S[k], Bt[k], Mt[k]], [S[k], Mt[k], Bt[next(k)]]); // upper girdle halves
+    quad(tris, Bt[k], Mt[k], Mb[k], Bb[k]); // girdle band
+    quad(tris, Mt[k], Bt[next(k)], Bb[next(k)], Mb[k]);
+    tris.push([P[k], Bb[k], Mb[k]], [P[k], Mb[k], Bb[next(k)]]); // lower girdle halves
+    quad(tris, Bb[k], P[k], culet, P[prev(k)]); // pavilion main
+  }
+  return tris;
+}
+
+const diamond = defineShape({
+  id: 'diamond',
+  label: 'Diamond',
+  category: 'faceted',
+  parameterSchema: {
+    radius: { kind: 'number', min: 0.3, max: 2, step: 0.05, default: 1, rebuild: true },
+    // All four below are percentages of the girdle diameter, as gemmology quotes
+    // them. Ranges bracket real cut grades rather than being arbitrary.
+    tablePercent: { kind: 'number', min: 0.4, max: 0.7, step: 0.01, default: 0.55, rebuild: true },
+    crownPercent: { kind: 'number', min: 0.08, max: 0.26, step: 0.002, default: 0.162, rebuild: true },
+    pavilionPercent: { kind: 'number', min: 0.3, max: 0.58, step: 0.002, default: 0.431, rebuild: true },
+    girdlePercent: { kind: 'number', min: 0.005, max: 0.09, step: 0.005, default: 0.03, rebuild: true },
+    // How far the star facets reach from the table edge toward the girdle, and
+    // how far the lower girdle facets reach from the girdle toward the culet.
+    starLength: { kind: 'number', min: 0.3, max: 0.8, step: 0.01, default: 0.55, rebuild: true },
+    lowerHalves: { kind: 'number', min: 0.55, max: 0.9, step: 0.01, default: 0.77, rebuild: true },
+  },
+  defaultParameters: {
+    radius: 1,
+    tablePercent: 0.55,
+    crownPercent: 0.162,
+    pavilionPercent: 0.431,
+    girdlePercent: 0.03,
+    starLength: 0.55,
+    lowerHalves: 0.77,
+  },
+  create(params, ctx) {
+    const geometry = facetedGeometry(
+      brilliantTriangles({
+        tableRatio: params.tablePercent,
+        // Diameter percentages -> girdle-radius units.
+        crownHeight: params.crownPercent * 2,
+        pavilionDepth: params.pavilionPercent * 2,
+        girdleThickness: params.girdlePercent * 2,
+        starRatio: params.starLength,
+        lowerRatio: params.lowerHalves,
+      }),
+    );
+    geometry.scale(params.radius, params.radius, params.radius);
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+/**
+ * Chamfered box: 6 rectangles + 12 edge chamfers + 8 corner chamfers = 26 faces.
+ * Every vertex is a permutation of the half-extents with one axis at full size
+ * and the other two pulled in by the chamfer, which is the exact vertex set of a
+ * chamfered box — so the faces are planar by construction and the chamfer is
+ * uniform on all twelve edges.
+ *
+ * That last part is why this is no longer an `ExtrudeGeometry` with
+ * `bevelEnabled`: extrusion bevels only the front and back rims and leaves the
+ * four side edges sharp, so the shape read "bevelled" from one axis and
+ * hard-edged from the other two.
+ */
+function chamferedBoxTriangles(hx: number, hy: number, hz: number, chamfer: number): Tri[] {
+  const h = [hx, hy, hz];
+  // Keep every reduced extent strictly positive — the parameter ranges allow a
+  // chamfer larger than the smallest half-extent, which would invert the solid.
+  const c = Math.min(chamfer, 0.98 * Math.min(hx, hy, hz));
+  // Coordinates are assembled per-axis so the three families of faces can be
+  // written once and rotated, rather than three times by hand. In the frame for
+  // family `a`: `major` is axis a, `u` is axis (a+1)%3, `v` is axis (a+2)%3.
+  const axis = (a: number, major: number, u: number, v: number): THREE.Vector3 =>
+    a === 0 ? new THREE.Vector3(major, u, v) : a === 1 ? new THREE.Vector3(v, major, u) : new THREE.Vector3(u, v, major);
+
+  const tris: Tri[] = [];
+  for (let a = 0; a < 3; a++) {
+    const H = h[a];
+    const U = h[(a + 1) % 3] - c;
+    const V = h[(a + 2) % 3] - c;
+    for (const sa of [1, -1]) {
+      // Rectangular face on axis `a`.
+      quad(tris, axis(a, sa * H, U, V), axis(a, sa * H, -U, V), axis(a, sa * H, -U, -V), axis(a, sa * H, U, -V));
+      for (const sb of [1, -1]) {
+        // Edge chamfer between face (a, sa) and its `u`-axis neighbour
+        // (axis (a+1)%3, sign sb) — written entirely in the `a` frame, which is
+        // why each axis pair is visited exactly once across the outer loop.
+        quad(
+          tris,
+          axis(a, sa * H, sb * U, V),
+          axis(a, sa * H, sb * U, -V),
+          axis(a, sa * (H - c), sb * (U + c), -V),
+          axis(a, sa * (H - c), sb * (U + c), V),
+        );
+      }
+    }
+  }
+  // Corner chamfers: one triangle per octant, through the three vertices that
+  // carry the full half-extent on a different axis each.
+  for (const sx of [1, -1]) {
+    for (const sy of [1, -1]) {
+      for (const sz of [1, -1]) {
+        tris.push([
+          new THREE.Vector3(sx * hx, sy * (hy - c), sz * (hz - c)),
+          new THREE.Vector3(sx * (hx - c), sy * hy, sz * (hz - c)),
+          new THREE.Vector3(sx * (hx - c), sy * (hy - c), sz * hz),
+        ]);
+      }
+    }
+  }
+  return tris;
+}
+
 const bevelledBox = defineShape({
   id: 'bevelled-box',
   label: 'Bevelled Box',
-  category: 'extruded',
+  category: 'faceted',
   parameterSchema: {
     size: { kind: 'number', min: 0.4, max: 2.4, step: 0.05, default: 1.2, rebuild: true },
     depth: { kind: 'number', min: 0.2, max: 2.4, step: 0.05, default: 1.2, rebuild: true },
@@ -674,21 +936,12 @@ const bevelledBox = defineShape({
   },
   defaultParameters: { size: 1.2, depth: 1.2, bevel: 0.08 },
   create(params, ctx) {
-    const half = params.size / 2;
-    const shape = new THREE.Shape()
-      .moveTo(-half, -half)
-      .lineTo(half, -half)
-      .lineTo(half, half)
-      .lineTo(-half, half)
-      .closePath();
-    const geometry = new THREE.ExtrudeGeometry(shape, {
-      depth: params.depth,
-      bevelEnabled: params.bevel > 0,
-      bevelSize: params.bevel,
-      bevelThickness: params.bevel,
-      steps: 1,
-    });
-    geometry.center();
+    // At zero chamfer the 12 edge faces and 8 corner faces collapse to
+    // degenerate triangles, whose normals are undefined — fall back to the
+    // primitive the shape is a chamfered version of.
+    const geometry = params.bevel <= 0
+      ? new THREE.BoxGeometry(params.size, params.size, params.depth)
+      : facetedGeometry(chamferedBoxTriangles(params.size / 2, params.size / 2, params.depth / 2, params.bevel));
     ctx.registry.track(geometry);
     return geometry;
   },
@@ -713,27 +966,56 @@ const spring = defineShape({
   },
 });
 
+/** Where the profile pulls in to the neck, as a fraction of total height. */
+const NECK_HEIGHT = 0.8;
+
+/**
+ * A lathed vessel — vase, bottle, lamp or goblet from one definition, which is
+ * the point: a profile curve gives a whole family of designed silhouettes for
+ * the cost of one shape.
+ *
+ * The profile is flat base -> spline body -> flat top, so the solid is closed.
+ * That matters because Forma's materials render `side: FrontSide`: the previous
+ * fixed profile ended at the mouth without returning to the axis, so the vase
+ * was open and showed through to its own inside back wall. A spline can also
+ * overshoot to a negative radius when the neck is much narrower than the belly,
+ * which would fold the lathe inside out, so sampled radii are clamped.
+ *
+ * The spline runs through four control points, not three. Belly straight to lip
+ * gives a smooth onion with no neck at all — the shoulder point at `NECK_HEIGHT`
+ * is what makes the profile turn in and then run up, which is the difference
+ * between a vase and a balloon. `lipFlare` then opens the mouth back out, and is
+ * most of what separates a goblet from a bottle.
+ */
 const vase = defineShape({
   id: 'vase',
   label: 'Vase',
   category: 'lathe',
   parameterSchema: {
-    height: { kind: 'number', min: 0.6, max: 2.8, step: 0.1, default: 1.8, rebuild: true },
-    radius: { kind: 'number', min: 0.3, max: 1.2, step: 0.05, default: 0.75, rebuild: true },
-    neck: { kind: 'number', min: 0.15, max: 0.7, step: 0.05, default: 0.35, rebuild: true },
+    height: { kind: 'number', min: 0.6, max: 3, step: 0.05, default: 1.8, rebuild: true },
+    baseRadius: { kind: 'number', min: 0.08, max: 1, step: 0.02, default: 0.3, rebuild: true },
+    bellyRadius: { kind: 'number', min: 0.15, max: 1.2, step: 0.02, default: 0.74, rebuild: true },
+    neckRadius: { kind: 'number', min: 0.04, max: 0.9, step: 0.02, default: 0.22, rebuild: true },
+    bellyHeight: { kind: 'number', min: 0.1, max: 0.7, step: 0.02, default: 0.34, rebuild: true },
+    // Mouth radius as a multiple of the neck: 1 is a straight bottle, above that
+    // a vase or goblet, below it a closed flask.
+    lipFlare: { kind: 'number', min: 0.6, max: 2.2, step: 0.05, default: 1.35, rebuild: true },
+    radialSegments: { kind: 'number', min: 6, max: 48, step: 1, default: 32, rebuild: true },
   },
-  defaultParameters: { height: 1.8, radius: 0.75, neck: 0.35 },
+  defaultParameters: { height: 1.8, baseRadius: 0.3, bellyRadius: 0.74, neckRadius: 0.22, bellyHeight: 0.34, lipFlare: 1.35, radialSegments: 32 },
   create(params, ctx) {
-    const half = params.height / 2;
-    const points = [
-      new THREE.Vector2(0.18, -half),
-      new THREE.Vector2(params.radius * 0.82, -half + params.height * 0.08),
-      new THREE.Vector2(params.radius, -half + params.height * 0.35),
-      new THREE.Vector2(params.radius * 0.78, half - params.height * 0.2),
-      new THREE.Vector2(params.neck, half - params.height * 0.08),
-      new THREE.Vector2(params.neck, half),
-    ];
-    const geometry = new THREE.LatheGeometry(points, 48);
+    const body = new THREE.SplineCurve([
+      new THREE.Vector2(params.baseRadius, 0),
+      new THREE.Vector2(params.bellyRadius, params.bellyHeight * params.height),
+      new THREE.Vector2(params.neckRadius, NECK_HEIGHT * params.height),
+      new THREE.Vector2(params.neckRadius * params.lipFlare, params.height),
+    ]);
+    const profile: THREE.Vector2[] = [new THREE.Vector2(0, 0)];
+    for (const point of body.getPoints(32)) {
+      profile.push(new THREE.Vector2(Math.max(point.x, 1e-4), point.y));
+    }
+    profile.push(new THREE.Vector2(0, params.height));
+    const geometry = new THREE.LatheGeometry(profile, params.radialSegments);
     geometry.center();
     ctx.registry.track(geometry);
     return geometry;
@@ -819,6 +1101,7 @@ export function registerShapes(): void {
     ring,
     cross,
     pyramid,
+    diamond,
     bevelledBox,
     spring,
     vase,

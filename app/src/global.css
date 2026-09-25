@@ -334,7 +334,10 @@ textarea:focus-visible {
 .picker-thumb[data-id='spiral']::after, .picker-thumb[data-id='knot']::after { border-radius: 48% 52% 45% 55%; transform: rotate(35deg) skewX(-18deg); }
 .picker-thumb[data-id='gem']::after, .picker-thumb[data-id='icosahedron']::after, .picker-thumb[data-id='octahedron']::after, .picker-thumb[data-id='dodecahedron']::after, .picker-thumb[data-id='tetrahedron']::after { clip-path: polygon(50% 0, 100% 36%, 78% 100%, 22% 100%, 0 36%); background: linear-gradient(135deg, #bdf2ff, #6a5cff); }
 .picker-thumb[data-id='pyramid']::after { clip-path: polygon(50% 0, 100% 100%, 0 100%); background: linear-gradient(135deg, #ffe0a6, #d45f48); }
-.picker-thumb[data-id='bevelled-box']::after { border-radius: 9px; transform: rotate(7deg) skewY(-7deg); }
+/* Brilliant cut, read from the side: flat table, girdle at the widest point, pavilion to a culet. */
+.picker-thumb[data-id='diamond']::after { clip-path: polygon(26% 8%, 74% 8%, 100% 33%, 50% 97%, 0 33%); background: linear-gradient(160deg, #eafcff, #7fd8ff 45%, #5a4cff); }
+/* An octagon, not a rounded square — the chamfer is now uniform on all twelve edges. */
+.picker-thumb[data-id='bevelled-box']::after { clip-path: polygon(23% 0, 77% 0, 100% 23%, 100% 77%, 77% 100%, 23% 100%, 0 77%, 0 23%); transform: rotate(7deg) skewY(-7deg); }
 .picker-thumb[data-id='spring']::after { border-radius: 50%; background: transparent; border: 5px solid #73f5cf; box-shadow: inset 0 0 0 2px #221e28, 0 0 8px #73f5cf; transform: scaleY(.78) rotate(18deg); }
 .picker-thumb[data-id='vase']::after { clip-path: polygon(35% 0, 65% 0, 66% 25%, 88% 75%, 76% 100%, 24% 100%, 12% 75%, 34% 25%); background: linear-gradient(135deg, #ffe0a6, #a96bff 55%, #51e8d0); }
 .picker-thumb[data-kind='material'] { background: #221e28; }

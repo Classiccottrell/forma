@@ -24,6 +24,14 @@ const { scene, camera, renderer, composer, render } = createFormaScene({ el: can
 
 const runtime = new FormaRuntime({ scene, camera, renderer, composer });
 
+// Visual QA handle. The harness renders one fixed front view, which is enough
+// for the architecture checks it exists for but not for judging geometry — a
+// faceted solid's crown is invisible from the side, and a back-facing facet
+// reads as a hole only from the angle that exposes it. Repo convention (see the
+// `threejs-viewer-qa` workflow) is to expose the scene graph so a driven browser
+// can move the camera. Harness-only: `src/` must never do this.
+(window as unknown as { __harness: unknown }).__harness = { scene, camera, renderer, runtime, render };
+
 let current: Composition = {
   shapeId: 'sphere',
   shapeParams: shapeRegistry.require('sphere').defaultParameters,
