@@ -177,20 +177,25 @@ export function ControlPanel(props: ControlPanelProps) {
   );
 }
 
+// One effect may be active per stage, so stages are what decide which effects
+// can be combined. Bloom gets its own rather than joining Finish: bloom plus a
+// vignette is the combination that reads premium, and sharing a stage would
+// make them mutually exclusive.
 const EFFECT_STAGES = [
   { label: 'Texture', ids: ['none'] },
-  { label: 'Colour', ids: ['duotone', 'grayscale', 'invert'] },
-  { label: 'Finish', ids: ['vignette', 'chromatic-aberration'] },
+  { label: 'Colour', ids: ['duotone', 'grayscale', 'invert', 'color-grade'] },
+  { label: 'Glow', ids: ['bloom'] },
+  { label: 'Finish', ids: ['vignette', 'chromatic-aberration', 'film-grain'] },
 ] as const;
 
 function EffectPipeline({ composition, search, onSelect, onParamChange }: { composition: Composition; search: string; onSelect(stageIds: string[], id: string): void; onParamChange(id: string, key: string, value: Composition['shapeParams'][string]): void }) {
   return <div className="effect-pipeline">
-    {EFFECT_STAGES.map((stage) => {
+    {EFFECT_STAGES.map((stage, stageIndex) => {
       const entries = stage.ids.map((id) => effectRegistry.require(id)).filter((def) => !search || def.label.toLowerCase().includes(search.toLowerCase()));
       const selectedId = stage.ids.find((id) => composition.effectIds.includes(id)) ?? 'none';
       const selected = selectedId === 'none' ? null : effectRegistry.require(selectedId);
       return <div className="effect-stage" key={stage.label}>
-        <div className="effect-stage-heading"><span>{stage.label}</span><span>01 / {EFFECT_STAGES.length}</span></div>
+        <div className="effect-stage-heading"><span>{stage.label}</span><span>{String(stageIndex + 1).padStart(2, '0')} / {EFFECT_STAGES.length}</span></div>
         <select aria-label={`${stage.label} effect`} value={selectedId} onChange={(event) => onSelect([...stage.ids], event.target.value)}>
           <option value="none">None</option>
           {entries.filter((def) => def.id !== 'none').map((def) => <option key={def.id} value={def.id}>{def.label}</option>)}
