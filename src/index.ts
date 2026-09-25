@@ -32,7 +32,7 @@ import { createFormaScene } from './scene/createFormaScene.js';
 export async function mountForma(el: HTMLElement, composition: Composition): Promise<FormaRuntime> {
   const formaScene = createFormaScene({ el, cameraZ: 3 });
   const { scene, camera, renderer, composer, render } = formaScene;
-  const runtime = new FormaRuntime({ scene, camera, renderer, composer, disposeExternal: formaScene.dispose });
+  const runtime = new FormaRuntime({ scene, camera, renderer, composer, ensureOutputPassLast: formaScene.ensureOutputPassLast, disposeExternal: formaScene.dispose });
   runtime.applyComposition(composition);
   render();
   return runtime;

@@ -76,7 +76,7 @@ export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>, initialCo
     });
     const textureBaseUrl = new URL('textures/', document.baseURI).href;
     const environmentBaseUrl = new URL('environments/', document.baseURI).href;
-    const runtime = new FormaRuntime({ scene: formaScene.scene, camera: formaScene.camera, renderer: formaScene.renderer, composer: formaScene.composer, disposeExternal: formaScene.dispose, textureBaseUrl, environmentBaseUrl });
+    const runtime = new FormaRuntime({ scene: formaScene.scene, camera: formaScene.camera, renderer: formaScene.renderer, composer: formaScene.composer, ensureOutputPassLast: formaScene.ensureOutputPassLast, disposeExternal: formaScene.dispose, textureBaseUrl, environmentBaseUrl });
     runtime.applyComposition(currentRef.current);
     runtimeRef.current = runtime;
     setScene(formaScene);

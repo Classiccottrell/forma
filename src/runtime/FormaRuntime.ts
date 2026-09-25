@@ -21,6 +21,12 @@ export interface FormaRuntimeOptions {
    * Optional so headless/test runtimes without a real GL context (see
    * `tests/testUtils.ts`) stay constructible; only pass-based effects need it. */
   composer?: EffectComposer;
+  /** Restores the colour-management OutputPass to the end of the composer chain
+   * (see `createFormaScene`). Effects append their passes when enabled, so the
+   * terminator has to be pushed back afterwards or every effect renders in the
+   * wrong colour space. Optional for the same reason `composer` is: headless
+   * test runtimes have no real chain to reorder. */
+  ensureOutputPassLast?: () => void;
   /** Scene-lifetime registry owning the long-lived Mesh wrapper (blueprint §3 pt.3).
    * Caller-supplied so it can be the same instance as a cc-webgl SceneContext's
    * ctx.resources; a fresh one is created if omitted (e.g. headless tests). */
@@ -43,6 +49,7 @@ export class FormaRuntime {
   readonly camera: THREE.Camera;
   readonly renderer: THREE.WebGLRenderer;
   readonly composer?: EffectComposer;
+  private readonly ensureOutputPassLast?: () => void;
   readonly resources: ResourceRegistry;
   readonly mesh: THREE.Mesh;
   private readonly disposeExternal?: () => void;
@@ -72,6 +79,7 @@ export class FormaRuntime {
     this.camera = opts.camera;
     this.renderer = opts.renderer;
     this.composer = opts.composer;
+    this.ensureOutputPassLast = opts.ensureOutputPassLast;
     this.resources = opts.resources ?? new ResourceRegistry();
     this.disposeExternal = opts.disposeExternal;
     this.textureBaseUrl = opts.textureBaseUrl;
@@ -353,6 +361,9 @@ export class FormaRuntime {
       handles.push(handle);
     }
     this.effectsSlot.handle = handles;
+    // Each effect above appended its pass to the end of the chain, which just
+    // pushed the colour-management terminator into the middle. Put it back.
+    this.ensureOutputPassLast?.();
   }
 
   private updateEffectsSlotIfHotParamsChanged(prev: Composition, next: Composition): void {
