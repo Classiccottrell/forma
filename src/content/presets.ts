@@ -19,7 +19,7 @@ function composition(spec: {
 }): Composition {
   const shapeDef = shapeRegistry.require(spec.shapeId);
   const materialDef = materialRegistry.require(spec.materialId);
-  environmentRegistry.require(spec.environmentId); // validates id, no params on env today
+  const environmentDef = environmentRegistry.require(spec.environmentId);
   const effectIds = spec.effectIds ?? [];
   const effectParams: Composition['effectParams'] = {};
   for (const id of effectIds) {
@@ -34,7 +34,7 @@ function composition(spec: {
     textureId: 'none',
     textureParams: {},
     environmentId: spec.environmentId,
-    environmentParams: {},
+    environmentParams: { ...environmentDef.defaultParameters },
     effectIds,
     effectParams,
   };

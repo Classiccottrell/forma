@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { FormaScene, FrameScheduler } from 'forma';
 import { useReducedMotion } from '../hooks/useReducedMotion';
@@ -7,16 +8,35 @@ export interface ViewportProps {
   hostRef: React.RefObject<HTMLDivElement>;
   scene: FormaScene | null;
   scheduler: FrameScheduler | null;
+  contextLost: boolean;
+  environmentId?: string;
+  presentation?: PresentationState;
+  onPresentationChange?: (patch: Partial<PresentationState>) => void;
   defaultAutoSpin?: boolean;
 }
+
+export interface PresentationState {
+  fov: number;
+  azimuth: number;
+  elevation: number;
+  zoom: number;
+  backdrop: 'environment' | 'gradient' | 'transparent';
+  floorShadow: boolean;
+  shadowStrength: number;
+  shadowSoftness: number;
+}
+
+export const DEFAULT_PRESENTATION: PresentationState = { fov: 50, azimuth: 0, elevation: 0, zoom: 1, backdrop: 'environment', floorShadow: true, shadowStrength: 0.45, shadowSoftness: 0.5 };
 
 /** Mounts the canvas host div, wires OrbitControls (pointer+touch) + auto-spin once
  * `scene` is ready. `prefers-reduced-motion` forces auto-spin off regardless of the
  * toggle state (roadmap §6). */
-export function Viewport({ hostRef, scene, scheduler, defaultAutoSpin = false }: ViewportProps) {
+export function Viewport({ hostRef, scene, scheduler, contextLost, environmentId, presentation, onPresentationChange, defaultAutoSpin = false }: ViewportProps) {
   const reducedMotion = useReducedMotion();
   const [autoSpin, setAutoSpin] = useState(() => defaultAutoSpin && !reducedMotion);
   const [spinSpeed, setSpinSpeed] = useState(2.2);
+  const [localPresentation, setLocalPresentation] = useState(DEFAULT_PRESENTATION);
+  const activePresentation = presentation ?? localPresentation;
   const wasAutoSpinning = useRef(false);
   const controlsRef = useRef<OrbitControls | null>(null);
   const autoSpinRef = useRef(autoSpin);
@@ -48,6 +68,31 @@ export function Viewport({ hostRef, scene, scheduler, defaultAutoSpin = false }:
   }, [scene]);
 
   useEffect(() => {
+    if (!scene) return;
+    const camera = scene.camera as THREE.PerspectiveCamera;
+    const controls = controlsRef.current;
+    camera.fov = activePresentation.fov;
+    camera.zoom = activePresentation.zoom;
+    camera.updateProjectionMatrix();
+    if (!controls) return;
+    const radius = Math.max(camera.position.length(), 0.1);
+    const phi = THREE.MathUtils.degToRad(90 - Math.max(-80, Math.min(80, activePresentation.elevation)));
+    const theta = THREE.MathUtils.degToRad(activePresentation.azimuth);
+    camera.position.set(radius * Math.sin(phi) * Math.sin(theta), radius * Math.cos(phi), radius * Math.sin(phi) * Math.cos(theta));
+    controls.target.set(0, 0, 0);
+    controls.update();
+  }, [scene, activePresentation]);
+
+  useEffect(() => {
+    if (!scene || activePresentation.backdrop === 'environment') return;
+    const environmentBackground = scene.scene.background;
+    scene.scene.background = null;
+    return () => {
+      if (scene.scene.background === null) scene.scene.background = environmentBackground;
+    };
+  }, [scene, environmentId, activePresentation.backdrop]);
+
+  useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
     controls.autoRotate = autoSpin && !reducedMotion;
@@ -60,9 +105,15 @@ export function Viewport({ hostRef, scene, scheduler, defaultAutoSpin = false }:
     return scheduler.addTask(() => controls.update());
   }, [scene, scheduler]);
 
+  function changePresentation(patch: Partial<PresentationState>): void {
+    if (onPresentationChange) onPresentationChange(patch);
+    else setLocalPresentation((current) => ({ ...current, ...patch }));
+  }
+
   return (
     <>
       <div ref={hostRef} className="viewport-host" data-testid="viewport-host" />
+      {contextLost && <div className="viewport-fallback" role="status">Renderer recovering…</div>}
       <div className="toolbelt">
         <button
           type="button"
@@ -104,6 +155,7 @@ export function Viewport({ hostRef, scene, scheduler, defaultAutoSpin = false }:
             internals._sphericalDelta?.set(0, 0, 0);
             internals._panOffset?.set(0, 0, 0);
             controls.reset();
+            changePresentation({ fov: DEFAULT_PRESENTATION.fov, azimuth: DEFAULT_PRESENTATION.azimuth, elevation: DEFAULT_PRESENTATION.elevation, zoom: DEFAULT_PRESENTATION.zoom });
           }}
           title="Reset camera to default orbit"
           data-testid="reset-camera"

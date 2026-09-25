@@ -35,7 +35,7 @@ describe('content smoke test — every shape/material creates cleanly from defau
   });
 
   it('registers the neutral symbol set', () => {
-    expect(['heart', 'plus', 'arrow', 'star', 'smiley', 'sparkle'].every((id) => shapeRegistry.get(id))).toBe(true);
+    expect(['heart', 'plus', 'arrow', 'star', 'sparkle'].every((id) => shapeRegistry.get(id))).toBe(true);
   });
 
   it('every default non-SVG shape has usable UVs after the runtime fallback', () => {

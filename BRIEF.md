@@ -138,7 +138,7 @@ core.
 ### H1 — Lifecycle and delivery correctness (in progress)
 
 - Make every public mount disposable, including renderer and resize-observer ownership.
-- Remove duplicate context-loss wiring and define one recovery owner.
+- [x] Remove duplicate context-loss wiring and define one recovery owner.
 - Make FALLBACK a real remount boundary; never leave a live WebGL scene mislabeled FALLBACK.
 - Use the shared `cc-webgl` `FrameScheduler` in the product app for visibility pause and delta clamping.
 - Keep OrbitControls updates inside that scheduler; no second product RAF loop.
@@ -185,6 +185,52 @@ core.
   keeps `none`/procedural fallbacks for offline tests. The embed API receives the same
   `baseUrl` explicitly so website hosts control CDN/static asset placement.
 
+### Reference-driven roadmap additions (2026-09-21)
+
+Use the Vanta 3D Shape Generator as a workflow reference, not a feature-count
+target. Add in this order:
+
+- **Control taxonomy:** Shape filters (`All`, `Solid`, `Flat`, `Yours`) plus
+  stronger category labels and searchable visual cards.
+- **Material studio:** split material `Library` from `Settings`; add a small
+  surface preset row and advanced physical controls for color, roughness,
+  metalness, clearcoat, transmission, thickness, IOR, sheen, and iridescence.
+- **Lighting rig:** environment gallery, environment strength/blur/rotation,
+  light color/intensity, and an optional directional-light placement pad.
+- **Effect pipeline:** ordered `Texture → Colour → Finish` stages with one
+  selectable effect per stage while preserving the registry-native effect model.
+- **Backdrop and presentation:** solid/gradient/transparent backdrop modes,
+  floor shadow toggle, shadow strength/softness, and camera controls for lens,
+  zoom, turn, tilt, and auto-spin.
+- **History and delivery:** undo/redo for composition changes, one reset-all
+  action, and an export menu covering PNG, JSON, and generated embed code.
+
+First slice: add the control taxonomy and camera/presentation state without
+expanding the content catalog. Validate the interaction model before adding
+advanced material parameters or a directional-light rig.
+
+**Implementation slice (2026-09-22):** environment controls now expose strength,
+rotation, light intensity, and light colour through the existing registry-native parameter path;
+HDR environment intensity/rotation and synchronous light intensity update live.
+Legacy empty environment parameter objects remain readable.
+
+Material controls now split into Library and Settings views, keeping the existing
+registry-native physical parameters in one focused panel.
+
+Added `Physical Studio`, a registry-native MeshPhysicalMaterial exposing color,
+roughness, metalness, clearcoat, transmission, thickness, IOR, sheen, and iridescence.
+
+Effects now present as ordered Texture, Colour, and Finish stages with one selected
+effect per stage; registry IDs and composer ordering remain unchanged.
+
+Presentation now supports environment, gradient, and transparent backdrops, floor
+shadow strength/softness, and composition undo/redo controls.
+
+Added three curated environments: Dusk Rose, Warm Paper, and Forest Night.
+
+Directional lighting now has an Environment/Directional mode and pointer pad;
+horizontal and vertical placement remain available through keyboard-operable sliders.
+
   **Implementation slice (2026-09-18):** `TexturePackManifest` and the staged
   `texturePackCatalog` now live in the published library. `TexturePackLoader` uses
   `ImageLoader`, loads only declared maps from an explicit base URL, caches by
@@ -224,6 +270,11 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-09-23 | Reference-driven material slice: split Material into accessible Library/Settings views and added registry-backed surface presets for None, Linen Blue, Book Pattern, Fine Grained Wood, Brushed Metal, and Mineral Matte. App typecheck/build and browser selection review pass. |
+| 2026-09-21 | Reference review: added staged roadmap for control taxonomy, material settings, lighting rig, ordered effects, backdrop/camera presentation, and history/export workflow. First slice is taxonomy plus camera/presentation state; no catalog expansion yet. |
+| 2026-09-21 | Reference-driven UI slice: added accessible Shape filters (`All`, `Solid`, `Flat`, `Yours`) and a Presentation section with live lens, turn, tilt, and zoom controls routed through the existing OrbitControls scene. App typecheck/build and browser review pass. |
+| 2026-09-20 | H1 lifecycle slice: Forma scene bootstrap now owns WebGL context-loss listeners, pauses its scheduler while lost, shows an accessible recovery fallback, and remounts the scene after restoration so recovered canvases never reuse stale GPU resources. Library and app builds pass. |
+| 2026-09-20 | H3 catalog slice: corrected the registry-native Heart to use the supplied Three.js path and kept it as a beveled solid extrusion. Removed the toilet and Smiley candidates after review rather than shipping weak silhouettes. Content total is now 31 shapes / 20 materials / 7 environments / 6 effects. |
 | 2026-09-19 | H3 UI-shape slice: added registry-native Badge and Tab rounded panels plus a centered Notched Card ExtrudeGeometry path with typed rebuild parameters, safe radius/notch/bevel clamping, focused finite-geometry smoke coverage, and truthful CSS picker thumbnails. Content total is now 27 shapes / 20 materials / 7 environments / 6 effects. |
 | 2026-09-19 | H3 shape slice: added registry-native Pill and Card rounded panels with typed rebuild parameters, radius clamping, focused finite-geometry smoke coverage, and truthful CSS picker thumbnails. Content total is now 24 shapes / 20 materials / 7 environments / 6 effects. |
 | 2026-09-19 | H3 material slice: added registry-native Rubber and Pearl materials with in-place parameter updates, native Three physical shading, compatibility-aware Surprise Me biasing, and CSS picker thumbnails. Content total is now 22 shapes / 20 materials / 7 environments / 6 effects. |

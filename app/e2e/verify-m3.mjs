@@ -3,7 +3,7 @@
 // throwaway-safe script kept in-repo per the task's "reused pattern" instruction.
 import { chromium } from 'playwright';
 
-const URL = 'http://localhost:5183/';
+const URL = 'http://localhost:5183/editor';
 const results = [];
 function record(name, ok, detail) {
   results.push({ name, ok, detail });
@@ -184,6 +184,34 @@ async function main() {
     await page.waitForTimeout(300);
     const goneAfterReload = !(await page.getByTestId('onboarding-hint').isVisible().catch(() => false));
     record('onboarding: dismiss persists across reload (localStorage)', goneImmediately && goneAfterReload);
+    await ctx.close();
+  }
+
+  // --- 7. Reference-driven controls ---
+  {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto(URL);
+    await page.waitForSelector('[data-testid="control-panel"]');
+
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    await page.getByRole('option', { name: 'Linen Blue' }).click();
+    const surfaceSelected = await page.getByRole('option', { name: 'Linen Blue' }).getAttribute('aria-selected');
+    record('material settings: surface preset selection is live', surfaceSelected === 'true', `selected=${surfaceSelected}`);
+
+    await page.getByTestId('section-header-camera').click();
+    await page.getByLabel('Lens').fill('35');
+    const fov = await page.evaluate(() => window.__formaDebug?.camera?.fov);
+    record('presentation: lens control updates the live camera', Math.abs(Number(fov) - 35) < 0.01, `fov=${fov}`);
+
+    await page.getByRole('button', { name: 'Reset composition' }).click();
+    const shapeGrid = page.getByTestId('section-header-shape').locator('xpath=following-sibling::div[1]//div[contains(@class,"picker-grid")]');
+    await shapeGrid.locator('.picker-cell').nth(1).click();
+    await page.getByRole('button', { name: 'Undo last change' }).click();
+    const undone = await shapeGrid.locator('.picker-cell.selected').textContent();
+    await page.getByRole('button', { name: 'Redo last change' }).click();
+    const redone = await shapeGrid.locator('.picker-cell.selected').textContent();
+    record('history: undo and redo restore composition selection', /sphere/i.test(undone ?? '') && /box/i.test(redone ?? ''), `undo=${undone} redo=${redone}`);
     await ctx.close();
   }
 

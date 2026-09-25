@@ -1,6 +1,7 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import * as THREE from 'three';
 import type { Composition, ParamValue } from 'forma';
-import { materialRegistry, shapeRegistry } from 'forma';
+import { environmentRegistry, materialRegistry, shapeRegistry } from 'forma';
 import { builtInPresets, registerAllContent } from 'forma/content';
 import { useFormaRuntime } from './hooks/useFormaRuntime';
 import { Viewport } from './components/Viewport';
@@ -11,8 +12,12 @@ registerAllContent();
 const studioPreset = builtInPresets().find((preset) => preset.id === 'clay-pill-softbox')!;
 const studioComposition: Composition = {
   ...studioPreset.composition,
-  materialId: 'pearl',
-  materialParams: { ...materialRegistry.require('pearl').defaultParameters },
+  shapeId: 'knot',
+  shapeParams: { ...shapeRegistry.require('knot').defaultParameters },
+  materialId: 'holographic',
+  materialParams: { ...materialRegistry.require('holographic').defaultParameters },
+  environmentId: 'neon-room',
+  environmentParams: { ...environmentRegistry.require('neon-room').defaultParameters },
 };
 const galleryPresetIds = ['clay-pill-softbox', 'ceramic-card-studio', 'chrome-badge-studio', 'frosted-notched-card-softbox'] as const;
 
@@ -42,16 +47,58 @@ function ControlCard({ current, apply }: { current: Composition; apply: (patch: 
   );
 }
 
+const mapAnchors = [
+  { id: 'shape', point: new THREE.Vector3(-0.62, 0.42, 0.3), side: 'left' },
+  { id: 'surface', point: new THREE.Vector3(0.58, 0.18, 0.22), side: 'right' },
+  { id: 'light', point: new THREE.Vector3(0.05, -0.7, 0.1), side: 'right' },
+] as const;
+
+function ObjectMap({ scene, scheduler, current }: { scene: NonNullable<ReturnType<typeof useFormaRuntime>['scene']>; scheduler: NonNullable<ReturnType<typeof useFormaRuntime>['scheduler']>; current: Composition }) {
+  const refs = useRef<Record<string, HTMLDivElement | null>>({});
+  const labels = {
+    shape: ['SHAPE / 01', shapeRegistry.require(current.shapeId).label],
+    surface: ['SURFACE / 02', materialRegistry.require(current.materialId).label],
+    light: ['LIGHT / 03', environmentRegistry.require(current.environmentId).label],
+  } as const;
+
+  useEffect(() => {
+    const point = new THREE.Vector3();
+    return scheduler.addTask(() => {
+      const rect = scene.renderer.domElement.getBoundingClientRect();
+      for (const anchor of mapAnchors) {
+        point.copy(anchor.point).project(scene.camera);
+        const el = refs.current[anchor.id];
+        if (!el) continue;
+        const x = (point.x * 0.5 + 0.5) * (rect.width || 1);
+        const y = (-point.y * 0.5 + 0.5) * (rect.height || 1);
+        el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+        el.style.opacity = point.z > -1 && point.z < 1 ? '1' : '0';
+      }
+    });
+  }, [scene, scheduler]);
+
+  return (
+    <div className="home-object-map" aria-label="Live object annotations">
+      {mapAnchors.map((anchor) => (
+        <div key={anchor.id} ref={(el) => { refs.current[anchor.id] = el; }} className={`home-map-label home-map-label--${anchor.side}`}>
+          <span>{labels[anchor.id][0]}</span>
+          <strong>{labels[anchor.id][1]}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function HomePage({ gallery = false }: { gallery?: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const presets = useMemo(() => builtInPresets().filter((preset) => galleryPresetIds.includes(preset.id as (typeof galleryPresetIds)[number])), []);
   const initialFallback = gallery ? presets[1]?.composition ?? studioComposition : studioComposition;
   const initial = selectedHomepageComposition(gallery ? 'gallery' : 'studio', initialFallback);
-  const { scene, scheduler, current, apply } = useFormaRuntime(hostRef, initial);
+  const { scene, scheduler, current, apply, contextLost } = useFormaRuntime(hostRef, initial);
 
   return (
     <main className={`home-shell${gallery ? ' home-gallery' : ' home-studio'}`}>
-      <Viewport hostRef={hostRef} scene={scene} scheduler={scheduler} defaultAutoSpin />
+      <Viewport hostRef={hostRef} scene={scene} scheduler={scheduler} contextLost={contextLost} defaultAutoSpin />
       <header className="home-nav">
         <a className="brand" href="/">for<em>ma</em></a>
         <nav aria-label="Homepage navigation">
@@ -59,6 +106,7 @@ export default function HomePage({ gallery = false }: { gallery?: boolean }) {
           <a className="home-nav-cta" href="/editor">Open editor <span aria-hidden="true">↗</span></a>
         </nav>
       </header>
+      {!gallery && scene && scheduler && <ObjectMap scene={scene} scheduler={scheduler} current={current} />}
 
       {gallery ? (
         <section className="home-gallery-content" aria-labelledby="gallery-title">
@@ -71,7 +119,6 @@ export default function HomePage({ gallery = false }: { gallery?: boolean }) {
       ) : (
         <section className="home-studio-content" aria-labelledby="studio-title">
           <div className="home-studio-copy"><p className="eyebrow">A quiet place for form</p><h1 id="studio-title">Make the invisible<br /><i>feel tangible.</i></h1><p>Forma turns shape, surface, and light into a living design material.</p><a className="home-button" href="/editor">Enter the studio <span aria-hidden="true">→</span></a></div>
-          <div className="home-type-map" aria-label="Live type mapped to the rotating 3D object"><span>LIVE TYPE / 01</span><strong>FORMA</strong><small>mapped to the current object</small></div>
           <ControlCard current={current} apply={apply} />
         </section>
       )}

@@ -30,7 +30,11 @@ export function deserializeComposition(s: string): Composition {
   assertKeysMatch('textureParams', textureParams, textureDef.parameterSchema);
 
   const envDef = environmentRegistry.require(c.environmentId);
-  assertKeysMatch('environmentParams', c.environmentParams, envDef.parameterSchema);
+  // Empty environment params remain valid for older compositions; environment
+  // controls use definition defaults for any omitted value.
+  if (Object.keys(c.environmentParams).length > 0) {
+    assertKeysMatch('environmentParams', c.environmentParams, envDef.parameterSchema);
+  }
 
   for (const id of c.effectIds) {
     const def = effectRegistry.require(id);

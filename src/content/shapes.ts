@@ -386,12 +386,17 @@ const star = defineShape({
   },
 });
 
-function makeHeartShape(size: number): THREE.Shape {
+function makeHeartShape(): THREE.Shape {
   const shape = new THREE.Shape();
-  shape.moveTo(0, -size * 0.9);
-  shape.bezierCurveTo(-size * 1.2, -size * 0.15, -size * 0.9, size * 0.8, 0, size * 1.25);
-  shape.bezierCurveTo(size * 0.9, size * 0.8, size * 1.2, -size * 0.15, 0, -size * 0.9);
-  shape.closePath();
+  const x = -2.5;
+  const y = -5;
+  shape.moveTo(x + 2.5, y + 2.5);
+  shape.bezierCurveTo(x + 2.5, y + 2.5, x + 2, y, x, y);
+  shape.bezierCurveTo(x - 3, y, x - 3, y + 3.5, x - 3, y + 3.5);
+  shape.bezierCurveTo(x - 3, y + 5.5, x - 1.5, y + 7.7, x + 2.5, y + 9.5);
+  shape.bezierCurveTo(x + 6, y + 7.7, x + 8, y + 4.5, x + 8, y + 3.5);
+  shape.bezierCurveTo(x + 8, y + 3.5, x + 8, y, x + 5, y);
+  shape.bezierCurveTo(x + 3.5, y, x + 2.5, y + 2.5, x + 2.5, y + 2.5);
   return shape;
 }
 
@@ -411,16 +416,34 @@ function extrudedSymbol(shape: THREE.Shape, params: { width: number; height: num
   const geometry = new THREE.ExtrudeGeometry(shape, { depth: params.depth, bevelEnabled: params.bevelEnabled, bevelSize: params.roundness, bevelThickness: params.roundness, steps: 1 });
   geometry.computeBoundingBox();
   const bounds = geometry.boundingBox!;
-  geometry.scale(params.width / Math.max(bounds.max.x - bounds.min.x, 1e-6), params.height / Math.max(bounds.max.y - bounds.min.y, 1e-6), 1);
+  geometry.scale(params.width / Math.max(bounds.max.x - bounds.min.x, 1e-6), -params.height / Math.max(bounds.max.y - bounds.min.y, 1e-6), 1);
   geometry.center();
   ctx.registry.track(geometry);
   return geometry;
 }
 
 const heart = defineShape({
-  id: 'heart', label: 'Heart', category: 'symbol', parameterSchema: { width: { kind: 'number', min: 0.4, max: 2.5, step: 0.05, default: 1.4, rebuild: true }, height: { kind: 'number', min: 0.4, max: 2.5, step: 0.05, default: 1.4, rebuild: true }, depth: { kind: 'number', min: 0.05, max: 1, step: 0.05, default: 0.3, rebuild: true }, roundness: { kind: 'number', min: 0, max: 0.15, step: 0.005, default: 0.03, rebuild: true }, bevelEnabled: { kind: 'boolean', default: true, rebuild: true } },
-  defaultParameters: { width: 1.4, height: 1.4, depth: 0.3, roundness: 0.03, bevelEnabled: true },
-  create(params, ctx) { return extrudedSymbol(makeHeartShape(0.8), params, ctx); },
+  id: 'heart', label: 'Heart', category: 'symbol', parameterSchema: { width: { kind: 'number', min: 0.4, max: 2.5, step: 0.05, default: 1.5, rebuild: true }, height: { kind: 'number', min: 0.4, max: 2.5, step: 0.05, default: 1.3, rebuild: true }, depth: { kind: 'number', min: 0.05, max: 1, step: 0.05, default: 0.4, rebuild: true }, roundness: { kind: 'number', min: 0, max: 0.25, step: 0.005, default: 0.12, rebuild: true }, bevelEnabled: { kind: 'boolean', default: true, rebuild: true } },
+  defaultParameters: { width: 1.5, height: 1.3, depth: 0.4, roundness: 0.12, bevelEnabled: true },
+  create(params, ctx) {
+    const sourceWidth = 11;
+    const sourceHeight = 9.5;
+    const scale = Math.min(params.width / sourceWidth, params.height / sourceHeight);
+    const bevel = Math.min(params.roundness / scale, 0.12);
+    const geometry = new THREE.ExtrudeGeometry(makeHeartShape(), {
+      curveSegments: 24,
+      steps: 2,
+      depth: params.depth / scale,
+      bevelEnabled: params.bevelEnabled,
+      bevelThickness: bevel,
+      bevelSize: bevel,
+      bevelSegments: 2,
+    });
+    geometry.scale(scale, -scale, scale);
+    geometry.center();
+    ctx.registry.track(geometry);
+    return geometry;
+  },
 });
 
 const plus = defineShape({
@@ -435,7 +458,7 @@ const arrow = defineShape({
   create(params, ctx) { return extrudedSymbol(makeArrowShape(), params, ctx); },
 });
 
-function makeSmileyShape(): THREE.Shape {
+function makeFallbackGlyphShape(): THREE.Shape {
   const shape = new THREE.Shape();
   shape.absarc(0, 0, 0.85, 0, Math.PI * 2, false);
   for (const x of [-0.28, 0.28]) {
@@ -452,12 +475,6 @@ function makeSmileyShape(): THREE.Shape {
 function makeSparkleShape(): THREE.Shape {
   return makeStarShape(4, 1, 0.18);
 }
-
-const smiley = defineShape({
-  id: 'smiley', label: 'Smiley', category: 'emoji symbol', parameterSchema: { width: { kind: 'number', min: 0.4, max: 2.5, step: 0.05, default: 1.5, rebuild: true }, height: { kind: 'number', min: 0.4, max: 2.5, step: 0.05, default: 1.5, rebuild: true }, depth: { kind: 'number', min: 0.05, max: 1, step: 0.05, default: 0.3, rebuild: true }, roundness: { kind: 'number', min: 0, max: 0.15, step: 0.005, default: 0.03, rebuild: true }, bevelEnabled: { kind: 'boolean', default: true, rebuild: true } },
-  defaultParameters: { width: 1.5, height: 1.5, depth: 0.3, roundness: 0.03, bevelEnabled: true },
-  create(params, ctx) { return extrudedSymbol(makeSmileyShape(), params, ctx); },
-});
 
 const sparkle = defineShape({
   id: 'sparkle', label: 'Sparkle', category: 'emoji symbol', parameterSchema: { width: { kind: 'number', min: 0.4, max: 2.5, step: 0.05, default: 1.4, rebuild: true }, height: { kind: 'number', min: 0.4, max: 2.5, step: 0.05, default: 1.4, rebuild: true }, depth: { kind: 'number', min: 0.05, max: 1, step: 0.05, default: 0.3, rebuild: true }, roundness: { kind: 'number', min: 0, max: 0.15, step: 0.005, default: 0.03, rebuild: true }, bevelEnabled: { kind: 'boolean', default: true, rebuild: true } },
@@ -744,7 +761,7 @@ function createSvgGeometry(params: { svg: string; size: number; depth: number; b
       geometry = new THREE.ExtrudeGeometry(parsed.paths.flatMap((path) => path.toShapes()), { depth: params.depth, bevelEnabled: params.bevelEnabled, bevelSize: params.bevelSize, bevelThickness: params.bevelSize, curveSegments: params.curveSegments, steps: 1 });
     } catch {
       // ponytail: headless DOMParser fallback; browser path remains the real SVG extrusion.
-      geometry = new THREE.ExtrudeGeometry(makeSmileyShape(), { depth: params.depth, bevelEnabled: params.bevelEnabled, bevelSize: params.bevelSize, bevelThickness: params.bevelSize, curveSegments: params.curveSegments, steps: 1 });
+      geometry = new THREE.ExtrudeGeometry(makeFallbackGlyphShape(), { depth: params.depth, bevelEnabled: params.bevelEnabled, bevelSize: params.bevelSize, bevelThickness: params.bevelSize, curveSegments: params.curveSegments, steps: 1 });
     }
   }
   geometry.computeBoundingBox();
@@ -793,7 +810,6 @@ export function registerShapes(): void {
     heart,
     plus,
     arrow,
-    smiley,
     sparkle,
     cone,
     cylinder,

@@ -17,7 +17,7 @@ cd app && npm install   # editor product app — its own package.json, React + f
 
 - `npm run dev` — serves `harness/` (live switching UI, JSON round-trip, PNG export, embed-code, leak-check button + HUD) at the printed localhost URL.
 - `npm run build` — emits the library plus versioned `dist/forma.browser.v<package-version>.js` IIFE. Run this before `app/`'s typecheck/build — the app resolves `forma`/`forma/content` through `dist/` in production (dev mode aliases straight to `src/` for iteration speed, see `app/vite.config.ts`).
-- `npm test` — vitest (happy-dom, logic-only, no WebGL). Includes a ≥50-cycle leak-check run (`tests/leak-check.test.ts`) against a stratified 360-combo sample of the content set (32 shapes × 20 materials × 6 environments, H3 scale — a full cartesian product is 3840 combos, too slow to cycle repeatedly), asserting the merged `FormaRuntime.report()` total returns to its post-warm-up baseline every cycle. `svg-extrude` is excluded from the leak-check/smoke-test shape lists (happy-dom's `DOMParser` doesn't support `image/svg+xml`); it's covered instead by headless-browser Playwright checks. `tests/content-smoke.test.ts` separately guards that every shape/material/texture creates cleanly from its own defaults.
+- `npm test` — vitest (happy-dom, logic-only, no WebGL). Includes a ≥50-cycle leak-check run (`tests/leak-check.test.ts`) against a stratified 360-combo sample of the content set (31 shapes × 20 materials × 6 environments, H3 scale — a full cartesian product is 3720 combos, too slow to cycle repeatedly), asserting the merged `FormaRuntime.report()` total returns to its post-warm-up baseline every cycle. `svg-extrude` is excluded from the leak-check/smoke-test shape lists (happy-dom's `DOMParser` doesn't support `image/svg+xml`); it's covered instead by headless-browser Playwright checks. `tests/content-smoke.test.ts` separately guards that every shape/material/texture creates cleanly from its own defaults.
 - `npm run typecheck` — `src/` only.
 - `npm run typecheck:harness` — `harness/` (excluded from the published package, mirrors `cc-webgl/example/`).
 
@@ -33,7 +33,14 @@ cd app && npm install   # editor product app — its own package.json, React + f
 
 The H3 polish slice remains active across the 32-shape catalog. Remaining work includes
 picker reference-card polish, broader content expansion, lifecycle hardening, and final
-browser QA. Generic SVG import remains a separate upload path.
+browser QA. Reference-driven next slices add control taxonomy, material settings,
+lighting direction, ordered effect stages, presentation controls, and history/export
+workflow. Generic SVG import remains a separate upload path.
+
+The first reference-driven UI slice is complete: Shape now supports All/Solid/Flat/Yours
+filters, and Presentation exposes lens, turn, tilt, and zoom controls.
+
+Material now also has Library/Settings views with registry-backed surface presets.
 
 The versioned browser bundle contract is `dist/forma.browser.v<package-version>.js`. Copy that file beside generated embed HTML, or pass a hosted URL
 to `generateEmbedCode(composition, { libraryUrl })`. See `examples/embed/index.html` for a local example.

@@ -309,7 +309,8 @@ export class FormaRuntime {
       }
       this.loadedEnvironment = { target };
       this.scene.environment = target.texture;
-      this.scene.environmentIntensity = 0.8;
+      this.scene.environmentIntensity = Number(next.environmentParams.environmentStrength ?? 1);
+      this.scene.environmentRotation.y = THREE.MathUtils.degToRad(Number(next.environmentParams.environmentRotation ?? 0));
     }, undefined, () => { /* existing lights remain the fallback */ });
   }
 
@@ -328,6 +329,8 @@ export class FormaRuntime {
     const hot = changedHotKeys(def.parameterSchema, prev.environmentParams, next.environmentParams);
     if (hot.length === 0) return;
     def.update(this.environmentSlot.handle, next.environmentParams as any);
+    this.scene.environmentIntensity = Number(next.environmentParams.environmentStrength ?? 1);
+    this.scene.environmentRotation.y = THREE.MathUtils.degToRad(Number(next.environmentParams.environmentRotation ?? 0));
   }
 
   // --- effects -------------------------------------------------------------

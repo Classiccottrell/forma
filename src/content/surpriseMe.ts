@@ -60,6 +60,7 @@ export function surpriseMe(): Composition {
 
   const shapeDef = shapeRegistry.require(shapeId);
   const materialDef = materialRegistry.require(materialId);
+  const environmentDef = environmentRegistry.require(environmentId);
 
   // Effects: bias toward zero or one, never stack several at once (keeps the result
   // readable rather than chaotic) — 50% none, 50% one real effect.
@@ -78,7 +79,7 @@ export function surpriseMe(): Composition {
     textureId: 'none',
     textureParams: {},
     environmentId,
-    environmentParams: {},
+    environmentParams: { ...environmentDef.defaultParameters },
     effectIds,
     effectParams,
   };

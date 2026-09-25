@@ -175,9 +175,13 @@ README.
 
 ## Current H3 roadmap status
 
-The H3 polish slice remains active across the shape catalog. Remaining work includes
-picker reference-card polish, broader content expansion, lifecycle hardening, and final
-browser QA.
+The H3 polish slice remains active across the shape catalog. The reference-driven
+control taxonomy, camera presentation controls, lighting controls, directional-light
+placement, Material Library / Settings views, the full-control Physical Studio
+material, and three additional environments are now in place. Remaining work includes
+the ordered Texture / Colour / Finish effect pipeline, picker reference-card polish,
+broader content expansion, lifecycle hardening, and final browser QA.
+Presentation backdrops, floor-shadow controls, and composition undo/redo are also live.
 
 ## Known limitations
 

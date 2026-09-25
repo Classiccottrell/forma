@@ -540,6 +540,42 @@ const pearl = defineMaterial({
   },
 });
 
+const physicalStudio = defineMaterial({
+  id: 'physical-studio',
+  label: 'Physical Studio',
+  category: 'pbr',
+  parameterSchema: {
+    color: { kind: 'color', default: '#d9e2f2', rebuild: false },
+    roughness: { kind: 'number', min: 0, max: 1, step: 0.01, default: 0.28, rebuild: false },
+    metalness: { kind: 'number', min: 0, max: 1, step: 0.01, default: 0.15, rebuild: false },
+    clearcoat: { kind: 'number', min: 0, max: 1, step: 0.01, default: 0.2, rebuild: false },
+    transmission: { kind: 'number', min: 0, max: 1, step: 0.01, default: 0, rebuild: false },
+    thickness: { kind: 'number', min: 0, max: 5, step: 0.05, default: 0.5, rebuild: false },
+    ior: { kind: 'number', min: 1, max: 2.5, step: 0.01, default: 1.5, rebuild: false },
+    sheen: { kind: 'number', min: 0, max: 1, step: 0.01, default: 0.1, rebuild: false },
+    iridescence: { kind: 'number', min: 0, max: 1, step: 0.01, default: 0, rebuild: false },
+  },
+  defaultParameters: { color: '#d9e2f2', roughness: 0.28, metalness: 0.15, clearcoat: 0.2, transmission: 0, thickness: 0.5, ior: 1.5, sheen: 0.1, iridescence: 0 },
+  create(params, ctx) {
+    const material = new THREE.MeshPhysicalMaterial(params);
+    ctx.registry.track(material);
+    return material;
+  },
+  update(material, params) {
+    const m = material as THREE.MeshPhysicalMaterial;
+    m.color.set(params.color);
+    m.roughness = params.roughness;
+    m.metalness = params.metalness;
+    m.clearcoat = params.clearcoat;
+    m.transmission = params.transmission;
+    m.thickness = params.thickness;
+    m.ior = params.ior;
+    m.sheen = params.sheen;
+    m.iridescence = params.iridescence;
+    m.needsUpdate = true;
+  },
+});
+
 export function registerMaterials(): void {
   for (const def of [
     matte,
@@ -557,6 +593,7 @@ export function registerMaterials(): void {
     neonPlastic,
     wireframe,
     obsidian,
+    physicalStudio,
     plastic,
     ceramic,
     holographic,

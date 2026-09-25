@@ -83,6 +83,29 @@ describe('applyComposition slot decoupling', () => {
     runtime.dispose();
   });
 
+  it('updates the optional directional light in place', () => {
+    const runtime = new FormaRuntime({ scene: new THREE.Scene(), camera: new THREE.PerspectiveCamera(), renderer: {} as THREE.WebGLRenderer });
+    runtime.applyComposition(baseComposition());
+    runtime.applyComposition({
+      ...baseComposition(),
+      environmentParams: {
+        lightingMode: 'directional',
+        environmentStrength: 1,
+        environmentRotation: 0,
+        lightIntensity: 1,
+        lightColor: '#ff0000',
+        lightX: -0.5,
+        lightY: 0.8,
+      },
+    });
+    const lamp = runtime.scene.children.find((child) => child instanceof THREE.DirectionalLight && child.position.z === 2.4) as THREE.DirectionalLight | undefined;
+    expect(lamp?.visible).toBe(true);
+    expect(lamp?.position.x).toBe(-1);
+    expect(lamp?.position.y).toBe(1.6);
+    expect(lamp?.color.getHex()).toBe(0xff0000);
+    runtime.dispose();
+  });
+
   it('never touches an unrelated slot on a partial change (material-only switch leaves shape registry identity unchanged)', () => {
     const runtime = makeHeadlessRuntime();
     runtime.applyComposition(baseComposition());
