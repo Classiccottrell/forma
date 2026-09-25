@@ -20,7 +20,7 @@ describe('generateEmbedCode', () => {
   });
 
   it('uses the browser bundle without bare module imports', () => {
-    expect(code).toContain('<script src="./forma.browser.js"></script>');
+    expect(code).toMatch(/<script src="\.\/forma\.browser\.v\d+\.\d+\.\d+\.js"><\/script>/);
     expect(code).not.toMatch(/\bfrom ['"](?:forma|three)/);
   });
 

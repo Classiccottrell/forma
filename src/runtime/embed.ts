@@ -8,7 +8,7 @@ export interface EmbedOptions {
 
 export function generateEmbedCode(c: Composition, options: EmbedOptions = {}): string {
   const json = serializeComposition(c);
-  const libraryUrl = escapeAttribute(options.libraryUrl ?? './forma.browser.js');
+  const libraryUrl = escapeAttribute(options.libraryUrl ?? './forma.browser.v0.1.0.js');
   return `<div id="forma-mount"></div>
 <script src="${libraryUrl}"></script>
 <script>

@@ -1,11 +1,12 @@
 import { DefinitionRegistry } from './DefinitionRegistry.js';
-import type { ShapeDefinition, MaterialDefinition, EnvironmentDefinition, EffectDefinition, ParamSchemaMap } from '../types.js';
+import type { ShapeDefinition, MaterialDefinition, TextureDefinition, EnvironmentDefinition, EffectDefinition, ParamSchemaMap } from '../types.js';
 
-// Four typed singletons (blueprint §2). Populated by harness/* (or any future
+// Five typed singletons (blueprint §2). Populated by harness/* (or any future
 // consumer) via .register(); empty at construction — src/ owns the registry shape,
 // not the content.
 export const shapeRegistry = new DefinitionRegistry<ShapeDefinition>();
 export const materialRegistry = new DefinitionRegistry<MaterialDefinition>();
+export const textureRegistry = new DefinitionRegistry<TextureDefinition>();
 export const environmentRegistry = new DefinitionRegistry<EnvironmentDefinition>();
 export const effectRegistry = new DefinitionRegistry<EffectDefinition>();
 
@@ -16,6 +17,9 @@ export function defineShape<S extends ParamSchemaMap>(def: ShapeDefinition<S>): 
   return def;
 }
 export function defineMaterial<S extends ParamSchemaMap>(def: MaterialDefinition<S>): MaterialDefinition<S> {
+  return def;
+}
+export function defineTexture<S extends ParamSchemaMap>(def: TextureDefinition<S>): TextureDefinition<S> {
   return def;
 }
 export function defineEnvironment<S extends ParamSchemaMap>(def: EnvironmentDefinition<S>): EnvironmentDefinition<S> {

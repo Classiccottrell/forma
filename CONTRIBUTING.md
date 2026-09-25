@@ -14,12 +14,12 @@ cd app && npm install
 See root `README.md`'s "Setup"/"Scripts" sections and `app/README.md` for the
 full local-dev and deployment picture.
 
-## Adding a shape, material, environment, or effect
+## Adding a shape, material, texture, environment, or effect
 
-All four content kinds follow the same pattern: an object built with
-`defineShape`/`defineMaterial`/`defineEnvironment`/`defineEffect`
+All five content kinds follow the same pattern: an object built with
+`defineShape`/`defineMaterial`/`defineTexture`/`defineEnvironment`/`defineEffect`
 (`src/registry/instances.ts`), registered into the matching singleton registry
-from `src/content/{shapes,materials,environments,effects}.ts`.
+from `src/content/{shapes,materials,textures,environments,effects}.ts`.
 
 ### Example: a shape (`sphere`, `src/content/shapes.ts`)
 
@@ -93,7 +93,7 @@ export function registerShapes(): void {
 ```
 
 That's the whole contract — one `defineX` object, one entry in the registration
-array. `registerAllContent()` (`src/content/index.ts`) calls all four
+array. `registerAllContent()` (`src/content/index.ts`) calls all five
 `registerX()` functions; every consumer (harness, `app/`, generated embed
 snippets) calls it explicitly once at startup.
 
@@ -117,14 +117,14 @@ list unless it's SVG-based (see "Known limitations" below for why
 
 `generateEmbedCode()` (`src/runtime/embed.ts`) serializes the current
 `Composition` to JSON (`serializeComposition`) and references the bundled
-`forma.browser.js` IIFE:
+`forma.browser.v<package-version>.js` IIFE:
 
 ```html
 <div id="forma-mount"></div>
-<script src="./forma.browser.js"></script>
+<script src="./forma.browser.v0.1.0.js"></script>
 <script>
   Forma.registerAllContent();
-  const composition = { /* ...serialized shape/material/environment/effect ids + params... */ };
+  const composition = { /* ...serialized shape/material/texture/environment/effect ids + params... */ };
   Forma.mountForma(document.getElementById('forma-mount'), composition);
 </script>
 ```

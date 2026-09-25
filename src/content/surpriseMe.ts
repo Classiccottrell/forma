@@ -13,10 +13,10 @@ const SPARSE_SHAPES = new Set(['soft-blob', 'spiral', 'ring', 'cross']);
 
 // Materials whose look depends on strong directional/reflective lighting — biased
 // toward the two lighting-style environments rather than flat backdrop environments.
-const REFLECTIVE_MATERIALS = new Set(['chrome', 'gold', 'copper', 'metal', 'obsidian']);
+const REFLECTIVE_MATERIALS = new Set(['chrome', 'gold', 'copper', 'metal', 'obsidian', 'pearl']);
 
 // Materials that read best against a moody/dark backdrop.
-const COOL_MATERIALS = new Set(['glass', 'frosted-glass', 'ice', 'obsidian', 'wireframe']);
+const COOL_MATERIALS = new Set(['glass', 'frosted-glass', 'ice', 'obsidian', 'wireframe', 'rubber']);
 
 // Materials that pair well with a saturated/stylized backdrop.
 const STYLIZED_MATERIALS = new Set(['toon', 'neon-plastic', 'velvet']);
@@ -60,6 +60,7 @@ export function surpriseMe(): Composition {
 
   const shapeDef = shapeRegistry.require(shapeId);
   const materialDef = materialRegistry.require(materialId);
+  const environmentDef = environmentRegistry.require(environmentId);
 
   // Effects: bias toward zero or one, never stack several at once (keeps the result
   // readable rather than chaotic) — 50% none, 50% one real effect.
@@ -75,8 +76,10 @@ export function surpriseMe(): Composition {
     shapeParams: { ...shapeDef.defaultParameters },
     materialId,
     materialParams: { ...materialDef.defaultParameters },
+    textureId: 'none',
+    textureParams: {},
     environmentId,
-    environmentParams: {},
+    environmentParams: { ...environmentDef.defaultParameters },
     effectIds,
     effectParams,
   };

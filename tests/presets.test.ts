@@ -9,14 +9,20 @@ ensureHarnessContentRegistered();
 describe('built-in presets', () => {
   const presets = builtInPresets();
 
-  it('ships a reasonable-sized curated set', () => {
-    expect(presets.length).toBeGreaterThanOrEqual(8);
-    expect(presets.length).toBeLessThanOrEqual(12);
+  it('ships exactly eight curated presets', () => {
+    expect(presets).toHaveLength(8);
   });
 
   it('every preset id is unique', () => {
     const ids = presets.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('covers the curated UI shape set', () => {
+    const shapeIds = new Set(presets.map((p) => p.composition.shapeId));
+    for (const shapeId of ['pill', 'card', 'badge', 'notched-card']) {
+      expect(shapeIds.has(shapeId)).toBe(true);
+    }
   });
 
   it('every preset composition resolves to valid registry entries', () => {

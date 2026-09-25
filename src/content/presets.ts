@@ -19,7 +19,7 @@ function composition(spec: {
 }): Composition {
   const shapeDef = shapeRegistry.require(spec.shapeId);
   const materialDef = materialRegistry.require(spec.materialId);
-  environmentRegistry.require(spec.environmentId); // validates id, no params on env today
+  const environmentDef = environmentRegistry.require(spec.environmentId);
   const effectIds = spec.effectIds ?? [];
   const effectParams: Composition['effectParams'] = {};
   for (const id of effectIds) {
@@ -31,8 +31,10 @@ function composition(spec: {
     shapeParams: { ...shapeDef.defaultParameters, ...(spec.shapeOverrides ?? {}) },
     materialId: spec.materialId,
     materialParams: { ...materialDef.defaultParameters, ...(spec.materialOverrides ?? {}) },
+    textureId: 'none',
+    textureParams: {},
     environmentId: spec.environmentId,
-    environmentParams: {},
+    environmentParams: { ...environmentDef.defaultParameters },
     effectIds,
     effectParams,
   };
@@ -50,93 +52,52 @@ interface PresetSpec {
  * reflectivity matched to environment, effect chosen to complement the mood. */
 const BUILT_IN_PRESET_SPECS: PresetSpec[] = [
   {
-    id: 'gold-knot-softbox',
-    name: 'Gold Torus Knot',
-    tags: ['warm', 'metallic', 'studio'],
-    spec: { shapeId: 'knot', materialId: 'gold', environmentId: 'softbox' },
+    id: 'clay-pill-softbox',
+    name: 'Soft Clay Pill',
+    tags: ['ui', 'soft', 'studio'],
+    spec: { shapeId: 'pill', materialId: 'clay', environmentId: 'softbox' },
   },
   {
-    id: 'frosted-gem-midnight-vignette',
-    name: 'Frosted Gem at Midnight',
-    tags: ['cool', 'glass', 'moody'],
-    spec: {
-      shapeId: 'gem',
-      materialId: 'frosted-glass',
-      environmentId: 'midnight',
-      effectIds: ['vignette'],
-    },
+    id: 'ceramic-card-studio',
+    name: 'Ceramic UI Card',
+    tags: ['ui', 'matte', 'studio'],
+    spec: { shapeId: 'card', materialId: 'ceramic', environmentId: 'studio' },
   },
   {
-    id: 'chrome-sphere-studio',
-    name: 'Chrome Sphere',
-    tags: ['metallic', 'studio', 'classic'],
-    spec: { shapeId: 'sphere', materialId: 'chrome', environmentId: 'studio' },
+    id: 'chrome-badge-studio',
+    name: 'Chrome Badge',
+    tags: ['ui', 'reflective', 'studio'],
+    spec: { shapeId: 'badge', materialId: 'chrome', environmentId: 'studio' },
   },
   {
-    id: 'neon-plastic-spiral-neon-room',
-    name: 'Neon Spiral',
-    tags: ['warm', 'stylized', 'party'],
-    spec: { shapeId: 'spiral', materialId: 'neon-plastic', environmentId: 'neon-room' },
-  },
-  {
-    id: 'obsidian-dodecahedron-midnight',
-    name: 'Obsidian Dodecahedron',
-    tags: ['cool', 'moody', 'geometric'],
-    spec: {
-      shapeId: 'dodecahedron',
-      materialId: 'obsidian',
-      environmentId: 'midnight',
-      effectIds: ['vignette'],
-      effectOverrides: { vignette: { darkness: 1.0, radius: 0.6 } },
-    },
+    id: 'frosted-notched-card-softbox',
+    name: 'Frosted Notched Card',
+    tags: ['ui', 'glass', 'softbox'],
+    spec: { shapeId: 'notched-card', materialId: 'frosted-glass', environmentId: 'softbox' },
   },
   {
     id: 'ice-blob-sunset',
     name: 'Ice Blob at Sunset',
-    tags: ['cool', 'organic', 'glass'],
+    tags: ['organic', 'glass', 'warm'],
     spec: { shapeId: 'soft-blob', materialId: 'ice', environmentId: 'sunset' },
   },
   {
-    id: 'copper-torus-softbox',
-    name: 'Copper Torus',
-    tags: ['warm', 'metallic', 'studio'],
-    spec: { shapeId: 'torus', materialId: 'copper', environmentId: 'softbox' },
+    id: 'obsidian-gem-midnight',
+    name: 'Obsidian Gem at Midnight',
+    tags: ['faceted', 'reflective', 'moody'],
+    spec: { shapeId: 'gem', materialId: 'obsidian', environmentId: 'midnight', effectIds: ['vignette'] },
   },
   {
-    id: 'velvet-star-sunset-duotone',
-    name: 'Velvet Star',
-    tags: ['warm', 'stylized'],
-    spec: { shapeId: 'star', materialId: 'velvet', environmentId: 'sunset', effectIds: ['duotone'] },
+    id: 'toon-star-gradient-sky',
+    name: 'Toon Star in Gradient Sky',
+    tags: ['stylized', 'playful', 'colorful'],
+    spec: { shapeId: 'star', materialId: 'toon', environmentId: 'gradient-sky' },
   },
   {
-    id: 'wireframe-knot-studio',
-    name: 'Wireframe Knot',
-    tags: ['geometric', 'technical'],
-    spec: { shapeId: 'knot', materialId: 'wireframe', environmentId: 'studio' },
-  },
-  {
-    id: 'clay-capsule-studio',
-    name: 'Clay Capsule',
-    tags: ['warm', 'soft', 'studio'],
-    spec: { shapeId: 'capsule', materialId: 'clay', environmentId: 'studio' },
-  },
-  {
-    id: 'carbon-gem-neon-room-grayscale',
-    name: 'Carbon Gem',
-    tags: ['cool', 'faceted', 'stylized'],
-    spec: {
-      shapeId: 'gem',
-      materialId: 'carbon',
-      environmentId: 'neon-room',
-      effectIds: ['grayscale'],
-      effectOverrides: { grayscale: { intensity: 0.6 } },
-    },
-  },
-  {
-    id: 'toon-icosahedron-gradient-sky',
-    name: 'Toon Icosahedron',
-    tags: ['stylized', 'playful'],
-    spec: { shapeId: 'icosahedron', materialId: 'toon', environmentId: 'gradient-sky' },
+    id: 'gold-torus-softbox',
+    name: 'Gold Torus in Softbox',
+    tags: ['reflective', 'metallic', 'studio'],
+    spec: { shapeId: 'torus', materialId: 'gold', environmentId: 'softbox' },
   },
 ];
 

@@ -12,6 +12,8 @@ export interface Composition {
   shapeParams: Record<string, ParamValue>;
   materialId: string;
   materialParams: Record<string, ParamValue>;
+  textureId?: string;
+  textureParams?: Record<string, ParamValue>;
   environmentId: string;
   environmentParams: Record<string, ParamValue>;
   effectIds: string[]; // ordered; empty array is valid (no effects)
@@ -79,6 +81,10 @@ export interface MaterialCreateContext {
   registry: ResourceRegistry;
 }
 
+export interface TextureCreateContext {
+  registry: ResourceRegistry;
+}
+
 export interface EnvironmentCreateContext {
   registry: ResourceRegistry;
   scene: THREE.Scene;
@@ -125,7 +131,41 @@ export interface MaterialDefinition<S extends ParamSchemaMap = ParamSchemaMap> e
   update?(material: THREE.Material, params: ParamsOf<S>): void;
 }
 
+export interface TextureHandle {
+  texture: THREE.Texture | null;
+  apply(material: THREE.Material): void;
+  applyPack?(material: THREE.Material, maps: TextureMapSet, intensity: number, scale: number): void;
+  dispose(): void;
+}
+
+export type TexturePackMap = 'color' | 'normal' | 'roughness';
+
+export interface TexturePackManifest {
+  id: string;
+  source: string;
+  license: string;
+  use: string;
+  color?: string;
+  normal?: string;
+  roughness?: string;
+  defaultIntensity: number;
+}
+
+export type TextureMapSet = Pick<Partial<{
+  color: THREE.Texture;
+  normal: THREE.Texture;
+  roughness: THREE.Texture;
+}>, TexturePackMap>;
+
+export interface TextureDefinition<S extends ParamSchemaMap = ParamSchemaMap> extends RegistryEntryBase<S> {
+  pack?: TexturePackManifest;
+  create(params: ParamsOf<S>, ctx: TextureCreateContext): TextureHandle;
+  update?(handle: TextureHandle, params: ParamsOf<S>): void;
+}
+
 export interface EnvironmentDefinition<S extends ParamSchemaMap = ParamSchemaMap> extends RegistryEntryBase<S> {
+  /** Optional app-hosted equirectangular HDR used for image-based lighting. */
+  hdrPath?: string;
   create(params: ParamsOf<S>, ctx: EnvironmentCreateContext): EnvironmentHandle;
   update?(handle: EnvironmentHandle, params: ParamsOf<S>): void;
 }

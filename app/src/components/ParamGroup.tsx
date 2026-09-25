@@ -19,7 +19,7 @@ export function ParamGroup({ schema, values, onChange }: ParamGroupProps) {
         <ParamControl
           key={key}
           id={key}
-          label={key}
+          label={key === 'ior' ? 'IOR' : key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (letter) => letter.toUpperCase())}
           schema={schema[key]!}
           value={values[key] ?? schema[key]!.default}
           onChange={(next) => onChange(key, next)}

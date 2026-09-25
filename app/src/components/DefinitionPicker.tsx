@@ -1,3 +1,5 @@
+import { ShapePreviewGrid } from './ShapePreviewGrid';
+
 export interface DefinitionPickerEntry {
   id: string;
   label: string;
@@ -9,17 +11,16 @@ export interface DefinitionPickerProps {
   selectedId: string;
   onSelect(id: string): void;
   filter?: string;
-  kind: 'shape' | 'material' | 'environment';
+  kind: 'shape' | 'material' | 'texture' | 'environment';
 }
 
 /** Generic grid of registry entries for one slot — reused for shapes, materials,
- * environments, effects via a plain data prop (roadmap §6). Thumbnail is a label
- * glyph (no rendered preview asset in M1 — an acceptable scope narrowing; the
- * picker's job is fast switching, not gallery imagery). */
+ * textures, and environments via a plain data prop. */
 export function DefinitionPicker({ entries, selectedId, onSelect, filter, kind }: DefinitionPickerProps) {
   const visible = filter
     ? entries.filter((e) => e.label.toLowerCase().includes(filter.toLowerCase()) || e.category.toLowerCase().includes(filter.toLowerCase()))
     : entries;
+  if (kind === 'shape') return <ShapePreviewGrid entries={visible} selectedId={selectedId} onSelect={onSelect} />;
   return (
     <div className="picker-grid" role="listbox" aria-label={`${kind} options`}>
       {visible.length === 0 && <div className="empty-state">No {kind} options match this search.</div>}

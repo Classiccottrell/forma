@@ -20,6 +20,8 @@ export interface CreateFormaSceneOptions {
   el: HTMLElement;
   /** Camera distance from origin along +z. Default 3.2 (harness's prior default). */
   cameraZ?: number;
+  onContextLost?: () => void;
+  onContextRestored?: () => void;
 }
 
 export interface FormaScene {
@@ -33,12 +35,14 @@ export interface FormaScene {
   composer: EffectComposer;
   /** Renders one frame through the composer (RenderPass + any active effect passes). */
   render(): void;
+  /** True while the browser has lost this renderer's WebGL context. */
+  contextLost: boolean;
   /** Stops observing resize and disposes the renderer + removes its canvas. */
   dispose(): void;
 }
 
 export function createFormaScene(opts: CreateFormaSceneOptions): FormaScene {
-  const { el, cameraZ = 3.2 } = opts;
+  const { el, cameraZ = 3.2, onContextLost, onContextRestored } = opts;
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, Math.max(el.clientWidth, 1) / Math.max(el.clientHeight, 1), 0.1, 100);
@@ -53,6 +57,19 @@ export function createFormaScene(opts: CreateFormaSceneOptions): FormaScene {
   composer.setSize(Math.max(el.clientWidth, 1), Math.max(el.clientHeight, 1));
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
+
+  let contextLost = false;
+  function handleContextLost(event: Event): void {
+    event.preventDefault();
+    contextLost = true;
+    onContextLost?.();
+  }
+  function handleContextRestored(): void {
+    contextLost = false;
+    onContextRestored?.();
+  }
+  renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
+  renderer.domElement.addEventListener('webglcontextrestored', handleContextRestored);
 
   function resize(): void {
     const w = Math.max(el.clientWidth, 1);
@@ -76,12 +93,18 @@ export function createFormaScene(opts: CreateFormaSceneOptions): FormaScene {
     camera,
     renderer,
     composer,
+    get contextLost() {
+      return contextLost;
+    },
     render() {
+      if (contextLost) return;
       composer.render();
     },
     dispose() {
       observer?.disconnect();
       if (!observer && typeof window !== 'undefined') window.removeEventListener('resize', resize);
+      renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
+      renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestored);
       renderer.dispose();
       renderer.domElement.remove();
     },

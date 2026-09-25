@@ -16,6 +16,12 @@ npm install
 npm run dev           # Vite dev server, printed localhost URL
 ```
 
+Homepage routes: `/` (Studio), `/?variant=gallery` (Gallery), and `/editor` (full editor).
+
+Editor creator mode is local-only: enable it from `/editor` to save named Studio or
+Gallery compositions and choose which saved composition each homepage uses. Settings
+live in `localStorage`; consumer homepages never show creator controls.
+
 **Why `npm run build` first, even for `npm run dev`.** `app/package.json`
 declares `"forma": "file:.."` — a real npm dependency resolved through the
 library's `package.json` `exports` map, which points at `./dist/index.js` and
@@ -51,6 +57,40 @@ any static host.
 
 `npm run preview` serves the built `app/dist/` locally for a final check before
 deploying.
+
+Texture review uses the checked-in 1K packs under `app/public/textures/`. The app
+passes the Vite base URL explicitly to Forma, so project-site builds resolve packs
+under the configured `FORMA_BASE`; failed loads retain procedural fallbacks.
+Book Pattern and Fine Grained Wood are active local PBR texture options; their
+authored material colors remain visible while normal and roughness maps load.
+
+## Release checks
+
+Run from `app/` after the library has been built:
+
+```bash
+npm run build
+npm run check:bundle
+npm run typecheck
+cd .. && npm test && npm run typecheck && npm run typecheck:harness && npm run build
+```
+
+`check:bundle` measures the existing `dist/assets/*.js` output and fails above
+900,000 JavaScript bytes or 250,000 summed gzip bytes. It does not build.
+
+| Target | Status | Caveat |
+| --- | --- | --- |
+| Chrome / Edge / Firefox / Safari | Supported | Recent WebGL2-enabled versions |
+| GitHub Pages project site | Supported | Build with `FORMA_BASE=/<repo>/` |
+| Cloudflare Pages | Supported | Root directory must include library and app |
+| Vercel | Supported | Root directory must include library and app |
+| Browser QA | Required before release | Local Chromium is currently blocked by macOS `bootstrap_check_in` permissions |
+
+## Browser bundle example
+
+The library build emits ../dist/forma.browser.v<package-version>.js. Build the
+library, then serve ../examples/embed/ with any static server to review the
+versioned browser bundle contract and embed path locally.
 
 ## Deployment
 
@@ -119,7 +159,9 @@ node e2e/verify-m3.mjs                     # shell 2, from app/
 ```
 
 See the root README's "Editor UX (M3)" section for what `verify-m3.mjs`
-actually checks (12 assertions against a live Playwright/chromium session).
+actually checks (12 assertions against a live Playwright/chromium session). For
+texture review, inspect `/textures/<stable-id>/` requests after selecting each
+local PBR entry.
 
 ## Browser support
 
@@ -130,6 +172,16 @@ browser with WebGL2 enabled works — Chrome/Edge/Firefox/Safari (recent
 versions). Mobile touch support (orbit/zoom via OrbitControls' built-in touch
 handling, responsive collapsed panel under 640px) verified in M3 — see root
 README.
+
+## Current H3 roadmap status
+
+The H3 polish slice remains active across the shape catalog. The reference-driven
+control taxonomy, camera presentation controls, lighting controls, directional-light
+placement, Material Library / Settings views, the full-control Physical Studio
+material, and three additional environments are now in place. Remaining work includes
+the ordered Texture / Colour / Finish effect pipeline, picker reference-card polish,
+broader content expansion, lifecycle hardening, and final browser QA.
+Presentation backdrops, floor-shadow controls, and composition undo/redo are also live.
 
 ## Known limitations
 
