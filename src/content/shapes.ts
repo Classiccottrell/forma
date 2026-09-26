@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 import { defineShape, shapeRegistry } from '../registry/instances.js';
 
@@ -1091,6 +1092,282 @@ const vase = defineShape({
   },
 });
 
+// --- apparel -----------------------------------------------------------------
+//
+// The TerryTime merch as parametric shapes. The hoodie and polo outlines are
+// the traced front silhouettes the Blender pipeline built the store's GLBs
+// from — the actual base meshes in terrytime-assets.blend (Hoodie_Body, 33
+// points; Polo_Body, 19), normalised to unit height. Those GLBs are flat
+// cutouts only 3-8 cm deep, so an extrusion loses nothing, and the garments
+// stay tiny, synchronous and embeddable like every other shape — no model
+// loading, no hosting. The cap is the one genuinely 3D piece, so it is
+// designed rather than traced, sized to the proportions of the store's dad hat.
+// The logo is deliberately not part of these shapes; SVG Import covers it.
+
+/** Traced silhouettes as flat [x0, y0, x1, y1, …], unit height, centred. */
+const HOODIE_OUTLINE = [
+  -0.3668, -0.5, -0.3668, -0.4402, -0.3886, -0.4185, -0.3886, -0.2337, -0.3342, 0.2174, -0.2908, 0.3207, -0.2636, 0.3424,
+  -0.1821, 0.3696, -0.1495, 0.462, -0.1114, 0.4891, -0.0734, 0.4946, -0.0679, 0.5, 0.0516, 0.5, 0.1332, 0.4728, 0.1712, 0.375,
+  0.2473, 0.3478, 0.2908, 0.2989, 0.3234, 0.2011, 0.3832, -0.1902, 0.3886, -0.3804, 0.3832, -0.413, 0.356, -0.4456, 0.3614,
+  -0.4946, 0.2853, -0.5, 0.2636, -0.4456, 0.2527, -0.4674, 0.2255, -0.4837, -0.2255, -0.4783, -0.2418, -0.4674, -0.2418, -0.413,
+  -0.2527, -0.4076, -0.2799, -0.4294, -0.2853, -0.5,
+];
+const POLO_OUTLINE = [
+  0.2431, -0.5, -0.2431, -0.4945, -0.232, -0.2735, -0.2376, -0.0083, -0.3757, 0.0249, -0.3757, 0.0414, -0.2707, 0.3564, -0.2155,
+  0.395, -0.0994, 0.4337, -0.0718, 0.4724, -0.0387, 0.4945, -0.0332, 0.5, 0.0774, 0.4889, 0.1271, 0.4282, 0.2431, 0.3895,
+  0.2928, 0.3564, 0.3757, 0.0801, 0.3757, 0.0414, 0.2376, -0.0028,
+];
+
+/**
+ * Chaikin corner-cutting on a closed polygon: each edge PQ becomes the points
+ * ¾P + ¼Q and ¼P + ¾Q. It is the curve analogue of the Subdivision Surface
+ * modifier the Blender pipeline ran on these garments — it rounds corners but,
+ * unlike a spline through the same points, never overshoots them, which matters
+ * at sharp cuffs, hems and the notch between sleeve and body.
+ */
+function chaikin(points: THREE.Vector2[], iterations: number): THREE.Vector2[] {
+  let pts = points;
+  for (let i = 0; i < iterations; i++) {
+    const next: THREE.Vector2[] = [];
+    for (let k = 0; k < pts.length; k++) {
+      const p = pts[k];
+      const q = pts[(k + 1) % pts.length];
+      next.push(new THREE.Vector2().lerpVectors(p, q, 0.25), new THREE.Vector2().lerpVectors(p, q, 0.75));
+    }
+    pts = next;
+  }
+  return pts;
+}
+
+function garmentGeometry(outline: number[], p: { size: number; thickness: number; roundness: number; smoothing: number }): THREE.BufferGeometry {
+  const points: THREE.Vector2[] = [];
+  for (let i = 0; i < outline.length; i += 2) points.push(new THREE.Vector2(outline[i], outline[i + 1]));
+  const shape = new THREE.Shape(chaikin(points, Math.round(p.smoothing)));
+  // A rounded edge rather than a hard one is what keeps a flat cutout from
+  // reading as a cookie cutter. It is capped in absolute terms because the
+  // bevel grows outward and the outlines have narrow features — cuffs, the gap
+  // between sleeve and hem — where a wide one would fold through itself.
+  const bevel = Math.min(p.roundness * p.thickness * 0.5, 0.02);
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: p.thickness,
+    bevelEnabled: bevel > 0,
+    bevelThickness: bevel,
+    bevelSize: bevel * 0.6,
+    bevelSegments: 4,
+    steps: 1,
+  });
+  geometry.center();
+  geometry.scale(p.size, p.size, p.size);
+  return geometry;
+}
+
+const GARMENT_SCHEMA = {
+  size: { kind: 'number', min: 0.5, max: 2.5, step: 0.05, default: 1.6, rebuild: true },
+  // Real garments are ~1.6% as thick as they are tall, which reads as paper at
+  // playground scale; the default is a chunkier "3D icon" slab.
+  thickness: { kind: 'number', min: 0.02, max: 0.4, step: 0.01, default: 0.1, rebuild: true },
+  roundness: { kind: 'number', min: 0, max: 1, step: 0.05, default: 0.8, rebuild: true },
+  // Chaikin passes over the traced outline: 0 is the raw trace, corners and all.
+  smoothing: { kind: 'number', min: 0, max: 3, step: 1, default: 2, rebuild: true },
+} as const;
+// `as const` like the schema, the same pattern as the environments' shared
+// lighting schema: ParamsOf narrows each param to its default's literal type.
+const GARMENT_DEFAULTS = { size: 1.6, thickness: 0.1, roundness: 0.8, smoothing: 2 } as const;
+
+const hoodie = defineShape({
+  id: 'hoodie',
+  label: 'Hoodie',
+  category: 'apparel',
+  parameterSchema: GARMENT_SCHEMA,
+  defaultParameters: GARMENT_DEFAULTS,
+  create(params, ctx) {
+    const geometry = garmentGeometry(HOODIE_OUTLINE, params);
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+const polo = defineShape({
+  id: 'polo',
+  label: 'Polo Shirt',
+  category: 'apparel',
+  parameterSchema: GARMENT_SCHEMA,
+  defaultParameters: GARMENT_DEFAULTS,
+  create(params, ctx) {
+    const geometry = garmentGeometry(POLO_OUTLINE, params);
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
+/**
+ * A six-panel dad hat, built at crown radius 1: a lathed hollow crown with
+ * seam grooves, a pre-curved brim, and a button. The crown follows the store's
+ * hat (0.94 as tall as its radius); its brim reached 0.74 of the radius past
+ * the crown and hung steeply, and the defaults sit a little shorter and
+ * flatter, which read better as a standalone object.
+ *
+ * The brim is the only hand-built surface in the file that is not convex, so
+ * the diamond's "outward means away from the origin" winding test does not
+ * apply. Its winding is set by construction instead, face by face, and the
+ * geometry sweep proves it: every directed edge used exactly once with its
+ * reverse present, and positive volume for each connected part.
+ */
+function capGeometry(p: { crownHeight: number; brimLength: number; brimTilt: number; brimCurve: number; seams: number }): THREE.BufferGeometry {
+  // --- crown: a hollow shell. One closed cross-section — down the inside from
+  // the apex, across the rim, up the outside — lathed around the axis. Traced
+  // in that order, the inner surface faces the cavity and the outer one faces
+  // out, so the shell is a closed solid with every face pointing out of the
+  // fabric. (A solid dome has a flat disc across its base, which from below
+  // reads as a bowl, not a cap.)
+  const SHELL = 0.04;
+  const STEPS = 24;
+  const dome = (scale: number, t: number) =>
+    new THREE.Vector2(t >= Math.PI / 2 ? 0 : Math.cos(t) * scale, p.crownHeight * Math.sin(t) * scale);
+  const profile: THREE.Vector2[] = [];
+  for (let i = STEPS; i >= 0; i--) profile.push(dome(1 - SHELL, (i / STEPS) * (Math.PI / 2)));
+  for (let i = 0; i <= STEPS; i++) profile.push(dome(1, (i / STEPS) * (Math.PI / 2)));
+  // LatheGeometry's seam falls at phiStart: put it at the back, out of sight.
+  const crown = new THREE.LatheGeometry(profile, 96, Math.PI);
+  // Six panels meet in seams running from the rim to the button, one at front
+  // centre. Pull the surface in along each seam; the pull scales with radius,
+  // so the grooves converge to nothing at the button. Kept below SHELL so a
+  // seam can never pull the outer surface through the inner one.
+  const depth = 0.035 * p.seams;
+  const PANEL = Math.PI / 3;
+  const seamPull = (angle: number): number => {
+    const along = ((angle % PANEL) + PANEL) % PANEL;
+    const toSeam = Math.min(along, PANEL - along);
+    return 1 - depth * Math.exp(-((toSeam / 0.05) ** 2));
+  };
+  if (depth > 0) {
+    const pos = crown.getAttribute('position');
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const pull = seamPull(Math.atan2(x, z));
+      pos.setX(i, x * pull);
+      pos.setZ(i, z * pull);
+    }
+  }
+  crown.computeVertexNormals();
+
+  // --- button
+  const button = new THREE.SphereGeometry(0.075, 16, 8);
+  button.scale(1, 0.55, 1);
+  button.translate(0, p.crownHeight, 0);
+
+  // --- brim: a thin slab over the front arc, tilted down and pre-curved.
+  const U = 36;
+  const V = 10;
+  const ARC = 1.05; // half-width of the front arc, radians (~60°) — wider reads as a sun visor
+  const THICK = 0.035;
+  const tilt = Math.tan(THREE.MathUtils.degToRad(p.brimTilt));
+  const positions: number[] = [];
+  const index: number[] = [];
+  const vertex = (v: THREE.Vector3): number => {
+    positions.push(v.x, v.y, v.z);
+    return positions.length / 3 - 1;
+  };
+  // Grid of the brim's top surface. Its inner edge sits mid-shell at every
+  // angle — halfway between the crown's inner and outer surfaces, both pulled
+  // in by the seam at that angle — so it is always buried in the fabric: no
+  // seam can open a gap between crown and brim, and the edge never pokes into
+  // the cavity. Its reach never quite falls to zero at the ends (0.87 below),
+  // so the side faces are real quads, not slivers.
+  const top: THREE.Vector3[][] = [];
+  for (let i = 0; i <= U; i++) {
+    const phi = ARC * ((2 * i) / U - 1);
+    const inset = seamPull(phi) * (1 - SHELL / 2);
+    const reach = p.brimLength * Math.cos((phi / ARC) * (Math.PI / 2) * 0.87);
+    const row: THREE.Vector3[] = [];
+    for (let j = 0; j <= V; j++) {
+      const v = j / V;
+      const rho = inset + v * (1 - inset + reach);
+      // Tilt drops the brim as it reaches forward; the curve bends it down
+      // across its width, like a pre-curved visor. Both vanish at the inner
+      // edge so the brim stays attached to the rim.
+      const lateral = Math.sin(phi) * rho;
+      const drop = Math.max(0, rho - 1) * tilt + p.brimCurve * 0.45 * lateral ** 2 * v;
+      row.push(new THREE.Vector3(Math.sin(phi) * rho, -drop, Math.cos(phi) * rho));
+    }
+    top.push(row);
+  }
+  const below = (v: THREE.Vector3) => new THREE.Vector3(v.x, v.y - THICK, v.z);
+  // Each part gets its own vertices so the slab's edges stay crisp.
+  const surface = (rows: THREE.Vector3[][], flip: boolean): void => {
+    const ids = rows.map((row) => row.map(vertex));
+    for (let i = 0; i < U; i++) {
+      for (let j = 0; j < V; j++) {
+        const a = ids[i][j], b = ids[i + 1][j], c = ids[i][j + 1], d = ids[i + 1][j + 1];
+        // Along i runs +x, along j runs outward: (a, c, b) faces +y.
+        if (flip) index.push(a, b, c, c, b, d);
+        else index.push(a, c, b, c, d, b);
+      }
+    }
+  };
+  surface(top, false);
+  surface(top.map((row) => row.map(below)), true);
+  const strip = (pairs: [THREE.Vector3, THREE.Vector3][], flip: boolean): void => {
+    const ids = pairs.map(([t, b]) => [vertex(t), vertex(b)]);
+    for (let k = 0; k < ids.length - 1; k++) {
+      const [t0, b0] = ids[k];
+      const [t1, b1] = ids[k + 1];
+      if (flip) index.push(t0, t1, b0, t1, b1, b0);
+      else index.push(t0, b0, t1, t1, b0, b1);
+    }
+  };
+  strip(top.map((row) => [row[V], below(row[V])]), false); // outer edge
+  strip(top.map((row) => [row[0], below(row[0])]), true); // inner edge
+  // The ends face away from the brim along the arc: -u at the left, +u at the
+  // right, which is why they take opposite windings.
+  strip(top[0].map((v) => [v, below(v)]), false); // left end
+  strip(top[U].map((v) => [v, below(v)]), true); // right end
+  const brim = new THREE.BufferGeometry();
+  brim.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  brim.setIndex(index);
+  brim.computeVertexNormals();
+
+  // One mesh, one material: merge the three solids. Their UVs differ (and the
+  // brim has none), so drop them all — the runtime's ensureGeometryUVs gives
+  // the merged result a consistent set.
+  const parts = [crown, button, brim];
+  for (const part of parts) part.deleteAttribute('uv');
+  const merged = mergeGeometries(parts, false);
+  for (const part of parts) part.dispose();
+  if (!merged) throw new Error('cap: parts could not be merged');
+  // Posed three-quarter and slightly from above, the classic product shot.
+  // Head-on, a brim pointing at the camera turns the cap into a bell; the flat
+  // garments face front instead, because their silhouettes are the point.
+  merged.rotateY(0.65);
+  merged.rotateX(0.22);
+  merged.center();
+  return merged;
+}
+
+const cap = defineShape({
+  id: 'cap',
+  label: 'Cap',
+  category: 'apparel',
+  parameterSchema: {
+    size: { kind: 'number', min: 0.5, max: 2.5, step: 0.05, default: 1.4, rebuild: true },
+    // Crown height as a multiple of its radius.
+    crownHeight: { kind: 'number', min: 0.5, max: 1.3, step: 0.02, default: 0.94, rebuild: true },
+    // How far the brim reaches past the crown, as a multiple of its radius.
+    brimLength: { kind: 'number', min: 0.3, max: 1.5, step: 0.05, default: 0.7, rebuild: true },
+    brimTilt: { kind: 'number', min: 0, max: 40, step: 1, default: 8, rebuild: true },
+    brimCurve: { kind: 'number', min: 0, max: 1, step: 0.05, default: 0.6, rebuild: true },
+    seams: { kind: 'number', min: 0, max: 1, step: 0.05, default: 0.5, rebuild: true },
+  },
+  defaultParameters: { size: 1.4, crownHeight: 0.94, brimLength: 0.7, brimTilt: 8, brimCurve: 0.6, seams: 0.5 },
+  create(params, ctx) {
+    const geometry = capGeometry(params);
+    geometry.scale(params.size, params.size, params.size);
+    ctx.registry.track(geometry);
+    return geometry;
+  },
+});
+
 // Small built-in glyph (a rounded square with a notch) — the svg-extrude default. Kept
 // tiny and always-valid so a freshly-selected shape (before any file is imported) and
 // the leak-check's defaultParameters pass never hit an empty/garbage SVG path.
@@ -1174,6 +1451,9 @@ export function registerShapes(): void {
     bevelledBox,
     spring,
     vase,
+    hoodie,
+    polo,
+    cap,
     svgExtrude,
   ]) {
     if (!shapeRegistry.get(def.id)) shapeRegistry.register(def);
