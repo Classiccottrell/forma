@@ -8,6 +8,7 @@ import { ControlPanel } from './components/ControlPanel';
 import { SurpriseMeButton } from './components/SurpriseMeButton';
 import { OnboardingHint } from './components/OnboardingHint';
 import HomePage from './HomePage';
+import { EDITOR_PATH } from './base';
 import CreatorPanel from './components/CreatorPanel';
 
 /** True while a shortcut should NOT fire — focus is in a text input, textarea,
@@ -20,7 +21,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 /** Top-level layout: viewport + ControlPanel + top bar (roadmap §6). Holds
  * Composition state via useFormaRuntime, passes apply(patch) down. */
 export default function App() {
-  if (typeof window !== 'undefined' && window.location.pathname !== '/editor') {
+  if (typeof window !== 'undefined' && window.location.pathname !== EDITOR_PATH) {
     return <HomePage gallery={new URLSearchParams(window.location.search).get('variant') === 'gallery'} />;
   }
   const hostRef = useRef<HTMLDivElement>(null);

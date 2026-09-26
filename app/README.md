@@ -104,6 +104,7 @@ serve from the domain root and need no change. GitHub Pages *project* sites
 ```bash
 cd Projects/Forma && npm run build
 cd app && FORMA_BASE=/forma/ npm run build   # replace 'forma' with the actual repo name
+mkdir -p dist/editor && cp dist/index.html dist/editor/index.html   # no SPA fallback on Pages: serve the shell at /forma/editor/ (HTTP 200)
 ```
 
 Then publish `app/dist/` as the Pages source — either:
@@ -118,8 +119,14 @@ Then publish `app/dist/` as the Pages source — either:
   app. Setup: set Settings -> Pages -> Source = "GitHub Actions", and while
   `Classiccottrell/cc-webgl` is private add a `CC_WEBGL_TOKEN` repo secret
   (fine-grained PAT, read-only Contents on that repo); once cc-webgl is public
-  the workflow falls back to the default token. The base-path build and a
-  headless load were verified locally; the **Actions run itself is
+  the workflow falls back to the default token. Editor routing and homepage
+  links derive from Vite's `import.meta.env.BASE_URL` (`src/base.ts`), and the
+  workflow copies the shell to `editor/index.html` because Pages has no SPA
+  fallback (Pages 301s `/<repo>/editor` to `/<repo>/editor/` and serves that
+  index with HTTP 200; `src/main.tsx` strips the trailing slash). The
+  base-path build, homepage load and `/<repo>/editor` route were verified
+  locally (vite preview + headless Chromium, and a Pages-style static server
+  with directory 301s and no SPA fallback); the **Actions run itself is
   unverified** — check the first run's logs.
 
 If served from a *user/org* Pages site (`https://<user>.github.io/`, repo named

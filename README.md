@@ -102,9 +102,16 @@ have 404'd on assets). A GitHub Actions workflow
 builds it first. Requires Settings -> Pages -> Source = "GitHub Actions", and
 while `Classiccottrell/cc-webgl` is private, a `CC_WEBGL_TOKEN` repo secret
 (fine-grained PAT, read-only Contents on that repo); once it is public the
-workflow falls back to the default token. The base-path build and a headless
-load of it were verified locally; the **GitHub Actions run itself is
-unverified** — no live runner was available, so check the first run's logs.
+workflow falls back to the default token. Editor routing and homepage links
+derive from Vite's `import.meta.env.BASE_URL` (`app/src/base.ts`), and the
+workflow copies the shell to `editor/index.html` because Pages has no SPA
+fallback (Pages 301s `/forma/editor` to `/forma/editor/` and serves that
+index with HTTP 200; `app/src/main.tsx` strips the trailing slash). The
+base-path build, the homepage load and the `/forma/editor` route were
+verified locally (vite preview + headless Chromium, and a Pages-style static
+server with directory 301s and no SPA fallback); the **GitHub Actions run
+itself is unverified** — no live runner was available, so check the first
+run's logs.
 
 ## Browser support & performance
 

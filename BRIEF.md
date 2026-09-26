@@ -77,9 +77,17 @@ core.
       URLs without it; verified by building with `FORMA_BASE=/forma/` and
       confirming `dist/index.html` emitted `/forma/assets/...` paths, then
       rebuilt with the default before committing. `.github/workflows/deploy-gh-pages.yml`
-      added — builds library then app and publishes `app/dist/` via
-      `actions/deploy-pages`; validated for YAML syntax only (`npx js-yaml`), not
-      executed — no live Actions runner available. Confirmed both `npm run build`
+      added — originally built library then app and published `app/dist/` via
+      `actions/deploy-pages`, validated for YAML syntax only (`npx js-yaml`).
+      Since revised (branch `forma-pages-deploy`): it now checks out `cc-webgl`
+      as a sibling of `forma/` (`CC_WEBGL_TOKEN` secret while cc-webgl is
+      private), builds it, then the library and app, copies the shell to
+      `editor/index.html` (Pages has no SPA fallback; it 301s `/forma/editor`
+      to `/forma/editor/` and serves that index with 200), and uploads
+      `forma/app/dist`. Editor routing/links now honour Vite's `BASE_URL`.
+      Base-path build, homepage and `/forma/editor` route verified locally
+      (vite preview + headless Chromium, plus a Pages-style static server);
+      the Actions run itself is still not executed — no live runner available. Confirmed both `npm run build`
       (library, `Projects/Forma/`) and `npm run build` (app) still pass after the
       `vite.config.ts` change (812.08 kB / 219.20 kB gzip single JS chunk, same
       pre-existing >500KB warning — documented in README as an explicit non-goal,

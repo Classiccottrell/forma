@@ -14,8 +14,8 @@
 # must be built before forma's `npm ci` / build can resolve it.
 #
 # Verified locally: root build, then FORMA_BASE=/forma/ app build served with
-# `vite preview --base /forma/` loads headless with zero 4xx, zero console
-# errors, and a rendering WebGL canvas.
+# `vite preview --base /forma/` loads headless (homepage and the /forma/editor
+# route) with zero 4xx, zero console errors, and a rendering WebGL canvas.
 # UNVERIFIED: the actual GitHub Actions run (checkout of the private repo via
 # CC_WEBGL_TOKEN, Pages deploy). No live runner was available to execute it;
 # check the first run's logs before relying on it.
@@ -72,6 +72,14 @@ jobs:
         run: |
           npm ci
           npm run build
+      # Pages has no SPA fallback: copy the app shell to the only non-root route
+      # so it is served with HTTP 200. Pages 301s /<repo>/editor to
+      # /<repo>/editor/ and serves the directory index; main.tsx strips the
+      # trailing slash so document.baseURI-relative asset URLs stay correct.
+      - name: Add editor/index.html route shell
+        run: |
+          mkdir -p forma/app/dist/editor
+          cp forma/app/dist/index.html forma/app/dist/editor/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
