@@ -20,9 +20,9 @@ const canvasHost = document.createElement('div');
 canvasHost.style.cssText = 'position:absolute;inset:0;';
 app.appendChild(canvasHost);
 
-const { scene, camera, renderer, composer, render } = createFormaScene({ el: canvasHost });
+const { scene, camera, renderer, composer, render, ensureOutputPassLast } = createFormaScene({ el: canvasHost });
 
-const runtime = new FormaRuntime({ scene, camera, renderer, composer });
+const runtime = new FormaRuntime({ scene, camera, renderer, composer, ensureOutputPassLast });
 
 let current: Composition = {
   shapeId: 'sphere',

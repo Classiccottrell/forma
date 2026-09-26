@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 /**
  * Owned scene bootstrap (expansion roadmap §2 item 1 / §1a). Replaces the two
@@ -33,6 +34,21 @@ export interface FormaScene {
    * through this same composer — the single-render-path guarantee that keeps an
    * active effect from vanishing in PNG export (roadmap §3's `duotone` note). */
   composer: EffectComposer;
+  /** Moves the colour-management OutputPass back to the end of the chain.
+   *
+   * The composer must *finish* with an OutputPass, which applies tone mapping
+   * and the renderer's output colour-space conversion. Without it every pass
+   * writes linear values straight into an sRGB framebuffer and the image
+   * shifts — a periwinkle #7f78ff sphere renders navy the moment any effect is
+   * enabled. That went unnoticed for a long time because the original five
+   * effects (grayscale, invert, duotone, vignette) all alter colour by design,
+   * so a shift inside them is invisible.
+   *
+   * Effects append their own passes via `composer.addPass()` as they are
+   * enabled, which would leave them *after* the OutputPass and back in the
+   * broken state. So whoever rebuilds the effect chain must call this
+   * afterwards — `FormaRuntime.rebuildEffectsSlot` does. Idempotent. */
+  ensureOutputPassLast(): void;
   /** Renders one frame through the composer (RenderPass + any active effect passes). */
   render(): void;
   /** True while the browser has lost this renderer's WebGL context. */
@@ -57,6 +73,18 @@ export function createFormaScene(opts: CreateFormaSceneOptions): FormaScene {
   composer.setSize(Math.max(el.clientWidth, 1), Math.max(el.clientHeight, 1));
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
+
+  // Colour management terminator. Must stay last — see ensureOutputPassLast().
+  const outputPass = new OutputPass();
+  composer.addPass(outputPass);
+
+  function ensureOutputPassLast(): void {
+    const passes = composer.passes;
+    if (passes.length === 0) return;
+    if (passes[passes.length - 1] === outputPass) return;
+    composer.removePass(outputPass);
+    composer.addPass(outputPass);
+  }
 
   let contextLost = false;
   function handleContextLost(event: Event): void {
@@ -93,6 +121,7 @@ export function createFormaScene(opts: CreateFormaSceneOptions): FormaScene {
     camera,
     renderer,
     composer,
+    ensureOutputPassLast,
     get contextLost() {
       return contextLost;
     },
