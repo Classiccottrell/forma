@@ -188,6 +188,20 @@ const EFFECT_STAGES = [
   { label: 'Finish', ids: ['vignette', 'chromatic-aberration', 'film-grain'] },
 ] as const;
 
+/** Sorts effect ids into stage order, which is the order the runtime creates
+ * their passes in. Without this, `effectIds` kept the order effects happened to
+ * be picked in: choose a Finish effect, then Bloom, and Bloom would process the
+ * already-finished image — while the panel above claimed the reverse. The
+ * displayed pipeline has to be the rendered one. Ids outside every stage keep
+ * their relative order at the end (the sort is stable). */
+export function orderByStage(effectIds: readonly string[]): string[] {
+  const rank = (id: string): number => {
+    const index = EFFECT_STAGES.findIndex((stage) => (stage.ids as readonly string[]).includes(id));
+    return index === -1 ? EFFECT_STAGES.length : index;
+  };
+  return [...effectIds].sort((a, b) => rank(a) - rank(b));
+}
+
 function EffectPipeline({ composition, search, onSelect, onParamChange }: { composition: Composition; search: string; onSelect(stageIds: string[], id: string): void; onParamChange(id: string, key: string, value: Composition['shapeParams'][string]): void }) {
   return <div className="effect-pipeline">
     {EFFECT_STAGES.map((stage, stageIndex) => {

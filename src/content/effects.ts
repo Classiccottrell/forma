@@ -485,10 +485,23 @@ const filmGrainShader = {
       }
 
       float n = rand(vUv + fract(time)) - 0.5;
-      gl_FragColor = vec4(clamp(texel.rgb + n * amount, 0.0, 1.0), texel.a);
+      // Lower bound only. The composer's buffers are half-float, so values
+      // above 1 are real highlights and must survive to OutputPass (and to any
+      // pass after this one). Below 0 must not: grain can push a dark pixel
+      // negative, and OutputPass's sRGB transfer evaluates pow() on it, which
+      // is NaN for a negative base.
+      gl_FragColor = vec4(max(texel.rgb + n * amount, 0.0), texel.a);
     }
   `,
 };
+
+/** Starts and stops a film-grain handle's clock. The animation loop lives in
+ * `create()`'s closure, which `update()` otherwise has no way to reach — so a
+ * live `animate` toggle used to zero `time` for a single frame and then be
+ * overwritten by the loop still running, and switching animation on for grain
+ * created static never started a loop at all. Weakly keyed so a disposed
+ * handle takes its entry with it. */
+const grainClocks = new WeakMap<EffectHandle, (on: boolean) => void>();
 
 const filmGrain = defineEffect({
   id: 'film-grain',
@@ -516,28 +529,37 @@ const filmGrain = defineEffect({
     // Static grain looks like a texture; moving grain looks like film. Drive it
     // off the clock rather than the frame counter so it is framerate-independent.
     let raf = 0;
-    // Explicitly boolean: ParamsOf<S> narrows a `default: true` schema to the
-    // literal type `true`, so an inferred `let` here could never be set false.
-    let animating: boolean = params.animate;
+    let animating = false;
+    let disposed = false;
     const tick = () => {
       if (!animating) return;
       pass.uniforms.time!.value = performance.now() / 1000;
       raf = requestAnimationFrame(tick);
     };
-    if (typeof requestAnimationFrame === 'function' && animating) raf = requestAnimationFrame(tick);
+    const setAnimate = (on: boolean): void => {
+      if (disposed || on === animating) return;
+      animating = on;
+      if (on) {
+        if (typeof requestAnimationFrame === 'function') raf = requestAnimationFrame(tick);
+        return;
+      }
+      if (raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf);
+      raf = 0;
+      pass.uniforms.time!.value = 0;
+    };
 
-    let disposed = false;
     const handle: EffectHandle = {
       pass,
       dispose() {
         if (disposed) return;
+        setAnimate(false);
         disposed = true;
-        animating = false;
-        if (raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf);
         ctx.composer?.removePass(pass);
         pass.dispose();
       },
     };
+    grainClocks.set(handle, setAnimate);
+    setAnimate(params.animate);
     return handle;
   },
   update(handle, params) {
@@ -545,7 +567,7 @@ const filmGrain = defineEffect({
     if (!pass) return;
     pass.uniforms.amount!.value = params.amount;
     pass.uniforms.aberration!.value = params.aberration;
-    if (!params.animate) pass.uniforms.time!.value = 0;
+    grainClocks.get(handle)?.(params.animate);
   },
 });
 

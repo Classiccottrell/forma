@@ -4,7 +4,7 @@ import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, 
 const SVG_EXTRUDE_SHAPE_ID = 'svg-extrude';
 import { useFormaRuntime, defaultComposition } from './hooks/useFormaRuntime';
 import { DEFAULT_PRESENTATION, Viewport, type PresentationState } from './components/Viewport';
-import { ControlPanel } from './components/ControlPanel';
+import { ControlPanel, orderByStage } from './components/ControlPanel';
 import { SurpriseMeButton } from './components/SurpriseMeButton';
 import { OnboardingHint } from './components/OnboardingHint';
 import HomePage from './HomePage';
@@ -95,7 +95,7 @@ export default function App() {
       effectIds.push(id);
       if (!effectParams[id]) effectParams[id] = { ...effectRegistry.require(id).defaultParameters };
     }
-    applyTracked({ effectIds, effectParams });
+    applyTracked({ effectIds: orderByStage(effectIds), effectParams });
   }
 
   function onSvgImport(svgText: string) {
