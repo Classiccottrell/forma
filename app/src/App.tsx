@@ -24,7 +24,15 @@ export default function App() {
     return <HomePage gallery={new URLSearchParams(window.location.search).get('variant') === 'gallery'} />;
   }
   const hostRef = useRef<HTMLDivElement>(null);
-  const { scene, scheduler, apply, current, contextLost } = useFormaRuntime(hostRef);
+  const { scene, scheduler, apply: applyRaw, current, contextLost } = useFormaRuntime(hostRef);
+
+  /** The single application boundary. Every path — stage picks, presets,
+   * Surprise Me, imports, undo and redo — lands here, so this is where effects
+   * are put into stage order. Normalising only inside the stage picker left
+   * imported and preset compositions rendering in their stored order. */
+  function apply(patch: Partial<Composition>): void {
+    applyRaw(patch.effectIds === undefined ? patch : { ...patch, effectIds: orderByStage(patch.effectIds) });
+  }
   const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 640);
   const [creatorMode, setCreatorMode] = useState(false);
   const [presentation, setPresentation] = useState<PresentationState>(DEFAULT_PRESENTATION);
@@ -95,7 +103,7 @@ export default function App() {
       effectIds.push(id);
       if (!effectParams[id]) effectParams[id] = { ...effectRegistry.require(id).defaultParameters };
     }
-    applyTracked({ effectIds: orderByStage(effectIds), effectParams });
+    applyTracked({ effectIds, effectParams });
   }
 
   function onSvgImport(svgText: string) {
