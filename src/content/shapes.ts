@@ -782,7 +782,12 @@ function brilliantTriangles(p: {
   const yStar = yTable - bezelSlope * (starR * cosHalf - p.tableRatio);
 
   // Pavilion main plane through the culet (0, yCulet) and (1, yGirdleBottom).
-  const pavR = p.lowerRatio;
+  // `lowerRatio` is how far the lower girdle halves reach from the girdle
+  // toward the culet — the gemmological "lower half" percentage, ~75-80% on an
+  // ideal cut — so their tips sit at radius 1 - lowerRatio. (Using lowerRatio
+  // as the radius directly inverted the control: the default 0.77 reached only
+  // 23% of the way, and a larger value gave shorter facets.)
+  const pavR = 1 - p.lowerRatio;
   const yPav = yCulet + p.pavilionDepth * pavR * cosHalf;
 
   const A: THREE.Vector3[] = []; // table corners
@@ -969,19 +974,86 @@ const spring = defineShape({
 /** Where the profile pulls in to the neck, as a fraction of total height. */
 const NECK_HEIGHT = 0.8;
 
+const VASE_DEFAULTS = { height: 1.8, baseRadius: 0.3, bellyRadius: 0.74, neckRadius: 0.22, bellyHeight: 0.34, lipFlare: 1.35, radialSegments: 32 };
+
+/**
+ * Resolves vase parameters defensively. Homepage presets are stored in
+ * localStorage and applied without going through `deserializeComposition`, so
+ * a vase saved against the original `{height, radius, neck}` schema reaches
+ * `create()` as-is — and used to build NaN geometry. The old keys map onto the
+ * new ones and anything missing falls back to its default. (The validated
+ * import path still rejects the old key set, deliberately: that check is exact
+ * by design.) `bellyHeight` is also kept inside the range that leaves the four
+ * control heights strictly increasing, which the profile below relies on.
+ */
+function vaseParams(raw: Record<string, unknown>): typeof VASE_DEFAULTS {
+  const num = (...keys: string[]): number | undefined => {
+    for (const key of keys) {
+      const value = raw[key];
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+    }
+    return undefined;
+  };
+  return {
+    height: Math.max(0.1, num('height') ?? VASE_DEFAULTS.height),
+    baseRadius: num('baseRadius') ?? VASE_DEFAULTS.baseRadius,
+    bellyRadius: num('bellyRadius', 'radius') ?? VASE_DEFAULTS.bellyRadius,
+    neckRadius: num('neckRadius', 'neck') ?? VASE_DEFAULTS.neckRadius,
+    bellyHeight: Math.min(NECK_HEIGHT - 0.05, Math.max(0.05, num('bellyHeight') ?? VASE_DEFAULTS.bellyHeight)),
+    lipFlare: num('lipFlare') ?? VASE_DEFAULTS.lipFlare,
+    radialSegments: Math.max(3, Math.round(num('radialSegments') ?? VASE_DEFAULTS.radialSegments)),
+  };
+}
+
+/**
+ * The vessel's profile as radius *as a function of height*: a cubic Hermite
+ * through the control points, with finite-difference tangents (Catmull-Rom for
+ * uneven spacing), sampled at evenly spaced heights.
+ *
+ * Writing it as r(y) is what guarantees it cannot fold. `LatheGeometry` joins
+ * profile rings in order, so the heights must only ever go up. The previous
+ * version ran a 2D spline through the same points, and with the belly low
+ * (`bellyHeight` 0.1) its height dipped between samples, folding a strip of
+ * surface back on itself with its facing reversed. Radius can still overshoot
+ * below zero between a wide belly and a narrow neck, so it is clamped.
+ */
+function monotoneProfile(ys: number[], rs: number[], samples: number): THREE.Vector2[] {
+  const last = ys.length - 1;
+  const tangents = ys.map((_, i) => {
+    const a = Math.max(0, i - 1);
+    const b = Math.min(last, i + 1);
+    return (rs[b] - rs[a]) / (ys[b] - ys[a]);
+  });
+  const points: THREE.Vector2[] = [];
+  for (let s = 0; s <= samples; s++) {
+    const y = (ys[last] * s) / samples;
+    let k = 0;
+    while (k < last - 1 && y > ys[k + 1]) k++;
+    const span = ys[k + 1] - ys[k];
+    const t = (y - ys[k]) / span;
+    const t2 = t * t;
+    const t3 = t2 * t;
+    const r =
+      (2 * t3 - 3 * t2 + 1) * rs[k] +
+      (t3 - 2 * t2 + t) * span * tangents[k] +
+      (-2 * t3 + 3 * t2) * rs[k + 1] +
+      (t3 - t2) * span * tangents[k + 1];
+    points.push(new THREE.Vector2(Math.max(r, 1e-4), y));
+  }
+  return points;
+}
+
 /**
  * A lathed vessel — vase, bottle, lamp or goblet from one definition, which is
  * the point: a profile curve gives a whole family of designed silhouettes for
  * the cost of one shape.
  *
- * The profile is flat base -> spline body -> flat top, so the solid is closed.
+ * The profile is flat base -> curved body -> flat top, so the solid is closed.
  * That matters because Forma's materials render `side: FrontSide`: the previous
  * fixed profile ended at the mouth without returning to the axis, so the vase
- * was open and showed through to its own inside back wall. A spline can also
- * overshoot to a negative radius when the neck is much narrower than the belly,
- * which would fold the lathe inside out, so sampled radii are clamped.
+ * was open and showed through to its own inside back wall.
  *
- * The spline runs through four control points, not three. Belly straight to lip
+ * The body runs through four control heights, not three. Belly straight to lip
  * gives a smooth onion with no neck at all — the shoulder point at `NECK_HEIGHT`
  * is what makes the profile turn in and then run up, which is the difference
  * between a vase and a balloon. `lipFlare` then opens the mouth back out, and is
@@ -1002,20 +1074,17 @@ const vase = defineShape({
     lipFlare: { kind: 'number', min: 0.6, max: 2.2, step: 0.05, default: 1.35, rebuild: true },
     radialSegments: { kind: 'number', min: 6, max: 48, step: 1, default: 32, rebuild: true },
   },
-  defaultParameters: { height: 1.8, baseRadius: 0.3, bellyRadius: 0.74, neckRadius: 0.22, bellyHeight: 0.34, lipFlare: 1.35, radialSegments: 32 },
+  defaultParameters: VASE_DEFAULTS,
   create(params, ctx) {
-    const body = new THREE.SplineCurve([
-      new THREE.Vector2(params.baseRadius, 0),
-      new THREE.Vector2(params.bellyRadius, params.bellyHeight * params.height),
-      new THREE.Vector2(params.neckRadius, NECK_HEIGHT * params.height),
-      new THREE.Vector2(params.neckRadius * params.lipFlare, params.height),
-    ]);
-    const profile: THREE.Vector2[] = [new THREE.Vector2(0, 0)];
-    for (const point of body.getPoints(32)) {
-      profile.push(new THREE.Vector2(Math.max(point.x, 1e-4), point.y));
-    }
-    profile.push(new THREE.Vector2(0, params.height));
-    const geometry = new THREE.LatheGeometry(profile, params.radialSegments);
+    const p = vaseParams(params as Record<string, unknown>);
+    const h = p.height;
+    const body = monotoneProfile(
+      [0, p.bellyHeight * h, NECK_HEIGHT * h, h],
+      [p.baseRadius, p.bellyRadius, p.neckRadius, p.neckRadius * p.lipFlare],
+      48,
+    );
+    const profile = [new THREE.Vector2(0, 0), ...body, new THREE.Vector2(0, h)];
+    const geometry = new THREE.LatheGeometry(profile, p.radialSegments);
     geometry.center();
     ctx.registry.track(geometry);
     return geometry;
