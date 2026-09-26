@@ -96,9 +96,15 @@ GitHub Pages *project* sites need (`app/vite.config.ts` sets
 `base: process.env.FORMA_BASE ?? '/'` — a config addition made in the M4 docs
 pass, since no `base` config existed before and a project-site deploy would
 have 404'd on assets). A GitHub Actions workflow
-(`.github/workflows/deploy-gh-pages.yml`) is included but **unverified beyond
-local YAML-syntax validation** — no live Actions runner was available to test
-it; the manual per-host steps in `app/README.md` are the verified path.
+(`.github/workflows/deploy-gh-pages.yml`) publishes `app/dist/` to
+`https://classiccottrell.github.io/forma/` on push to `main`. It checks out
+`cc-webgl` as a sibling of `forma/` (the `file:../cc-webgl` dependency) and
+builds it first. Requires Settings -> Pages -> Source = "GitHub Actions", and
+while `Classiccottrell/cc-webgl` is private, a `CC_WEBGL_TOKEN` repo secret
+(fine-grained PAT, read-only Contents on that repo); once it is public the
+workflow falls back to the default token. The base-path build and a headless
+load of it were verified locally; the **GitHub Actions run itself is
+unverified** — no live runner was available, so check the first run's logs.
 
 ## Browser support & performance
 

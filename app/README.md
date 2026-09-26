@@ -113,10 +113,14 @@ Then publish `app/dist/` as the Pages source — either:
   to that branch in Settings -> Pages.
 - **Actions:** this repo ships `.github/workflows/deploy-gh-pages.yml`, which
   builds and deploys `app/dist/` on push to `main` using
-  `actions/deploy-pages`. **Unverified beyond YAML syntax** — there is no live
-  GitHub Actions runner available in this environment to actually execute it;
-  review it before relying on it, and enable Pages -> "GitHub Actions" as the
-  source in the repo's Settings first.
+  `actions/deploy-pages`. It checks out `cc-webgl` as a sibling of `forma/`
+  (the `file:../cc-webgl` dependency) and builds it before the library and
+  app. Setup: set Settings -> Pages -> Source = "GitHub Actions", and while
+  `Classiccottrell/cc-webgl` is private add a `CC_WEBGL_TOKEN` repo secret
+  (fine-grained PAT, read-only Contents on that repo); once cc-webgl is public
+  the workflow falls back to the default token. The base-path build and a
+  headless load were verified locally; the **Actions run itself is
+  unverified** — check the first run's logs.
 
 If served from a *user/org* Pages site (`https://<user>.github.io/`, repo named
 `<user>.github.io`) rather than a project site, use `FORMA_BASE=/` (the
