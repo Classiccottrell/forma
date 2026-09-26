@@ -1231,17 +1231,21 @@ function capGeometry(p: { crownHeight: number; brimLength: number; brimTilt: num
   const crown = new THREE.LatheGeometry(profile, 96, Math.PI);
   // Six panels meet in seams running from the rim to the button, one at front
   // centre. Pull the surface in along each seam; the pull scales with radius,
-  // so the grooves converge to nothing at the button.
+  // so the grooves converge to nothing at the button. Kept below SHELL so a
+  // seam can never pull the outer surface through the inner one.
   const depth = 0.035 * p.seams;
+  const PANEL = Math.PI / 3;
+  const seamPull = (angle: number): number => {
+    const along = ((angle % PANEL) + PANEL) % PANEL;
+    const toSeam = Math.min(along, PANEL - along);
+    return 1 - depth * Math.exp(-((toSeam / 0.05) ** 2));
+  };
   if (depth > 0) {
-    const PANEL = Math.PI / 3;
     const pos = crown.getAttribute('position');
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
-      const along = ((Math.atan2(x, z) % PANEL) + PANEL) % PANEL;
-      const toSeam = Math.min(along, PANEL - along);
-      const pull = 1 - depth * Math.exp(-((toSeam / 0.05) ** 2));
+      const pull = seamPull(Math.atan2(x, z));
       pos.setX(i, x * pull);
       pos.setZ(i, z * pull);
     }
@@ -1265,18 +1269,21 @@ function capGeometry(p: { crownHeight: number; brimLength: number; brimTilt: num
     positions.push(v.x, v.y, v.z);
     return positions.length / 3 - 1;
   };
-  // Grid of the brim's top surface. It starts just inside the crown (0.97) so
-  // the seam grooves at the rim never open a gap between crown and brim, and
-  // its reach never quite falls to zero at the ends (0.87 below) so the side
-  // faces are real quads rather than slivers.
+  // Grid of the brim's top surface. Its inner edge sits mid-shell at every
+  // angle — halfway between the crown's inner and outer surfaces, both pulled
+  // in by the seam at that angle — so it is always buried in the fabric: no
+  // seam can open a gap between crown and brim, and the edge never pokes into
+  // the cavity. Its reach never quite falls to zero at the ends (0.87 below),
+  // so the side faces are real quads, not slivers.
   const top: THREE.Vector3[][] = [];
   for (let i = 0; i <= U; i++) {
     const phi = ARC * ((2 * i) / U - 1);
-    const reach = p.brimLength * Math.cos((phi / ARC) * (Math.PI / 2) * 0.87) + 0.03;
+    const inset = seamPull(phi) * (1 - SHELL / 2);
+    const reach = p.brimLength * Math.cos((phi / ARC) * (Math.PI / 2) * 0.87);
     const row: THREE.Vector3[] = [];
     for (let j = 0; j <= V; j++) {
       const v = j / V;
-      const rho = 0.97 + v * reach;
+      const rho = inset + v * (1 - inset + reach);
       // Tilt drops the brim as it reaches forward; the curve bends it down
       // across its width, like a pre-curved visor. Both vanish at the inner
       // edge so the brim stays attached to the rim.
