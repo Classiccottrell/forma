@@ -13,6 +13,17 @@ interface Slot<H> {
   handle: H | null;
 }
 
+/** `deserializeComposition` accepts omitted environment params — every
+ * composition exported before environments had parameters carries `{}` — and
+ * promises that omitted values fall back to the definition's defaults. That has
+ * to hold on both the create and the hot-update path. Without it, Studio builds
+ * its directional light at a NaN position, and update() multiplies every
+ * light's intensity by an undefined value: a scene lit by NaN renders nothing
+ * at all, so importing an older composition blanked the viewport. */
+function withEnvironmentDefaults(def: { defaultParameters: object }, params: Record<string, unknown>): Record<string, unknown> {
+  return { ...def.defaultParameters, ...params };
+}
+
 export interface FormaRuntimeOptions {
   scene: THREE.Scene;
   camera: THREE.Camera;
@@ -294,7 +305,8 @@ export class FormaRuntime {
     this.environmentSlot.registry.disposeAll();
     this.environmentSlot.registry = new ResourceRegistry();
     const def = environmentRegistry.require(next.environmentId);
-    const handle = def.create(next.environmentParams as any, { registry: this.environmentSlot.registry, scene: this.scene });
+    const params = withEnvironmentDefaults(def, next.environmentParams);
+    const handle = def.create(params as any, { registry: this.environmentSlot.registry, scene: this.scene });
     this.environmentSlot.registry.track(() => handle.dispose());
     this.environmentSlot.handle = handle;
 
@@ -317,8 +329,8 @@ export class FormaRuntime {
       }
       this.loadedEnvironment = { target };
       this.scene.environment = target.texture;
-      this.scene.environmentIntensity = Number(next.environmentParams.environmentStrength ?? 1);
-      this.scene.environmentRotation.y = THREE.MathUtils.degToRad(Number(next.environmentParams.environmentRotation ?? 0));
+      this.scene.environmentIntensity = Number(params.environmentStrength ?? 1);
+      this.scene.environmentRotation.y = THREE.MathUtils.degToRad(Number(params.environmentRotation ?? 0));
     }, undefined, () => { /* existing lights remain the fallback */ });
   }
 
@@ -336,9 +348,10 @@ export class FormaRuntime {
     if (!def || !def.update || !this.environmentSlot.handle) return;
     const hot = changedHotKeys(def.parameterSchema, prev.environmentParams, next.environmentParams);
     if (hot.length === 0) return;
-    def.update(this.environmentSlot.handle, next.environmentParams as any);
-    this.scene.environmentIntensity = Number(next.environmentParams.environmentStrength ?? 1);
-    this.scene.environmentRotation.y = THREE.MathUtils.degToRad(Number(next.environmentParams.environmentRotation ?? 0));
+    const params = withEnvironmentDefaults(def, next.environmentParams);
+    def.update(this.environmentSlot.handle, params as any);
+    this.scene.environmentIntensity = Number(params.environmentStrength ?? 1);
+    this.scene.environmentRotation.y = THREE.MathUtils.degToRad(Number(params.environmentRotation ?? 0));
   }
 
   // --- effects -------------------------------------------------------------
