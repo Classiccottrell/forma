@@ -1,9 +1,24 @@
-# Builds the library (dist/) then app/ (app/dist/) and publishes app/dist/ to
-# GitHub Pages. Requires repo Settings -> Pages -> Source = "GitHub Actions".
+# Builds cc-webgl, then the library (dist/), then app/ (app/dist/), and
+# publishes app/dist/ to GitHub Pages at https://<owner>.github.io/<repo>/.
 #
-# UNVERIFIED beyond local YAML syntax validation (`python3 -c "import yaml..."`)
-# — no live GitHub Actions runner was available to actually execute this
-# workflow. Review before relying on it in production.
+# Prerequisites (one-time, repo owner):
+#   1. Settings -> Pages -> Source = "GitHub Actions".
+#   2. While Classiccottrell/cc-webgl is PRIVATE: repo secret CC_WEBGL_TOKEN =
+#      fine-grained PAT with read-only "Contents" on Classiccottrell/cc-webgl
+#      (the default GITHUB_TOKEN cannot read another private repo). Once
+#      cc-webgl is public the secret is not needed; the checkout falls back to
+#      the default token.
+#
+# Why two checkouts: package.json depends on "cc-webgl": "file:../cc-webgl", so
+# cc-webgl must sit next to forma/ in the workspace, and its gitignored dist/
+# must be built before forma's `npm ci` / build can resolve it.
+#
+# Verified locally: root build, then FORMA_BASE=/forma/ app build served with
+# `vite preview --base /forma/` loads headless (homepage and the /forma/editor
+# route) with zero 4xx, zero console errors, and a rendering WebGL canvas.
+# UNVERIFIED: the actual GitHub Actions run (checkout of the private repo via
+# CC_WEBGL_TOKEN, Pages deploy). No live runner was available to execute it;
+# check the first run's logs before relying on it.
 name: Deploy to GitHub Pages
 
 on:
@@ -24,16 +39,32 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # forma and cc-webgl are checked out as siblings so file:../cc-webgl resolves.
       - uses: actions/checkout@v4
+        with:
+          path: forma
+      - uses: actions/checkout@v4
+        with:
+          repository: Classiccottrell/cc-webgl
+          path: cc-webgl
+          # Secret while cc-webgl is private; default token once it is public.
+          token: ${{ secrets.CC_WEBGL_TOKEN || github.token }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Install and build cc-webgl
+        working-directory: cc-webgl
+        run: |
+          npm ci
+          npm run build
       - name: Install and build library
+        working-directory: forma
         run: |
           npm ci
           npm run build
       - name: Install and build app
-        working-directory: app
+        working-directory: forma/app
         env:
           # ${{ github.event.repository.name }} == the repo's own name, so this
           # resolves correctly for a project Pages site without hardcoding it.
@@ -41,10 +72,18 @@ jobs:
         run: |
           npm ci
           npm run build
+      # Pages has no SPA fallback: copy the app shell to the only non-root route
+      # so it is served with HTTP 200. Pages 301s /<repo>/editor to
+      # /<repo>/editor/ and serves the directory index; main.tsx strips the
+      # trailing slash so document.baseURI-relative asset URLs stay correct.
+      - name: Add editor/index.html route shell
+        run: |
+          mkdir -p forma/app/dist/editor
+          cp forma/app/dist/index.html forma/app/dist/editor/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: app/dist
+          path: forma/app/dist
 
   deploy:
     needs: build

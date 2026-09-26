@@ -96,9 +96,22 @@ GitHub Pages *project* sites need (`app/vite.config.ts` sets
 `base: process.env.FORMA_BASE ?? '/'` — a config addition made in the M4 docs
 pass, since no `base` config existed before and a project-site deploy would
 have 404'd on assets). A GitHub Actions workflow
-(`.github/workflows/deploy-gh-pages.yml`) is included but **unverified beyond
-local YAML-syntax validation** — no live Actions runner was available to test
-it; the manual per-host steps in `app/README.md` are the verified path.
+(`.github/workflows/deploy-gh-pages.yml`) publishes `app/dist/` to
+`https://classiccottrell.github.io/forma/` on push to `main`. It checks out
+`cc-webgl` as a sibling of `forma/` (the `file:../cc-webgl` dependency) and
+builds it first. Requires Settings -> Pages -> Source = "GitHub Actions", and
+while `Classiccottrell/cc-webgl` is private, a `CC_WEBGL_TOKEN` repo secret
+(fine-grained PAT, read-only Contents on that repo); once it is public the
+workflow falls back to the default token. Editor routing and homepage links
+derive from Vite's `import.meta.env.BASE_URL` (`app/src/base.ts`), and the
+workflow copies the shell to `editor/index.html` because Pages has no SPA
+fallback (Pages 301s `/forma/editor` to `/forma/editor/` and serves that
+index with HTTP 200; `app/src/main.tsx` strips the trailing slash). The
+base-path build, the homepage load and the `/forma/editor` route were
+verified locally (vite preview + headless Chromium, and a Pages-style static
+server with directory 301s and no SPA fallback); the **GitHub Actions run
+itself is unverified** — no live runner was available, so check the first
+run's logs.
 
 ## Browser support & performance
 

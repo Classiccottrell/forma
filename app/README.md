@@ -104,6 +104,7 @@ serve from the domain root and need no change. GitHub Pages *project* sites
 ```bash
 cd Projects/Forma && npm run build
 cd app && FORMA_BASE=/forma/ npm run build   # replace 'forma' with the actual repo name
+mkdir -p dist/editor && cp dist/index.html dist/editor/index.html   # no SPA fallback on Pages: serve the shell at /forma/editor/ (HTTP 200)
 ```
 
 Then publish `app/dist/` as the Pages source — either:
@@ -113,10 +114,20 @@ Then publish `app/dist/` as the Pages source — either:
   to that branch in Settings -> Pages.
 - **Actions:** this repo ships `.github/workflows/deploy-gh-pages.yml`, which
   builds and deploys `app/dist/` on push to `main` using
-  `actions/deploy-pages`. **Unverified beyond YAML syntax** — there is no live
-  GitHub Actions runner available in this environment to actually execute it;
-  review it before relying on it, and enable Pages -> "GitHub Actions" as the
-  source in the repo's Settings first.
+  `actions/deploy-pages`. It checks out `cc-webgl` as a sibling of `forma/`
+  (the `file:../cc-webgl` dependency) and builds it before the library and
+  app. Setup: set Settings -> Pages -> Source = "GitHub Actions", and while
+  `Classiccottrell/cc-webgl` is private add a `CC_WEBGL_TOKEN` repo secret
+  (fine-grained PAT, read-only Contents on that repo); once cc-webgl is public
+  the workflow falls back to the default token. Editor routing and homepage
+  links derive from Vite's `import.meta.env.BASE_URL` (`src/base.ts`), and the
+  workflow copies the shell to `editor/index.html` because Pages has no SPA
+  fallback (Pages 301s `/<repo>/editor` to `/<repo>/editor/` and serves that
+  index with HTTP 200; `src/main.tsx` strips the trailing slash). The
+  base-path build, homepage load and `/<repo>/editor` route were verified
+  locally (vite preview + headless Chromium, and a Pages-style static server
+  with directory 301s and no SPA fallback); the **Actions run itself is
+  unverified** — check the first run's logs.
 
 If served from a *user/org* Pages site (`https://<user>.github.io/`, repo named
 `<user>.github.io`) rather than a project site, use `FORMA_BASE=/` (the
