@@ -55,8 +55,10 @@ export function ControlPanel(props: ControlPanelProps) {
   const textureDef = textureRegistry.require(composition.textureId ?? 'none');
   const shapeEntries = shapeRegistry.list().filter((entry) => {
     if (shapeFilter === 'yours') return entry.id === 'svg-extrude';
-    if (shapeFilter === 'solid') return ['primitive', 'organic', 'faceted', 'parametric', 'lathe'].includes(entry.category);
-    if (shapeFilter === 'flat') return ['ui', 'extruded', 'symbol', 'emoji symbol'].includes(entry.category);
+    // Apparel is in both: the garments are flat cutouts but the cap is solid,
+    // and a merch item should never vanish from a tab.
+    if (shapeFilter === 'solid') return ['primitive', 'organic', 'faceted', 'parametric', 'lathe', 'apparel'].includes(entry.category);
+    if (shapeFilter === 'flat') return ['ui', 'extruded', 'symbol', 'emoji symbol', 'apparel'].includes(entry.category);
     return true;
   });
 
