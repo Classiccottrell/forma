@@ -40,9 +40,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # forma and cc-webgl are checked out as siblings so file:../cc-webgl resolves.
+      # Neither checkout keeps its credential: `npm ci` below runs dependency
+      # install scripts, which could otherwise read the token from .git/config.
+      # Nothing later needs it — the deploy goes through Pages artifacts, not a
+      # git push.
       - uses: actions/checkout@v4
         with:
           path: forma
+          persist-credentials: false
       - uses: actions/checkout@v4
         with:
           repository: Classiccottrell/cc-webgl
