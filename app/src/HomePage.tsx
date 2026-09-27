@@ -6,6 +6,7 @@ import { builtInPresets, registerAllContent } from 'forma/content';
 import { useFormaRuntime } from './hooks/useFormaRuntime';
 import { Viewport } from './components/Viewport';
 import { selectedHomepageComposition } from './homepagePresets';
+import { BASE_URL, EDITOR_PATH } from './base';
 
 registerAllContent();
 
@@ -100,17 +101,17 @@ export default function HomePage({ gallery = false }: { gallery?: boolean }) {
     <main className={`home-shell${gallery ? ' home-gallery' : ' home-studio'}`}>
       <Viewport hostRef={hostRef} scene={scene} scheduler={scheduler} contextLost={contextLost} defaultAutoSpin />
       <header className="home-nav">
-        <a className="brand" href="/">for<em>ma</em></a>
+        <a className="brand" href={BASE_URL}>for<em>ma</em></a>
         <nav aria-label="Homepage navigation">
-          <a href={gallery ? '/' : '/?variant=gallery'}>{gallery ? 'Studio view' : 'Gallery view'}</a>
-          <a className="home-nav-cta" href="/editor">Open editor <span aria-hidden="true">↗</span></a>
+          <a href={gallery ? BASE_URL : `${BASE_URL}?variant=gallery`}>{gallery ? 'Studio view' : 'Gallery view'}</a>
+          <a className="home-nav-cta" href={EDITOR_PATH}>Open editor <span aria-hidden="true">↗</span></a>
         </nav>
       </header>
       {!gallery && scene && scheduler && <ObjectMap scene={scene} scheduler={scheduler} current={current} />}
 
       {gallery ? (
         <section className="home-gallery-content" aria-labelledby="gallery-title">
-          <div className="home-gallery-intro"><p className="eyebrow">Forma / object studies</p><h1 id="gallery-title">Designed in space.</h1><p>Shape, material, light, export. A small system for making dimensional ideas feel inevitable.</p><a className="home-button" href="/editor">Build your own <span aria-hidden="true">→</span></a></div>
+          <div className="home-gallery-intro"><p className="eyebrow">Forma / object studies</p><h1 id="gallery-title">Designed in space.</h1><p>Shape, material, light, export. A small system for making dimensional ideas feel inevitable.</p><a className="home-button" href={EDITOR_PATH}>Build your own <span aria-hidden="true">→</span></a></div>
           <div className="home-presets" aria-label="Curated presets">
             <p className="eyebrow">Curated presets</p>
             {presets.map((preset) => <button type="button" className={`home-preset${current.shapeId === preset.composition.shapeId && current.materialId === preset.composition.materialId ? ' is-active' : ''}`} key={preset.id} onClick={() => apply(preset.composition)}><span className="home-preset-swatch" data-shape={preset.composition.shapeId} data-material={preset.composition.materialId} /><span><strong>{preset.name}</strong><small>{preset.composition.shapeId} · {preset.composition.materialId}</small></span><span aria-hidden="true">↗</span></button>)}
@@ -118,7 +119,7 @@ export default function HomePage({ gallery = false }: { gallery?: boolean }) {
         </section>
       ) : (
         <section className="home-studio-content" aria-labelledby="studio-title">
-          <div className="home-studio-copy"><p className="eyebrow">A quiet place for form</p><h1 id="studio-title">Make the invisible<br /><i>feel tangible.</i></h1><p>Forma turns shape, surface, and light into a living design material.</p><a className="home-button" href="/editor">Enter the studio <span aria-hidden="true">→</span></a></div>
+          <div className="home-studio-copy"><p className="eyebrow">A quiet place for form</p><h1 id="studio-title">Make the invisible<br /><i>feel tangible.</i></h1><p>Forma turns shape, surface, and light into a living design material.</p><a className="home-button" href={EDITOR_PATH}>Enter the studio <span aria-hidden="true">→</span></a></div>
           <ControlCard current={current} apply={apply} />
         </section>
       )}
