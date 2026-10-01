@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { serializeComposition, deserializeComposition } from '../src/index.js';
+import { serializeComposition, deserializeComposition, replaceRetiredShape, shapeRegistry } from '../src/index.js';
 import type { Composition } from '../src/index.js';
 import { ensureHarnessContentRegistered } from './testUtils.js';
 
@@ -42,6 +42,23 @@ describe('serialize round-trip', () => {
   it('rejects an unknown textureId and mismatched texture params', () => {
     expect(() => deserializeComposition(serializeComposition({ ...baseComposition(), textureId: 'missing', textureParams: {} }))).toThrow(/unknown id/);
     expect(() => deserializeComposition(serializeComposition({ ...baseComposition(), textureId: 'checker-normal', textureParams: {} }))).toThrow(/textureParams/);
+  });
+
+  // hoodie, polo and cap shipped in #12 and were removed; files saved with them
+  // carry their old param keys and must still open, on the stand-in shape.
+  it.each([
+    ['hoodie', { size: 1.6, thickness: 0.1, roundness: 0.8, smoothing: 2 }],
+    ['polo', { size: 1.6, thickness: 0.1, roundness: 0.8, smoothing: 2 }],
+    ['cap', { crownHeight: 0.6, brimLength: 0.5, brimTilt: 0.1, brimCurve: 0.3, seams: 6 }],
+  ])('opens a composition saved with the retired %s shape', (shapeId, shapeParams) => {
+    expect(shapeRegistry.get(shapeId)).toBeUndefined();
+    const round = deserializeComposition(serializeComposition({ ...baseComposition(), shapeId, shapeParams }));
+    expect(round).toEqual({ ...baseComposition(), shapeId: 'sphere', shapeParams: shapeRegistry.require('sphere').defaultParameters });
+  });
+
+  it('leaves compositions on current shapes untouched', () => {
+    const c = baseComposition();
+    expect(replaceRetiredShape(c)).toBe(c);
   });
 
   it('rejects a params object with keys that do not match the schema', () => {

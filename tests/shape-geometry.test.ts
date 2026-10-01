@@ -8,8 +8,8 @@ import { ensureHarnessContentRegistered } from './testUtils.js';
 // built from explicit face lists and hand-set winding, where the failure mode is
 // silent: under `side: FrontSide` a back-facing face is invisible, so a winding
 // mistake ships as a hole. Each check here was first confirmed failing against
-// the bug it guards (an inverted `lowerHalves`, a folding vase profile, a brim
-// with reversed end caps) before being trusted.
+// the bug it guards (an inverted `lowerHalves` and a folding vase profile)
+// before being trusted.
 
 type Params = Record<string, number | string | boolean>;
 
@@ -114,9 +114,6 @@ describe('hand-built shape geometry, across each parameter box', () => {
   const cases: [string, string[], boolean][] = [
     ['diamond', ['tablePercent', 'crownPercent', 'pavilionPercent', 'girdlePercent', 'starLength', 'lowerHalves'], true],
     ['bevelled-box', ['size', 'depth', 'bevel'], true],
-    ['hoodie', ['thickness', 'roundness', 'smoothing'], false],
-    ['polo', ['thickness', 'roundness', 'smoothing'], false],
-    ['cap', ['crownHeight', 'brimLength', 'brimTilt', 'brimCurve', 'seams'], false],
   ];
   for (const [id, keys, convex] of cases) {
     it(`${id}: closed, consistently wound, outward-facing${convex ? ' and convex' : ''}`, () => {

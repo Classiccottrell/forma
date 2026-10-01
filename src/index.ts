@@ -12,6 +12,7 @@ export { slotKey, changedHotKeys } from './runtime/diff.js';
 export { ensureGeometryUVs } from './runtime/uv.js';
 export type { SlotName } from './runtime/diff.js';
 export { serializeComposition, deserializeComposition } from './runtime/serialize.js';
+export { replaceRetiredShape } from './runtime/retiredShapes.js';
 export { generateEmbedCode } from './runtime/embed.js';
 
 export { exportPNG } from './export/exportPNG.js';
@@ -23,6 +24,7 @@ export { FrameScheduler } from 'cc-webgl';
 import type { Composition } from './types.js';
 import { FormaRuntime } from './runtime/FormaRuntime.js';
 import { createFormaScene } from './scene/createFormaScene.js';
+import { replaceRetiredShape } from './runtime/retiredShapes.js';
 
 /** Convenience one-shot mount for embed-code consumers (blueprint §5.4's generated
  * snippet calls this). Uses the shared scene bootstrap (`createFormaScene`) — same
@@ -33,7 +35,7 @@ export async function mountForma(el: HTMLElement, composition: Composition): Pro
   const formaScene = createFormaScene({ el, cameraZ: 3 });
   const { scene, camera, renderer, composer, render } = formaScene;
   const runtime = new FormaRuntime({ scene, camera, renderer, composer, ensureOutputPassLast: formaScene.ensureOutputPassLast, disposeExternal: formaScene.dispose });
-  runtime.applyComposition(composition);
+  runtime.applyComposition(replaceRetiredShape(composition));
   render();
   return runtime;
 }

@@ -1,4 +1,4 @@
-import type { Composition } from 'forma';
+import { replaceRetiredShape, type Composition } from 'forma';
 
 export type HomepageTarget = 'studio' | 'gallery';
 export interface HomepagePreset { id: string; name: string; target: HomepageTarget; composition: Composition; }
@@ -21,5 +21,5 @@ export function writeHomepagePresets(state: HomepagePresetState): void {
 export function selectedHomepageComposition(target: HomepageTarget, fallback: Composition): Composition {
   const state = readHomepagePresets();
   const preset = state.entries.find((entry) => entry.id === state.selected[target] && entry.target === target);
-  return preset?.composition ?? fallback;
+  return preset ? replaceRetiredShape(preset.composition) : fallback;
 }
