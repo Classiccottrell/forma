@@ -1,5 +1,6 @@
 import type { Composition } from '../types.js';
 import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry } from '../registry/instances.js';
+import { replaceRetiredShape } from './retiredShapes.js';
 
 export function serializeComposition(c: Composition): string {
   return JSON.stringify({ ...c, textureId: c.textureId ?? 'none', textureParams: c.textureParams ?? {} });
@@ -16,7 +17,7 @@ export function deserializeComposition(s: string): Composition {
     throw new Error('deserializeComposition: invalid JSON');
   }
   assertCompositionShape(value);
-  const c = value;
+  const c = replaceRetiredShape(value);
 
   const shapeDef = shapeRegistry.require(c.shapeId);
   assertKeysMatch('shapeParams', c.shapeParams, shapeDef.parameterSchema);
