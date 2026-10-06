@@ -31,16 +31,17 @@ cd app && npm install   # editor product app — its own package.json, React + f
 
 ### Current H3 roadmap status
 
-The H3 polish slice remains active across the 32-shape catalog. Remaining work includes
-picker reference-card polish, broader content expansion, lifecycle hardening, and final
-browser QA. Reference-driven next slices add control taxonomy, material settings,
-lighting direction, ordered effect stages, presentation controls, and history/export
-workflow. Generic SVG import remains a separate upload path.
+The catalog is 32 shapes, 21 materials, 8 textures, 10 environments and 9 effects, which
+meets the H3 targets. The reference-driven slices are in: All/Solid/Flat/Yours shape
+filters; Material Library/Settings views with surface presets and a Physical Studio
+material; environment strength, rotation, light colour/intensity and a directional-light
+pad; ordered Texture → Colour → Finish effect stages, including Bloom, Colour Grade and
+Film Grain; backdrops, floor shadow, lens/turn/tilt/zoom; and undo/redo. Generic SVG
+import remains a separate upload path.
 
-The first reference-driven UI slice is complete: Shape now supports All/Solid/Flat/Yours
-filters, and Presentation exposes lens, turn, tilt, and zoom controls.
-
-Material now also has Library/Settings views with registry-backed surface presets.
+Still open before release: picker reference-card polish, H2 browser tests, a full
+browser QA pass, the app bundle budget (currently over), and the first successful
+GitHub Pages deploy. `BRIEF.md` has the full roadmap and dated update log.
 
 The versioned browser bundle contract is `dist/forma.browser.v<package-version>.js`. Copy that file beside generated embed HTML, or pass a hosted URL
 to `generateEmbedCode(composition, { libraryUrl })`. See `examples/embed/index.html` for a local example.

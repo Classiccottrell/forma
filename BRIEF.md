@@ -139,24 +139,31 @@ core.
 - [x] Browser support notes.
 
 ## Status
-**M0, M1, M2, M3, M4 complete. H3 content expansion remains active.**
+**M0, M1, M2, M3, M4 complete. H1 lifecycle work is done bar one stray RAF loop; H3 catalog
+targets are met. Open before release: H2 browser tests, full browser QA (H4), the bundle
+budget (currently over), and the first successful Pages deploy (blocked on repo settings —
+see the 2026-10-06 log entries).**
+
+Current content: 32 shapes / 21 materials / 8 textures / 10 environments / 9 effects.
 
 ## Product hardening roadmap
 
-### H1 — Lifecycle and delivery correctness (in progress)
+### H1 — Lifecycle and delivery correctness (one item open)
 
-- Make every public mount disposable, including renderer and resize-observer ownership.
+- [x] Make every public mount disposable, including renderer and resize-observer ownership.
 - [x] Remove duplicate context-loss wiring and define one recovery owner.
-- Make FALLBACK a real remount boundary; never leave a live WebGL scene mislabeled FALLBACK.
-- Use the shared `cc-webgl` `FrameScheduler` in the product app for visibility pause and delta clamping.
-- Keep OrbitControls updates inside that scheduler; no second product RAF loop.
-- Make generated embed output browser-runnable through a published browser bundle, not bare package imports.
+- [x] Make FALLBACK a real remount boundary; never leave a live WebGL scene mislabeled FALLBACK.
+- [x] Use the shared `cc-webgl` `FrameScheduler` in the product app for visibility pause and delta clamping.
+- Keep OrbitControls updates inside that scheduler; no second product RAF loop. OrbitControls
+  is done; the Film Grain effect (#6) still drives its `time` uniform from its own
+  `requestAnimationFrame` loop (`src/content/effects.ts`), which the scheduler cannot pause.
+- [x] Make generated embed output browser-runnable through a published browser bundle, not bare package imports.
 
 ### H2 — Resource and export safety
 
 - Finish AssetLoader cancellation with request identity and underlying-load cancellation where supported.
 - Dispose complete GLTF ownership graphs, including material textures and shared-resource policy.
-- Restore renderer pixel ratio, composer size, camera state, and background on every export failure path.
+- [x] Restore renderer pixel ratio, composer size, camera state, and background on every export failure path.
 - Add browser tests for repeated mount/unmount, export failure cleanup, context loss, and high-DPI output.
 
 ### H3 — Product completeness
@@ -164,16 +171,18 @@ core.
 - **Polish slice (in progress):** prioritize a small set of visibly distinct shapes,
   environments, materials, presets, and browser thumbnails before broad library expansion.
 - Add visual-reference cards to every picker so selection communicates appearance, not only labels.
-- Normalize shape framing automatically so geometry changes stay legible in one viewport.
-- Expand toward the source plan: 30–40 shapes, 20+ materials, 6–8 environments, 5–6 effects.
+- [x] Normalize shape framing automatically so geometry changes stay legible in one viewport.
+- [x] Expand toward the source plan: 30–40 shapes, 20+ materials, 6–8 environments, 5–6 effects.
 - Use cc-webgl lifecycle/quality/reduced-motion contracts directly, or explicitly split Forma into a separate renderer package.
 - Add real empty-state/import UX, accessible controls, preset thumbnails, and mobile export verification.
 - [x] Add validated composition JSON import through the Export section with a 1 MB guard.
 - Define composition/preset migrations and validate malformed user JSON at the input boundary.
+  Malformed-JSON validation is done; migrations exist case by case (empty environment
+  params, the old vase keys, retired apparel shape ids) but there is no versioned scheme yet.
 - **Texture-layer slice (COMPLETE):** one optional first-class DataTexture slot between
   material and post-processing; `none`, `checker-normal`, and `weave-roughness` are
   registry-native definitions. No external loader, fetched asset, or multi-layer stack.
-- **Texture pack replacement (NEXT):** retire the procedural checker/weave visuals as
+- **Texture pack replacement (COMPLETE — see the 2026-09-18 implementation slice):** retire the procedural checker/weave visuals as
   primary content. Curate a small CC0 PBR pack from Poly Haven at 1K review size:
   `rough_linen` for clean textile detail, `metal_plate_02` for worn industrial contrast,
   and `granular_concrete` for mineral matte breakup. Each pack entry should own a
@@ -269,6 +278,10 @@ horizontal and vertical placement remain available through keyboard-operable sli
 - [x] Publish versioned browser bundles and embeddable examples.
 - [x] Add executable performance budgets, bundle-size policy, and release checklist.
 - Re-run full browser QA before marking the project shipped.
+- Get `app/npm run check:bundle` passing again: `main` is at 905,065 JavaScript bytes against
+  the 900,000 budget (gzip is within budget). Raise the budget deliberately or trim; don't
+  let it drift.
+- First successful GitHub Pages deploy (needs Pages enabled and cc-webgl access — #14).
 
 `npm run typecheck` / `typecheck:harness` / `test` (17/17) / `build` all pass. Embed
 code generation confirmed genuinely working end-to-end (resolves through the real
@@ -278,6 +291,12 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-10-06 | PR #9 review follow-up. #9 was merged five minutes before its automated review arrived, so its 11 findings were checked against `main`. Already fixed since: effect stage order (normalised at the app's apply boundary) and NaN lighting from empty environment params (#11). Fixed now: generated embed code escapes the inline composition JSON, so an imported SVG string containing `</script>` can no longer inject script; environment edits keep the other environment values; lens/zoom/backdrop/shadow changes no longer snap a manually orbited camera back; an HDR that finishes loading applies the current strength/rotation; saved light intensity/colour apply on first render; Aurora's violet rim light is no longer treated as the movable lamp (Aurora gets its own); two mounts sharing a texture pack no longer overwrite each other's tiling (the loader hands each caller its own textures over the shared image); homepage presets naming any missing content fall back instead of crashing; exact-value number fields keep a decimal point while typing. Also fixed: the light-colour control replaced every light's colour, so themed rigs (Neon Room, Aurora, …) went white on first edit; it now tints. 89/89 tests (new ones confirmed failing on the old code), 15/15 M3 browser checks plus targeted checks on headless SwiftShader. |
+| 2026-10-06 | Pages deploy: every run from #6 to #13 failed at the cc-webgl checkout — cc-webgl is private and `CC_WEBGL_TOKEN` was never added; Pages is also not yet enabled on the repo. #14 makes the workflow say so. |
+| 2026-10-01 | #13: removed the hoodie, polo and cap after visual review. Compositions saved with them (file import, homepage presets, embeds) now open on the default sphere instead of failing with `unknown id`. 32 shapes. |
+| 2026-09-27 | #12 added hoodie, polo and cap apparel shapes (removed again in #13) and the hand-built shape geometry sweep test (closed, consistently wound, outward-facing). #11: older compositions with empty environment params no longer blank the viewport. #10: Pages workflow builds cc-webgl as a sibling and serves the `/editor` route. |
+| 2026-09-26 | #6 Cinematic effect tier: Bloom, Colour Grade, Film Grain. #7 colour management: the composer chain now ends in an `OutputPass`, so tone mapping and sRGB conversion happen once, at the end. #8 designed shapes: a real brilliant-cut Diamond; Bevelled Box and Vase rebuilt as closed solids. |
+| 2026-09-25 | #9 studio roadmap slices: lighting controls and directional placement pad, three new environments, Physical Studio material, ordered Texture/Colour/Finish effect stages, backdrops, floor shadow, camera presentation, undo/redo. |
 | 2026-09-23 | Reference-driven material slice: split Material into accessible Library/Settings views and added registry-backed surface presets for None, Linen Blue, Book Pattern, Fine Grained Wood, Brushed Metal, and Mineral Matte. App typecheck/build and browser selection review pass. |
 | 2026-09-21 | Reference review: added staged roadmap for control taxonomy, material settings, lighting rig, ordered effects, backdrop/camera presentation, and history/export workflow. First slice is taxonomy plus camera/presentation state; no catalog expansion yet. |
 | 2026-09-21 | Reference-driven UI slice: added accessible Shape filters (`All`, `Solid`, `Flat`, `Yours`) and a Presentation section with live lens, turn, tilt, and zoom controls routed through the existing OrbitControls scene. App typecheck/build and browser review pass. |

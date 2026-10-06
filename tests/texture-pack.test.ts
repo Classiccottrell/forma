@@ -35,7 +35,11 @@ describe('texture pack delivery', () => {
     const first = await loader.loadTexturePack(manifest, 'https://assets.test/packs/');
     const second = await loader.loadTexturePack(manifest, 'https://assets.test/packs/');
     expect(load).toHaveBeenCalledTimes(1);
-    expect(first.color).toBe(second.color);
+    expect(first.color!.source).toBe(second.color!.source);
+    // Separate objects, so one mount's tiling cannot rewrite another's.
+    expect(first.color).not.toBe(second.color);
+    first.color!.repeat.set(6, 6);
+    expect(second.color!.repeat.x).toBe(1);
     first.dispose();
     second.dispose();
     load.mockRestore();
@@ -53,10 +57,11 @@ describe('texture pack delivery', () => {
       return document.createElement('img');
     });
     const loader = new TexturePackLoader();
-    const pack = await loader.loadTexturePack(manifest, 'https://assets.test/');
-    const dispose = vi.spyOn(pack.color!, 'dispose');
+    await loader.loadTexturePack(manifest, 'https://assets.test/');
+    const dispose = vi.spyOn(THREE.Texture.prototype, 'dispose');
     loader.clear();
     expect(dispose).toHaveBeenCalledOnce();
+    dispose.mockRestore();
     load.mockRestore();
   });
 
