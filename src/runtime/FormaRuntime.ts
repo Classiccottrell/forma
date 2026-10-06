@@ -309,6 +309,9 @@ export class FormaRuntime {
     const handle = def.create(params as any, { registry: this.environmentSlot.registry, scene: this.scene });
     this.environmentSlot.registry.track(() => handle.dispose());
     this.environmentSlot.handle = handle;
+    // `create` builds the rig at its authored values; this applies the
+    // composition's own lighting so a saved or imported one renders as saved.
+    def.update?.(handle, params as any);
 
     const hdrPath = def.hdrPath;
     if (!hdrPath || !this.environmentBaseUrl) return;
@@ -329,8 +332,10 @@ export class FormaRuntime {
       }
       this.loadedEnvironment = { target };
       this.scene.environment = target.texture;
-      this.scene.environmentIntensity = Number(params.environmentStrength ?? 1);
-      this.scene.environmentRotation.y = THREE.MathUtils.degToRad(Number(params.environmentRotation ?? 0));
+      // Read now, not at load start: strength/rotation may have changed meanwhile.
+      const live = withEnvironmentDefaults(def, this._current?.environmentParams ?? next.environmentParams);
+      this.scene.environmentIntensity = Number(live.environmentStrength ?? 1);
+      this.scene.environmentRotation.y = THREE.MathUtils.degToRad(Number(live.environmentRotation ?? 0));
     }, undefined, () => { /* existing lights remain the fallback */ });
   }
 

@@ -24,6 +24,18 @@ describe('generateEmbedCode', () => {
     expect(code).not.toMatch(/\bfrom ['"](?:forma|three)/);
   });
 
+  it('cannot be broken out of by a string param containing </script>', () => {
+    const svg = '<svg></svg></script><script>alert(1)</script>\u2028';
+    const hostile = generateEmbedCode({
+      shapeId: 'svg-extrude', shapeParams: { svg }, materialId: 'matte', materialParams: {},
+      environmentId: 'studio', environmentParams: {}, effectIds: [], effectParams: {},
+    });
+    // Only the snippet's own two script elements close.
+    expect(hostile.match(/<\/script/gi)).toHaveLength(2);
+    const literal = /const composition = (.*);\n/.exec(hostile)![1]!;
+    expect(JSON.parse(literal).shapeParams.svg).toBe(svg);
+  });
+
   it('every exports map target exists after build', () => {
     const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf-8'));
     for (const entry of Object.values(pkg.exports) as { import: string }[]) {

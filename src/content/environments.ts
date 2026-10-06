@@ -8,6 +8,7 @@ import type { EnvironmentCreateContext, EnvironmentHandle } from '../types.js';
 interface LightHandle extends EnvironmentHandle {
   lights: THREE.Object3D[];
   baseIntensities?: number[];
+  baseColors?: THREE.Color[];
 }
 
 const LIGHTING_SCHEMA = {
@@ -22,13 +23,20 @@ const LIGHTING_SCHEMA = {
 
 const DEFAULT_LIGHTING = { lightingMode: 'environment', environmentStrength: 1, environmentRotation: 0, lightIntensity: 1, lightColor: '#ffffff', lightX: 0.45, lightY: 0.65 } as const;
 
+/** Scales and tints each light from the values it was created with, captured on
+ * the first call (the runtime makes that call straight after `create`). Tinting
+ * multiplies rather than replaces, so a theme's coloured lights keep their hue
+ * under the default white `lightColor`. The last light is the optional
+ * directional lamp — every environment ends its list with `createDirectional`. */
 function updateLighting(handle: EnvironmentHandle, params: typeof DEFAULT_LIGHTING): void {
   const lights = handle as LightHandle;
   if (!lights.baseIntensities) lights.baseIntensities = lights.lights.map((light) => light instanceof THREE.Light ? light.intensity : 1);
+  if (!lights.baseColors) lights.baseColors = lights.lights.map((light) => light instanceof THREE.Light ? light.color.clone() : new THREE.Color(0xffffff));
+  const tint = new THREE.Color(params.lightColor);
   lights.lights.forEach((light, index) => {
     if (light instanceof THREE.Light) {
       light.intensity = lights.baseIntensities![index]! * params.lightIntensity;
-      light.color.set(params.lightColor);
+      light.color.copy(lights.baseColors![index]!).multiply(tint);
     }
   });
   const directional = lights.lights[lights.lights.length - 1];
@@ -39,7 +47,8 @@ function updateLighting(handle: EnvironmentHandle, params: typeof DEFAULT_LIGHTI
 }
 
 function createDirectional(ctx: EnvironmentCreateContext, params: typeof DEFAULT_LIGHTING): THREE.DirectionalLight {
-  const light = new THREE.DirectionalLight(params.lightColor, 1.25);
+  // White here; `updateLighting` applies the `lightColor` tint.
+  const light = new THREE.DirectionalLight(0xffffff, 1.25);
   light.visible = String(params.lightingMode) === 'directional';
   light.position.set(params.lightX * 2, params.lightY * 2, 2.4);
   ctx.scene.add(light);
@@ -391,7 +400,7 @@ const aurora = defineEnvironment({
   parameterSchema: LIGHTING_SCHEMA,
   defaultParameters: DEFAULT_LIGHTING,
   update: updateLighting,
-  create(_params, ctx) {
+  create(params, ctx) {
     const texture = makeAuroraBackgroundTexture();
     ctx.registry.track(texture);
     ctx.scene.background = texture;
@@ -401,7 +410,8 @@ const aurora = defineEnvironment({
     const violet = new THREE.DirectionalLight(0x8b7dff, 1.2);
     violet.position.set(0.8, 0.6, -0.6);
     ctx.scene.add(ambient, green, violet);
-    const lights = [ambient, green, violet];
+    const directional = createDirectional(ctx, params);
+    const lights = [ambient, green, violet, directional];
     let disposed = false;
     const handle: LightHandle = {
       lights,

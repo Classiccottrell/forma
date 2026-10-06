@@ -91,8 +91,10 @@ export default function App() {
   }
 
   function onParamChange(slot: 'shapeParams' | 'materialParams' | 'textureParams' | 'environmentParams', key: string, value: ParamValue) {
+    // Environment params may be saved empty (older compositions), so layer the
+    // current values over the defaults rather than starting from either alone.
     const base = slot === 'environmentParams'
-      ? environmentRegistry.require(current.environmentId).defaultParameters
+      ? { ...environmentRegistry.require(current.environmentId).defaultParameters, ...current.environmentParams }
       : current[slot];
     applyTracked({ [slot]: { ...base, [key]: value } } as Partial<Composition>);
   }

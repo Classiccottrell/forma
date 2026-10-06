@@ -67,21 +67,28 @@ export function Viewport({ hostRef, scene, scheduler, contextLost, environmentId
     };
   }, [scene]);
 
+  const { fov, zoom, azimuth, elevation } = activePresentation;
   useEffect(() => {
     if (!scene) return;
     const camera = scene.camera as THREE.PerspectiveCamera;
-    const controls = controlsRef.current;
-    camera.fov = activePresentation.fov;
-    camera.zoom = activePresentation.zoom;
+    camera.fov = fov;
+    camera.zoom = zoom;
     camera.updateProjectionMatrix();
-    if (!controls) return;
+  }, [scene, fov, zoom]);
+
+  // Keyed on turn/tilt alone: re-running on lens, zoom, backdrop or shadow
+  // changes would snap a manually orbited camera back to the stored angles.
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!scene || !controls) return;
+    const camera = scene.camera as THREE.PerspectiveCamera;
     const radius = Math.max(camera.position.length(), 0.1);
-    const phi = THREE.MathUtils.degToRad(90 - Math.max(-80, Math.min(80, activePresentation.elevation)));
-    const theta = THREE.MathUtils.degToRad(activePresentation.azimuth);
+    const phi = THREE.MathUtils.degToRad(90 - Math.max(-80, Math.min(80, elevation)));
+    const theta = THREE.MathUtils.degToRad(azimuth);
     camera.position.set(radius * Math.sin(phi) * Math.sin(theta), radius * Math.cos(phi), radius * Math.sin(phi) * Math.cos(theta));
     controls.target.set(0, 0, 0);
     controls.update();
-  }, [scene, activePresentation]);
+  }, [scene, azimuth, elevation]);
 
   useEffect(() => {
     if (!scene || activePresentation.backdrop === 'environment') return;

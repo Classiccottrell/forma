@@ -49,11 +49,9 @@ export function ParamControl({ id, label, schema, value, onChange }: ParamContro
               max={schema.max}
               step={schema.step}
               value={draft}
-              onChange={(e) => {
-                const raw = e.target.value;
-                setDraft(raw);
-                if (raw.trim() !== '' && Number.isFinite(Number(raw))) commit(raw);
-              }}
+              // Commit on blur/Enter only: committing per keystroke rewrote the
+              // draft mid-entry, so "1." became "1" before the next digit landed.
+              onChange={(e) => setDraft(e.target.value)}
               onBlur={(e) => commit(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(e.currentTarget.value); } }}
             />

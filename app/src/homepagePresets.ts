@@ -1,4 +1,4 @@
-import { replaceRetiredShape, type Composition } from 'forma';
+import { replaceRetiredShape, shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry, type Composition } from 'forma';
 
 export type HomepageTarget = 'studio' | 'gallery';
 export interface HomepagePreset { id: string; name: string; target: HomepageTarget; composition: Composition; }
@@ -21,5 +21,21 @@ export function writeHomepagePresets(state: HomepagePresetState): void {
 export function selectedHomepageComposition(target: HomepageTarget, fallback: Composition): Composition {
   const state = readHomepagePresets();
   const preset = state.entries.find((entry) => entry.id === state.selected[target] && entry.target === target);
-  return preset ? replaceRetiredShape(preset.composition) : fallback;
+  if (!preset || typeof preset.composition !== 'object' || preset.composition === null) return fallback;
+  const composition = replaceRetiredShape(preset.composition);
+  return referencesKnownContent(composition) ? composition : fallback;
+}
+
+/** Presets live in localStorage and skip `deserializeComposition` (its exact
+ * param-key check would reject presets the shapes still read leniently), so
+ * only check that every id still resolves — the runtime throws on one that
+ * doesn't, which would take the whole homepage down. */
+function referencesKnownContent(c: Composition): boolean {
+  return Boolean(
+    shapeRegistry.get(c.shapeId)
+    && materialRegistry.get(c.materialId)
+    && textureRegistry.get(c.textureId ?? 'none')
+    && environmentRegistry.get(c.environmentId)
+    && Array.isArray(c.effectIds) && c.effectIds.every((id) => effectRegistry.get(id)),
+  );
 }

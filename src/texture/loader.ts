@@ -55,12 +55,24 @@ export class TexturePackLoader {
     const requested = mapNames.filter((map) => manifest[map]).map((map) => [map, resolveTextureUrl(manifest[map]!, baseUrl)] as const);
     const entries = requested.map(([map, url]) => [map, this.acquire(url)] as const);
     let disposed = false;
+    const owned: THREE.Texture[] = [];
     const dispose = () => {
       if (disposed) return;
       disposed = true;
+      for (const texture of owned) texture.dispose();
       for (const [, entry] of entries) this.release(entry);
     };
-    const loaded = Promise.all(entries.map(async ([map, entry]) => [map, await this.awaitWithSignal(entry.promise, options.signal)] as const))
+    // Each caller gets its own Texture objects over the cached image source:
+    // callers set per-use state like `repeat`, which on a shared object would
+    // leak between two mounts using the same pack at different scales.
+    const loaded = Promise.all(entries.map(async ([map, entry]) => {
+      const texture = (await this.awaitWithSignal(entry.promise, options.signal)).clone();
+      texture.needsUpdate = true;
+      // A sibling map can fail and dispose the pack before this one resolves.
+      if (disposed) texture.dispose();
+      else owned.push(texture);
+      return [map, texture] as const;
+    }))
       .then((maps) => ({ manifest, intensity: manifest.defaultIntensity, ...Object.fromEntries(maps), dispose } as LoadedTexturePack));
     return loaded.catch((error) => { dispose(); throw error; });
   }
