@@ -16,9 +16,9 @@
 # Verified locally: root build, then FORMA_BASE=/forma/ app build served with
 # `vite preview --base /forma/` loads headless (homepage and the /forma/editor
 # route) with zero 4xx, zero console errors, and a rendering WebGL canvas.
-# UNVERIFIED: the actual GitHub Actions run (checkout of the private repo via
-# CC_WEBGL_TOKEN, Pages deploy). No live runner was available to execute it;
-# check the first run's logs before relying on it.
+# On Actions, every run from #6 through #13 failed at the cc-webgl checkout
+# with a bare "Not Found": prerequisite 2 was never set up. The preflight step
+# below names the missing prerequisite instead.
 name: Deploy to GitHub Pages
 
 on:
@@ -44,6 +44,16 @@ jobs:
       # install scripts, which could otherwise read the token from .git/config.
       # Nothing later needs it — the deploy goes through Pages artifacts, not a
       # git push.
+      # A private repo the token cannot read is indistinguishable from one that
+      # does not exist, so actions/checkout only reports "Not Found".
+      - name: Check cc-webgl is readable
+        env:
+          GH_TOKEN: ${{ secrets.CC_WEBGL_TOKEN || github.token }}
+        run: |
+          if ! gh api repos/Classiccottrell/cc-webgl --silent; then
+            echo "::error title=cc-webgl not readable::Classiccottrell/cc-webgl is private and this run has no token that can read it. Add a repo secret CC_WEBGL_TOKEN (fine-grained PAT, read-only Contents on cc-webgl) under Settings -> Secrets and variables -> Actions, or make cc-webgl public."
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           path: forma
