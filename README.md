@@ -39,9 +39,9 @@ pad; ordered Texture → Colour → Finish effect stages, including Bloom, Colou
 Film Grain; backdrops, floor shadow, lens/turn/tilt/zoom; and undo/redo. Generic SVG
 import remains a separate upload path.
 
-Still open before release: picker reference-card polish, H2 browser tests, a full
-browser QA pass, the app bundle budget (currently over), and the first successful
-GitHub Pages deploy. `BRIEF.md` has the full roadmap and dated update log.
+Live at https://classiccottrell.github.io/forma/. Current milestone: R1, review → polish →
+release. The 2026-10-10 review findings are the polish backlog; see `BRIEF.md` for them, the
+full roadmap, and the dated update log.
 
 The versioned browser bundle contract is `dist/forma.browser.v<package-version>.js`. Copy that file beside generated embed HTML, or pass a hosted URL
 to `generateEmbedCode(composition, { libraryUrl })`. See `examples/embed/index.html` for a local example.

@@ -139,12 +139,77 @@ core.
 - [x] Browser support notes.
 
 ## Status
-**M0, M1, M2, M3, M4 complete. H1 lifecycle work is done bar one stray RAF loop; H3 catalog
-targets are met. Open before release: H2 browser tests, full browser QA (H4), the bundle
-budget (currently over), and the first successful Pages deploy (blocked on repo settings —
-see the 2026-10-06 log entries).**
+**M0, M1, M2, M3, M4 complete; live at https://classiccottrell.github.io/forma/. Current
+milestone: R1 — review → polish → release (below). The 2026-10-10 review is done; its
+findings are the polish backlog. H1 is done bar one stray RAF loop; H3 catalog targets
+are met.**
 
 Current content: 32 shapes / 21 materials / 8 textures / 10 environments / 9 effects.
+
+## R1 — Review → polish → release (current)
+
+Polish follows a review instead of happening ad hoc, so fixes are ordered by what a
+visitor actually hits. Three steps, in order:
+
+1. **Review (done 2026-10-10).** Live site, headless Chrome on SwiftShader, desktop
+   1440×900 and phone 390×844: homepage, gallery, editor (every section, Surprise Me ×3,
+   PNG export, Copy Code), keyboard tab order, axe-core WCAG 2 A/AA scan. Findings below.
+   Not covered: real devices and GPUs (SwiftShader timings are not representative),
+   JSON/SVG import flows, Creator mode, undo/redo beyond the M3 checks.
+2. **Polish.** Owner review of this list first — add, cut, re-rank — then fix P1 → P2 →
+   P3, one PR per group. Each fix gets a regression check where one is practical.
+3. **Release (v1.0).** Bundle budget passing, favicon, a full QA re-run against this
+   list, then tag. H2 hardening follows v1.0 unless the review surfaced it.
+
+### Review findings — 2026-10-10
+
+**P1 — broken; blocks a core task**
+- [ ] **Copied embed code doesn't work from the live site.** It loads
+  `./forma.browser.v0.1.0.js`, which the site doesn't serve (404), so a pasted snippet
+  renders nothing. Publish the bundle with Pages and point `libraryUrl` at its absolute URL.
+- [ ] **Phone editor is unusable.** The top bar wraps to three rows over the panel and hides
+  the search box; the open panel covers the whole viewport, so changes can't be seen; the
+  hint and Reset view float over the picker grid.
+- [ ] **Gallery page: the 3D object covers the content.** On desktop the card mesh sits on
+  top of the Curated Presets list and the intro copy (names cut off); on phone it renders
+  as a white glare band across the text.
+- [ ] **Object framing.** Shapes are scaled to nearly fill the frame and centred on the full
+  canvas, which runs under the editor panel — so the panel cuts the object off, and PNG
+  exports (square) crop it.
+
+**P2 — clearly wrong; hurts the experience**
+- [ ] **Surprise Me can produce unreadable results:** one of three runs was a near-black
+  object on a near-black environment; another paired Bloom with a bright sky and blew
+  the object out to white. Needs a legibility guard (luminance contrast, bloom vs bright
+  environments).
+- [ ] **Homepage legibility.** Headline italic, eyebrow, body copy, nav links and callout
+  labels sit over the moving object at low contrast. axe: toggle text 2.33:1, small
+  labels 3.03:1 (homepage, gallery); effect param labels 4.39:1 (editor). AA needs 4.5:1.
+- [ ] **Homepage on phone:** "Open editor" wraps and clips at the right edge; a callout
+  card sits off-screen; the viewer toolbar overlaps the "Forma / 2026" footer (which the
+  Auto-spin button also covers on desktop).
+- [ ] **Unlabelled form fields (axe critical):** the composition-import file input and the
+  SVG textarea.
+- [ ] **Editor top bar overlaps panel content** as the panel scrolls.
+- [ ] **Weak first impression in the editor:** the default is a flat lavender matte sphere
+  with a visibly faceted outline at default detail; the Matte swatch (violet) doesn't
+  match the render.
+- [ ] **Keyboard flow.** Viewer controls (Auto-spin/Speed/Reset view) come first in tab
+  order on every page, before the nav and the main call to action; no skip link; ~50 tabs
+  to get past the shape grid in the editor. Consider dropping viewer controls from the
+  marketing pages entirely.
+
+**P3 — polish**
+- [ ] Effect stage pickers are unstyled white native selects; Light Color is a full-width
+  white bar. Both clash with the dark panel.
+- [ ] Gallery preset thumbnails render as dark blobs, not previews of the presets.
+- [ ] Editor content isn't in landmarks (axe `region` ×22).
+- [ ] No favicon (404 on every page).
+- [ ] Console warning ×2: `toNonIndexed()` called on already non-indexed geometry (Faceted Gem).
+- [ ] Parameters sit far from the preview: one long panel scroll, with a shape's params
+  below the 32-card grid.
+
+**Carried from earlier sections:** bundle budget over (H4), Film Grain RAF loop (H1).
 
 ## Product hardening roadmap
 
@@ -281,7 +346,7 @@ horizontal and vertical placement remain available through keyboard-operable sli
 - Get `app/npm run check:bundle` passing again: `main` is at 905,065 JavaScript bytes against
   the 900,000 budget (gzip is within budget). Raise the budget deliberately or trim; don't
   let it drift.
-- First successful GitHub Pages deploy (needs Pages enabled and cc-webgl access — #14).
+- [x] First successful GitHub Pages deploy (2026-10-06).
 
 `npm run typecheck` / `typecheck:harness` / `test` (17/17) / `build` all pass. Embed
 code generation confirmed genuinely working end-to-end (resolves through the real
@@ -291,6 +356,8 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-10-10 | R1 review of the live site (desktop + phone, headless SwiftShader, axe-core): 4 P1, 7 P2, 6 P3 findings recorded under R1. Export PNG (1024² RGBA) and Copy Code work mechanically; the copied snippet points at an unhosted bundle. |
+| 2026-10-06 | Site live at https://classiccottrell.github.io/forma/: Pages enabled (source: GitHub Actions) and cc-webgl made public (history checked for secrets first), so the deploy no longer needs `CC_WEBGL_TOKEN`. First successful deploy; homepage and `/editor` verified rendering. |
 | 2026-10-06 | PR #9 review follow-up. #9 was merged five minutes before its automated review arrived, so its 11 findings were checked against `main`. Already fixed since: effect stage order (normalised at the app's apply boundary) and NaN lighting from empty environment params (#11). Fixed now: generated embed code escapes the inline composition JSON, so an imported SVG string containing `</script>` can no longer inject script; environment edits keep the other environment values; lens/zoom/backdrop/shadow changes no longer snap a manually orbited camera back; an HDR that finishes loading applies the current strength/rotation; saved light intensity/colour apply on first render; Aurora's violet rim light is no longer treated as the movable lamp (Aurora gets its own); two mounts sharing a texture pack no longer overwrite each other's tiling (the loader hands each caller its own textures over the shared image); homepage presets naming any missing content fall back instead of crashing; exact-value number fields keep a decimal point while typing. Also fixed: the light-colour control replaced every light's colour, so themed rigs (Neon Room, Aurora, …) went white on first edit; it now tints. 89/89 tests (new ones confirmed failing on the old code), 15/15 M3 browser checks plus targeted checks on headless SwiftShader. |
 | 2026-10-06 | Pages deploy: every run from #6 to #13 failed at the cc-webgl checkout — cc-webgl is private and `CC_WEBGL_TOKEN` was never added; Pages is also not yet enabled on the repo. #14 makes the workflow say so. |
 | 2026-10-01 | #13: removed the hoodie, polo and cap after visual review. Compositions saved with them (file import, homepage presets, embeds) now open on the default sphere instead of failing with `unknown id`. 32 shapes. |
