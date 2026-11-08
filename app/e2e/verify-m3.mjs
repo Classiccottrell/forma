@@ -11,7 +11,26 @@ function record(name, ok, detail) {
 }
 
 async function main() {
-  const browser = await chromium.launch();
+  // System Chrome, headless, forced onto SwiftShader: the iMac's nouveau GPU driver has
+  // frozen the machine under WebGL load, so never let this run on hardware GL.
+  const browser = await chromium.launch({
+    channel: 'chrome',
+    headless: true,
+    args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-accelerated-video-decode'],
+  });
+  {
+    const probe = await browser.newPage();
+    const gl = await probe.evaluate(() => {
+      const ctx = document.createElement('canvas').getContext('webgl');
+      const ext = ctx?.getExtension('WEBGL_debug_renderer_info');
+      return ext ? ctx.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '';
+    });
+    await probe.close();
+    if (!/swiftshader/i.test(gl)) {
+      await browser.close();
+      throw new Error(`refusing to run: WebGL renderer is not SwiftShader (${gl || 'unknown'})`);
+    }
+  }
 
   // --- 1. Search filters live ---
   {
@@ -58,6 +77,12 @@ async function main() {
     await page.goto(URL);
     await page.waitForSelector('[data-testid="viewport-host"]');
     await page.waitForTimeout(300);
+    // The default distance is framed to the viewport (not a fixed 3.2), so compare
+    // against where the camera starts.
+    const initial = await page.evaluate(() => {
+      const c = window.__formaDebug?.camera;
+      return c ? [c.position.x, c.position.y, c.position.z] : null;
+    });
 
     // orbit via drag
     const host = page.getByTestId('viewport-host');
@@ -77,8 +102,8 @@ async function main() {
       const c = window.__formaDebug?.camera;
       return c ? [c.position.x, c.position.y, c.position.z] : null;
     });
-    const closeToOrigin = reset && Math.abs(reset[0]) < 0.01 && Math.abs(reset[1]) < 0.01 && Math.abs(reset[2] - 3.2) < 0.01;
-    record('reset camera returns to default orbit position', !!moved && closeToOrigin, `moved=${JSON.stringify(moved)} reset=${JSON.stringify(reset)}`);
+    const closeToOrigin = reset && initial && reset.every((v, i) => Math.abs(v - initial[i]) < 0.01);
+    record('reset camera returns to default orbit position', !!moved && closeToOrigin, `initial=${JSON.stringify(initial)} moved=${JSON.stringify(moved)} reset=${JSON.stringify(reset)}`);
 
     // change shape (shape section is open by default), then reset composition
     const shapeGrid = page.locator('[data-testid="section-header-shape"]').locator('xpath=following-sibling::div[1]//div[contains(@class,"picker-grid")]');

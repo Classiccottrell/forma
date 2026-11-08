@@ -219,6 +219,17 @@ The current treatment is what makes the shapes look unfinished. Fix the stage fi
   distinct proportions or detail so each earns its tile.
 - Uniform picker thumbnails rendered from the real shapes.
 
+**Progress (2026-11-08):** framing done. `createFormaScene({ framing })` sets the camera
+distance from the canvas size and lens so the object's bounding radius takes 0.42 of the
+visible area's shorter half-extent, and shifts the projection (`setViewOffset`) to centre
+it clear of the top bar and the open panel (a panel that would leave under 40% of the
+width, i.e. the phone's full-width one, is ignored). Reset view and lens changes reframe;
+the user's zoom is untouched. PNG export frames for its own size with no panel offset, so
+a square export keeps the whole object centred. Hover motion measures from the object's
+screen centre, and the CSS floor shadow follows the object. Embeds keep a fixed camera
+until Phase 4. Closes the Phase 2 framing gap: Gas stays mostly in view and the liquid
+puddle fits and reads smoother.
+
 ### Phase 2 — Matter
 Build the Phase 0 behaviour into the product for all 32 shapes. Split by ownership:
 
@@ -510,6 +521,7 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-11-08 | Phase 1 framing: the editor fits the object to the area left of the panel with room around it; square PNG exports keep the whole object; floor shadow follows it. 137/137 tests (5 new), M3 browser checks 15/15 (now pinned to headless Chrome on SwiftShader with a renderer interlock), screenshots checked on desktop, panel closed, Gas, Liquid puddle, phone and a 1024² export. |
 | 2026-11-08 | Phase 2 matter in the product: `Composition.matter`, runtime `MatterLayer` on `cc-webgl/matter`, Matter and Cursor editor sections, per-shape inside fill. 132/132 tests (43 new, incl. every shape's particles staying inside it), M3 browser checks 15/15, editor checked headless on SwiftShader with 0 errors. App bundle +34 KB; now over the gzip budget too (256 KB / 250 KB). Framing gap handed to Phase 1. |
 | 2026-11-08 | Phase 0 matter prototype accepted by the owner after six rounds (`prototypes/matter/`, PR #18). Settled: Form + Disperse on one particle set; Solid cracks away then shatters into mixed fragments that crumble to dust; Liquid as screen-space fluid that settles into a shimmering puddle; Gas fine and wispy; six cursor modes with Wake as the favourite. Phase 2 spec written: shared pieces go into a new `cc-webgl/matter` subpath. |
 | 2026-11-08 | New direction: V2 — Matter. Forma becomes a tool for abstract, ambiguous 3D forms for interactive websites; shapes can be solid, liquid or gas, inside haze and particles, and meet linefield on the page. Vanta's generator is the finish reference for how objects are treated. Catalog fixed at the current 32 shapes. R1 findings folded into V2 phases. |

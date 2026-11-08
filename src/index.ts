@@ -20,6 +20,8 @@ export { exportPNG } from './export/exportPNG.js';
 
 export { createFormaScene } from './scene/createFormaScene.js';
 export type { CreateFormaSceneOptions, FormaScene } from './scene/createFormaScene.js';
+export { computeFraming, applyFraming, DEFAULT_FRAMING_FILL, DEFAULT_SUBJECT_RADIUS } from './scene/framing.js';
+export type { Framing, FramingInsets, FramingResult } from './scene/framing.js';
 export { FrameScheduler } from 'cc-webgl';
 
 import type { Composition } from './types.js';

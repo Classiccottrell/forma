@@ -1,5 +1,6 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { applyFraming, computeFraming, type Framing } from '../scene/framing.js';
 
 export interface ExportPNGTarget {
   renderer: THREE.WebGLRenderer;
@@ -8,6 +9,10 @@ export interface ExportPNGTarget {
   /** Shared composer (M1) — when present, export renders through it so active
    * effects (e.g. `duotone`) appear in the exported PNG, not just the live view. */
   composer?: EffectComposer;
+  /** The live view's framing (`FormaScene.framing`). When present the export is
+   * framed for its own size with no UI insets, so a square PNG keeps the whole object
+   * centred instead of inheriting the editor's panel offset and crop. */
+  framing?: Framing | null;
 }
 
 export interface ExportPNGOptions {
@@ -38,7 +43,7 @@ export interface ExportPNGOptions {
  * between them guarantees nothing composites/clears in between.
  */
 export function exportPNG(target: ExportPNGTarget, opts: ExportPNGOptions = {}): Promise<Blob> {
-  const { renderer, scene, camera, composer } = target;
+  const { renderer, scene, camera, composer, framing } = target;
   const { width, height, transparentBackground = true } = opts;
 
   const prevWidth = renderer.domElement.width;
@@ -49,6 +54,7 @@ export function exportPNG(target: ExportPNGTarget, opts: ExportPNGOptions = {}):
   const prevQuaternion = camera.quaternion.clone();
   const prevZoom = camera.zoom;
   const prevBackground = scene.background;
+  const prevView = camera.view ? { ...camera.view } : null;
 
   const targetW = width ?? Math.round(prevWidth / prevPixelRatio);
   const targetH = height ?? Math.round(prevHeight / prevPixelRatio);
@@ -65,6 +71,8 @@ export function exportPNG(target: ExportPNGTarget, opts: ExportPNGOptions = {}):
     camera.quaternion.copy(prevQuaternion);
     camera.zoom = prevZoom;
     camera.aspect = prevAspect;
+    if (prevView?.enabled) camera.setViewOffset(prevView.fullWidth, prevView.fullHeight, prevView.offsetX, prevView.offsetY, prevView.width, prevView.height);
+    else camera.clearViewOffset();
     camera.updateProjectionMatrix();
   };
 
@@ -75,6 +83,11 @@ export function exportPNG(target: ExportPNGTarget, opts: ExportPNGOptions = {}):
       composer?.setSize(targetW, targetH);
       camera.aspect = targetW / targetH;
       camera.updateProjectionMatrix();
+    }
+    if (framing) {
+      const { insets: _insets, ...exportFraming } = framing;
+      // The orbit target is the origin: FormaRuntime centres every shape there.
+      applyFraming(camera, new THREE.Vector3(), targetW, targetH, computeFraming(camera.fov, targetW, targetH, exportFraming));
     }
 
     if (composer) composer.render();

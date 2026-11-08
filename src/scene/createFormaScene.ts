@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { applyFraming, computeFraming, type Framing, type FramingInsets } from './framing.js';
 
 /**
  * Owned scene bootstrap (expansion roadmap §2 item 1 / §1a). Replaces the two
@@ -21,6 +22,10 @@ export interface CreateFormaSceneOptions {
   el: HTMLElement;
   /** Camera distance from origin along +z. Default 3.2 (harness's prior default). */
   cameraZ?: number;
+  /** When set, the camera distance follows the canvas size (and the lens) so the
+   * object sits at `fill` of the visible area, centred clear of `insets`. Overrides
+   * `cameraZ`. Omit for a fixed distance (embeds). */
+  framing?: Framing;
   onContextLost?: () => void;
   onContextRestored?: () => void;
 }
@@ -51,6 +56,13 @@ export interface FormaScene {
   ensureOutputPassLast(): void;
   /** Renders one frame through the composer (RenderPass + any active effect passes). */
   render(): void;
+  /** The framing in force, or null for a fixed camera distance. */
+  readonly framing: Framing | null;
+  /** Updates the UI insets the object is framed clear of, and reframes. */
+  setFramingInsets(insets: FramingInsets): void;
+  /** Re-applies framing (no-op without it) after something changed the lens or put the
+   * camera back to a saved distance. Keeps the camera's direction and zoom. */
+  reframe(): void;
   /** True while the browser has lost this renderer's WebGL context. */
   contextLost: boolean;
   /** Stops observing resize and disposes the renderer + removes its canvas. */
@@ -59,6 +71,8 @@ export interface FormaScene {
 
 export function createFormaScene(opts: CreateFormaSceneOptions): FormaScene {
   const { el, cameraZ = 3.2, onContextLost, onContextRestored } = opts;
+  let framing: Framing | null = opts.framing ? { ...opts.framing } : null;
+  const orbitTarget = new THREE.Vector3();
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, Math.max(el.clientWidth, 1) / Math.max(el.clientHeight, 1), 0.1, 100);
@@ -106,7 +120,16 @@ export function createFormaScene(opts: CreateFormaSceneOptions): FormaScene {
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
     composer.setSize(w, h);
+    reframe();
   }
+
+  function reframe(): void {
+    if (!framing) return;
+    const w = Math.max(el.clientWidth, 1);
+    const h = Math.max(el.clientHeight, 1);
+    applyFraming(camera, orbitTarget, w, h, computeFraming(camera.fov, w, h, framing));
+  }
+  reframe();
 
   let observer: ResizeObserver | undefined;
   if (typeof ResizeObserver !== 'undefined') {
@@ -122,6 +145,15 @@ export function createFormaScene(opts: CreateFormaSceneOptions): FormaScene {
     renderer,
     composer,
     ensureOutputPassLast,
+    get framing() {
+      return framing;
+    },
+    setFramingInsets(insets) {
+      if (!framing) return;
+      framing = { ...framing, insets: { ...insets } };
+      reframe();
+    },
+    reframe,
     get contextLost() {
       return contextLost;
     },

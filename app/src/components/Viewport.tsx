@@ -74,6 +74,8 @@ export function Viewport({ hostRef, scene, scheduler, contextLost, environmentId
     camera.fov = fov;
     camera.zoom = zoom;
     camera.updateProjectionMatrix();
+    // A new lens changes how far the camera must sit to keep the object framed.
+    scene.reframe();
   }, [scene, fov, zoom]);
 
   // Keyed on turn/tilt alone: re-running on lens, zoom, backdrop or shadow
@@ -162,6 +164,9 @@ export function Viewport({ hostRef, scene, scheduler, contextLost, environmentId
             internals._sphericalDelta?.set(0, 0, 0);
             internals._panOffset?.set(0, 0, 0);
             controls.reset();
+            // reset() restores the distance saved at mount; framing owns distance.
+            scene?.reframe();
+            controls.update();
             changePresentation({ fov: DEFAULT_PRESENTATION.fov, azimuth: DEFAULT_PRESENTATION.azimuth, elevation: DEFAULT_PRESENTATION.elevation, zoom: DEFAULT_PRESENTATION.zoom });
           }}
           title="Reset camera to default orbit"
