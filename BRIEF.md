@@ -9,10 +9,19 @@ shape/material/environment/effect composition engine (`src/`, already proven via
 dev harness) now growing a real product UI and content library on top of that proven
 core.
 
+**Direction from 2026-11-08 (V2 — Matter):** Forma is for making ambiguous, abstract
+3D forms for interactive websites. A shape is not only a solid: it can hold its form,
+run like liquid, or come apart like gas, inside plenty of space, haze and particles.
+The reference for *finish* — how objects are framed, lit, shadowed and reflected — is
+the Vanta 3D Shape Generator (vanta.supply/tools/3d-shape-generator). Its feature list
+and visual identity are not the target. Forma should also meet linefield (the
+generative line-art backgrounds project) on the page, so the two can share a scene.
+
 ## Non-Goals (explicit Phase 5 deferrals)
 - GLTF/model export — later.
 - Animation timeline — later.
-- Advanced post-processing beyond the MVP effect set (§ content plan) — later.
+- ~~Advanced post-processing beyond the MVP effect set — later.~~ Superseded by V2:
+  haze, glow and particle atmosphere are now core to the product.
 - Community preset sharing (server-backed) — later; local/curated presets only for now.
 - A React *adapter subpath shipped inside the `forma` package itself* — still
   deferred. (Distinct from: the product's own editor app, which IS built in React,
@@ -139,14 +148,93 @@ core.
 - [x] Browser support notes.
 
 ## Status
-**M0, M1, M2, M3, M4 complete; live at https://classiccottrell.github.io/forma/. Current
-milestone: R1 — review → polish → release (below). The 2026-10-10 review is done; its
-findings are the polish backlog. H1 is done bar one stray RAF loop; H3 catalog targets
-are met.**
+**M0–M4 complete; live at https://classiccottrell.github.io/forma/. Current milestone:
+V2 — Matter (below), which absorbs the R1 review findings. The shape catalog is fixed at
+the current 32 for now (owner decision, 2026-11-08).**
 
 Current content: 32 shapes / 21 materials / 8 textures / 10 environments / 9 effects.
 
-## R1 — Review → polish → release (current)
+## V2 — Matter (current)
+
+Six phases, in order. Each phase ships as its own PR(s) and ends with a live-site
+review in headless Chrome on SwiftShader (never the owner's Chrome on the iMac — see
+the GPU note in the agent memory) plus the owner's own look. A phase is done when the
+owner accepts it, not when its checks pass.
+
+**Catalog:** keep all 32 current shapes. No additions or removals until V2 ships.
+
+### Phase 0 — Prototype the matter feel (throwaway)
+Answer the design question before building it into the product: does a shape that
+goes solid → liquid → gas feel right? A standalone page, not product code: three
+shapes (Soft Blob, Torus Knot, Sphere), one State control, one Disperse slider, haze
+and a dust field. Decide from it: particle counts that look dense enough, how liquid
+should read (flowing particles first; a metaball surface only if particles can't sell
+it), and how reassembly should feel.
+
+### Phase 1 — Object finish (the reference's lesson)
+The current treatment is what makes the shapes look unfinished. Fix the stage first.
+- Frame the object in the visible area, left of the panel, with room around it; square
+  PNG exports keep the whole object (R1 P1 framing).
+- Soft contact shadow, real reflections on metal and glass, a default scene that looks
+  good (not the flat lavender sphere — R1 P2).
+- Geometry quality: smooth sphere outline at default detail; fix the washed-out front
+  faces on Heart, Plus, Arrow, Sparkle; make Soft Blob actually soft; give the
+  near-duplicate pairs (Icosahedron/Faceted Gem, Box/Bevelled Box, the rounded slabs)
+  distinct proportions or detail so each earns its tile.
+- Uniform picker thumbnails rendered from the real shapes.
+
+### Phase 2 — Matter
+Every shape can also be a particle cloud: points sampled over its surface and through
+its volume, drawn on the GPU.
+- **State:** Solid (particles bound to the surface, mesh visible) · Liquid (particles
+  flow, sag, and pull back together) · Gas (particles diffuse on curl noise and thin
+  into haze). One control, continuous between states.
+- **Disperse** 0–1: how far the form has come apart. Reassembly is the same motion run
+  backwards.
+- Per-state tuning: particle count and size, turbulence, cohesion, drift, fade.
+- Cursor: Attract, Vortex, Scatter on the particles; Wake-style trails (see Phase 5).
+- Performance tiers so dense clouds degrade gracefully on weak GPUs.
+
+### Phase 3 — Atmosphere
+Space around the object instead of a backdrop behind it.
+- Depth haze and glow that the particles sit inside; a far dust/star field; film grain
+  tuned to sit behind text.
+- Backdrops: transparent (for site embedding), deep space, soft gradient.
+- Effects reviewed against the new look; Surprise Me guarded against unreadable scenes
+  (R1 P2).
+
+### Phase 4 — Interactive web delivery
+What a site actually embeds.
+- Self-contained embed that works when pasted anywhere — bundle hosted or inlined (R1 P1).
+- Triggers: scroll position, hover, pointer distance, time loop, each mapped to Disperse
+  or State. Reduced-motion and visibility pause respected.
+- Export menu: embed code, PNG at 1×/2×/4×, a link to the exact scene.
+
+### Phase 5 — linefield bridge
+linefield stays Canvas 2D with zero dependencies (its brief rules out WebGL), so the
+two meet on the page rather than in one codebase.
+- A tiny shared contract: pointer, time, a noise/flow field, and palette, published by
+  whichever is present and read by the other, so lines and particles move in the same
+  current.
+- Shared vocabulary: linefield's presets (Whisper, Ink, Neon, Drift, Dense) and cursor
+  modes (Attract, Vortex, Wake) mean the same thing in both.
+- Composed scenes as the showcase: a shape thinning into gas inside Grain Field's dust; a
+  dispersing form drawn into Event Horizon's well; particles riding Flow Field's current.
+- A composed-scene export: linefield background + Forma object as one embed.
+
+### Phase 6 — Finish and release
+- Phone editor, homepage and gallery layouts, keyboard flow, labels, contrast,
+  landmarks (the remaining R1 findings).
+- Homepage rewritten around the matter idea, built from composed scenes.
+- Bundle budget, favicon, full QA against this list, tag v1.0.
+
+## R1 findings (2026-10-10) — folded into V2
+
+These stay as the record of the review; each is now owned by a V2 phase: framing,
+default scene, Surprise Me → Phases 1 and 3; embed → Phase 4; phone, gallery layout,
+keyboard, labels, contrast, landmarks, favicon → Phase 6.
+
+### R1 — Review → polish → release (superseded by V2)
 
 Polish follows a review instead of happening ad hoc, so fixes are ordered by what a
 visitor actually hits. Three steps, in order:
@@ -356,6 +444,7 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-11-08 | New direction: V2 — Matter. Forma becomes a tool for abstract, ambiguous 3D forms for interactive websites; shapes can be solid, liquid or gas, inside haze and particles, and meet linefield on the page. Vanta's generator is the finish reference for how objects are treated. Catalog fixed at the current 32 shapes. R1 findings folded into V2 phases. |
 | 2026-10-10 | R1 review of the live site (desktop + phone, headless SwiftShader, axe-core): 4 P1, 7 P2, 6 P3 findings recorded under R1. Export PNG (1024² RGBA) and Copy Code work mechanically; the copied snippet points at an unhosted bundle. |
 | 2026-10-06 | Site live at https://classiccottrell.github.io/forma/: Pages enabled (source: GitHub Actions) and cc-webgl made public (history checked for secrets first), so the deploy no longer needs `CC_WEBGL_TOKEN`. First successful deploy; homepage and `/editor` verified rendering. |
 | 2026-10-06 | PR #9 review follow-up. #9 was merged five minutes before its automated review arrived, so its 11 findings were checked against `main`. Already fixed since: effect stage order (normalised at the app's apply boundary) and NaN lighting from empty environment params (#11). Fixed now: generated embed code escapes the inline composition JSON, so an imported SVG string containing `</script>` can no longer inject script; environment edits keep the other environment values; lens/zoom/backdrop/shadow changes no longer snap a manually orbited camera back; an HDR that finishes loading applies the current strength/rotation; saved light intensity/colour apply on first render; Aurora's violet rim light is no longer treated as the movable lamp (Aurora gets its own); two mounts sharing a texture pack no longer overwrite each other's tiling (the loader hands each caller its own textures over the shared image); homepage presets naming any missing content fall back instead of crashing; exact-value number fields keep a decimal point while typing. Also fixed: the light-colour control replaced every light's colour, so themed rigs (Neon Room, Aurora, …) went white on first edit; it now tints. 89/89 tests (new ones confirmed failing on the old code), 15/15 M3 browser checks plus targeted checks on headless SwiftShader. |
