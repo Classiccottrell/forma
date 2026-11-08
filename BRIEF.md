@@ -163,13 +163,49 @@ owner accepts it, not when its checks pass.
 
 **Catalog:** keep all 32 current shapes. No additions or removals until V2 ships.
 
-### Phase 0 — Prototype the matter feel (throwaway)
-Answer the design question before building it into the product: does a shape that
-goes solid → liquid → gas feel right? A standalone page, not product code: three
-shapes (Soft Blob, Torus Knot, Sphere), one State control, one Disperse slider, haze
-and a dust field. Decide from it: particle counts that look dense enough, how liquid
-should read (flowing particles first; a metaball surface only if particles can't sell
-it), and how reassembly should feel.
+### Phase 0 — Prototype the matter feel (DONE, accepted 2026-11-08)
+`prototypes/matter/index.html` (standalone, three.js from a CDN, no Forma imports) is the
+reference implementation for Phase 2: when the product code and the prototype disagree
+on how something should *look*, the prototype wins until the owner says otherwise.
+Iterated with the owner over six rounds; what it settled:
+
+- **Model.** *Form* is what kind of matter it is; *Disperse* (0–1) is how far it has
+  come apart. Every Form is the same particle set (surface samples plus about a third
+  through the volume), so changing Form is a continuous crossfade, never a swap.
+- **Solid** — the surface stays opaque and *cracks away* in ragged noise patches over
+  Disperse 0–0.33 (a fading surface showed a see-through shell with the particle form
+  inside it, rejected). Underneath it shatters into **irregular mixed-size fragments**
+  (power-diagram cells from a weighted seed scatter: ~5 large, ~16 medium, ~60 small,
+  noise-warped edges, 12% loose specks; small pieces fly further and spin faster — a
+  regular grid read as puzzle pieces, rejected), then **crumbles**: each particle has its
+  own detach point, earlier near a fragment's edge, and drifts off as grit on the Gas
+  currents. Full Disperse is mostly dust with a few survivors.
+- **Liquid** — **screen-space fluid rendering**: particles drawn as spheres into a float
+  depth target, an edge-aware blur merges them into one surface (dense taps, several
+  rounds), and a composite shades it: refraction of the scene behind, Fresnel
+  reflection, highlights faded at the silhouette, and a thickness pass for
+  palette-tinted absorption (thick reads dense, thin edges and drops stay clear). The
+  body slumps, runs into drips and pools; ~6% of particles fall as real drops that
+  rejoin the pool. From Disperse 0.6 it *settles*: motion stops, it flattens into a
+  puddle, drops stop, and the puddle shimmers. Cursor reach is ~0.6× in Liquid.
+  (Rejected along the way: bubble/ring sprites, a deforming transmissive mesh — surface
+  pattern, and it popped when changing to Gas.)
+- **Gas** — 1.6× the particle count at a finer size, outward diffusion plus a second,
+  finer turbulence layer for wisps, rising and thinning, with haze growing as it goes.
+  Accepted as is.
+- **Cursor** — six modes, all kept: Push, Attract, Vortex (move particles; on a solid they
+  also loosen it locally at 0.45 strength), **Scatter** (local Disperse in the current
+  Form, with a ragged hole in the surface), **Wake** (a 16-point trail that comes apart
+  and heals over 1.4 s — the owner's favourite), Off. Strength and Radius controls.
+- **Motion** — Manual, Loop (9 s breathe apart and back), Hover (comes apart as the
+  cursor nears). Reduced motion: everything still, slider only.
+- **Atmosphere** — haze sprites, a far dust field (round sprites, kept well clear of the
+  camera), bloom with a high threshold, CSS grain, linefield-named palettes (Whisper,
+  Ink, Neon, Drift). Additive brightness is scaled by √(25 000 / particle count).
+- **Lessons to carry over:** guard every normalize against zero vectors and drop
+  non-finite colours (one NaN pixel blacked out the frame through bloom); use float
+  depth (half float terraced into stripes); make Form easing *arrive* exactly (a sliver
+  of a previous Form left its surface on).
 
 ### Phase 1 — Object finish (the reference's lesson)
 The current treatment is what makes the shapes look unfinished. Fix the stage first.
@@ -184,16 +220,33 @@ The current treatment is what makes the shapes look unfinished. Fix the stage fi
 - Uniform picker thumbnails rendered from the real shapes.
 
 ### Phase 2 — Matter
-Every shape can also be a particle cloud: points sampled over its surface and through
-its volume, drawn on the GPU.
-- **State:** Solid (particles bound to the surface, mesh visible) · Liquid (particles
-  flow, sag, and pull back together) · Gas (particles diffuse on curl noise and thin
-  into haze). One control, continuous between states.
-- **Disperse** 0–1: how far the form has come apart. Reassembly is the same motion run
-  backwards.
-- Per-state tuning: particle count and size, turbulence, cohesion, drift, fade.
-- Cursor: Attract, Vortex, Scatter on the particles; Wake-style trails (see Phase 5).
-- Performance tiers so dense clouds degrade gracefully on weak GPUs.
+Build the Phase 0 behaviour into the product for all 32 shapes. Split by ownership:
+
+**`cc-webgl/matter` — new optional subpath in cc-webgl** (shape-agnostic, reusable by
+linefield-style consumers; core cc-webgl stays as it is):
+- `sampleMatter(geometry, count, opts)` → particle buffers: surface and volume samples,
+  normals, seeds, and the fragment assignment (weighted seed scatter + speck share).
+- `createMatterMaterial()` / `createMatterDepthMaterial()` — the shared vertex program
+  for every Form, Disperse, cursor modes and the Wake trail, with sprite and sphere
+  variants.
+- `FluidPass` — the screen-space liquid (depth, blur, thickness, composite, shimmer)
+  as an EffectComposer pass.
+- GLSL chunks: simplex noise, the flow field, rotation helpers.
+- Quality tiers wired to the existing `QualityManager` (particle count, liquid
+  resolution, blur rounds); the frame clock through the existing `FrameScheduler`;
+  pointer through `InputManager`.
+
+**Forma** (product):
+- A `matter` slot on `Composition`: `form`, `disperse`, `cursor` mode, `strength`,
+  `radius`, `motion`. Older compositions without it load as today's solid object.
+- Runtime: the matter layer alongside the mesh; the Solid crack-away on Forma's own
+  materials; Form and Disperse hot-updatable without a rebuild.
+- Editor: a Matter section (Form, Disperse, Motion) and a Cursor section, matching the
+  prototype.
+- Per-shape fit: thin shapes (Torus Knot, Spring, Ring) take a thinner volume fill;
+  flat extrusions need checking against the liquid settle and the solid fragments.
+- Tests: deterministic sampling for a seed, finite positions at every Form and Disperse,
+  serialization of the new slot, and a headless render check per Form.
 
 ### Phase 3 — Atmosphere
 Space around the object instead of a backdrop behind it.
@@ -444,6 +497,7 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-11-08 | Phase 0 matter prototype accepted by the owner after six rounds (`prototypes/matter/`, PR #18). Settled: Form + Disperse on one particle set; Solid cracks away then shatters into mixed fragments that crumble to dust; Liquid as screen-space fluid that settles into a shimmering puddle; Gas fine and wispy; six cursor modes with Wake as the favourite. Phase 2 spec written: shared pieces go into a new `cc-webgl/matter` subpath. |
 | 2026-11-08 | New direction: V2 — Matter. Forma becomes a tool for abstract, ambiguous 3D forms for interactive websites; shapes can be solid, liquid or gas, inside haze and particles, and meet linefield on the page. Vanta's generator is the finish reference for how objects are treated. Catalog fixed at the current 32 shapes. R1 findings folded into V2 phases. |
 | 2026-10-10 | R1 review of the live site (desktop + phone, headless SwiftShader, axe-core): 4 P1, 7 P2, 6 P3 findings recorded under R1. Export PNG (1024² RGBA) and Copy Code work mechanically; the copied snippet points at an unhosted bundle. |
 | 2026-10-06 | Site live at https://classiccottrell.github.io/forma/: Pages enabled (source: GitHub Actions) and cc-webgl made public (history checked for secrets first), so the deploy no longer needs `CC_WEBGL_TOKEN`. First successful deploy; homepage and `/editor` verified rendering. |

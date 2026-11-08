@@ -1,0 +1,696 @@
+<meta charset="utf-8">
+<title>Forma Matter</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed WebGL stage; one floating control column at the right edge; single dark look by design. */
+:root{
+  color-scheme:dark;
+  --stage:#07060d; --panel:rgba(14,13,22,.72); --line:rgba(255,255,255,.09);
+  --ink:#ece9f4; --muted:#9a95ad; --accent:#cfc7ff;
+  --display:"Instrument Serif", Georgia, "Times New Roman", serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+html,body{height:100%;background:var(--stage);color:var(--ink);overflow:hidden}
+body{font-family:var(--mono);font-size:12px}
+#stage{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none}
+#grain{position:fixed;inset:-50%;pointer-events:none;opacity:.05;background-size:180px 180px;mix-blend-mode:overlay;animation:grain 1.2s steps(6) infinite}
+@keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-1%)}100%{transform:translate(1%,3%)}}
+.title{position:fixed;left:max(24px,env(safe-area-inset-left,0px));top:calc(20px + env(safe-area-inset-top,0px));display:grid;gap:4px;pointer-events:none}
+.title h1{font-family:var(--display);font-weight:400;font-size:30px;margin:0;letter-spacing:.01em}
+.title h1 i{color:var(--accent)}
+.title p{margin:0;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-size:10.5px}
+.panel{position:fixed;top:calc(16px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));width:260px;max-height:calc(100% - 32px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow:auto;background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:14px}
+.panel[hidden]{display:none}
+.group{display:grid;gap:7px}
+.label{display:flex;justify-content:space-between;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-size:10px}
+.label output{color:var(--ink);font-variant-numeric:tabular-nums}
+.seg{display:flex;flex-wrap:wrap;gap:4px}
+.seg button{flex:1 1 auto;font:500 11.5px var(--mono);color:var(--ink);background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:999px;padding:6px 10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#0b0a12;border-color:var(--ink)}
+.seg button:focus-visible,input:focus-visible,.hint button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.note{color:var(--muted);line-height:1.5;margin:0}
+.hint{position:fixed;left:max(24px,env(safe-area-inset-left,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));display:flex;gap:12px;align-items:center;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-size:10px}
+.hint button{white-space:nowrap;font:500 11px var(--mono);color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+#fail[hidden]{display:none}
+#fail{position:fixed;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--muted)}
+@media (max-width:640px){.panel{top:auto;bottom:calc(56px + env(safe-area-inset-bottom,0px));left:max(16px,env(safe-area-inset-left,0px));width:auto;max-height:46%}.title h1{font-size:24px}}
+@media (prefers-reduced-motion: reduce){#grain{animation:none}}
+</style>
+<canvas id="stage" aria-label="Interactive 3D form made of particles"></canvas>
+<div id="grain" aria-hidden="true"></div>
+<div class="title"><h1>Forma <i>matter</i></h1><p>Phase 0 · feel prototype</p></div>
+
+<aside class="panel" id="panel" aria-label="Matter controls">
+  <div class="group"><span class="label">Shape</span>
+    <div class="seg" data-key="shape"><button type="button" data-v="blob" aria-pressed="true">Soft blob</button><button type="button" data-v="knot" aria-pressed="false">Torus knot</button><button type="button" data-v="sphere" aria-pressed="false">Sphere</button></div></div>
+  <div class="group"><span class="label">Form</span>
+    <div class="seg" data-key="form"><button type="button" data-v="0" aria-pressed="false">Solid</button><button type="button" data-v="1" aria-pressed="false">Liquid</button><button type="button" data-v="2" aria-pressed="true">Gas</button></div></div>
+  <div class="group"><label class="label" for="disperse">Disperse <output id="disperseOut">0.00</output></label>
+    <input id="disperse" type="range" min="0" max="1" step="0.001" value="0"></div>
+  <div class="group"><span class="label">Motion</span>
+    <div class="seg" data-key="motion"><button type="button" data-v="manual" aria-pressed="false">Manual</button><button type="button" data-v="loop" aria-pressed="true">Loop</button><button type="button" data-v="hover" aria-pressed="false">Hover</button></div>
+    <p class="note" id="motionNote">Breathes apart and back together.</p></div>
+  <div class="group"><span class="label">Cursor</span>
+    <div class="seg" data-key="cursor"><button type="button" data-v="0" aria-pressed="true">Push</button><button type="button" data-v="1" aria-pressed="false">Attract</button><button type="button" data-v="2" aria-pressed="false">Vortex</button><button type="button" data-v="3" aria-pressed="false">Scatter</button><button type="button" data-v="4" aria-pressed="false">Wake</button><button type="button" data-v="5" aria-pressed="false">Off</button></div>
+    <p class="note" id="cursorNote">Moves particles out of the way.</p></div>
+  <div class="group"><label class="label" for="strength">Strength <output id="strengthOut">1.00</output></label>
+    <input id="strength" type="range" min="0" max="1.5" step="0.01" value="1"></div>
+  <div class="group"><label class="label" for="radius">Radius <output id="radiusOut">0.22</output></label>
+    <input id="radius" type="range" min="0.08" max="0.5" step="0.01" value="0.22"></div>
+  <div class="group"><label class="label" for="haze">Haze <output id="hazeOut">0.60</output></label>
+    <input id="haze" type="range" min="0" max="1" step="0.01" value="0.6"></div>
+  <div class="group"><span class="label">Palette</span>
+    <div class="seg" data-key="palette"><button type="button" data-v="whisper" aria-pressed="true">Whisper</button><button type="button" data-v="ink" aria-pressed="false">Ink</button><button type="button" data-v="neon" aria-pressed="false">Neon</button><button type="button" data-v="drift" aria-pressed="false">Drift</button></div></div>
+  <div class="group"><span class="label">Particles</span>
+    <div class="seg" data-key="density"><button type="button" data-v="25000" aria-pressed="false">Low</button><button type="button" data-v="60000" aria-pressed="true">Med</button><button type="button" data-v="120000" aria-pressed="false">High</button></div></div>
+</aside>
+<div class="hint"><button type="button" id="toggle" aria-controls="panel" aria-expanded="true">Hide tools</button><span>Drag to orbit · move to push · H hides tools</span></div>
+<div id="fail" hidden>This prototype needs WebGL, which isn't available in this browser.</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const canvas = document.getElementById('stage');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); }
+catch { document.getElementById('fail').hidden = false; throw new Error('no webgl'); }
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.92;
+
+// Software rasterisers (headless QA, old GPUs) get the light tier by default.
+const gl = renderer.getContext();
+const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+const gpu = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
+const softwareGL = /SwiftShader|llvmpipe|Software/i.test(gpu);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+camera.position.set(0, 0.35, 8.6);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.enablePan = false; controls.minDistance = 4; controls.maxDistance = 12;
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+// ---------- palettes (linefield preset names) ----------
+const PALETTES = {
+  whisper: { bgIn: '#1d1a36', bgOut: '#05040a', a: '#bfb6ff', b: '#f6f3ff', c: '#5b54a8', mesh: '#958cd6', haze: '#8c84d6' },
+  ink:     { bgIn: '#16151a', bgOut: '#020203', a: '#d9d4c7', b: '#ffffff', c: '#4d4a45', mesh: '#bdb8ab', haze: '#8d8a83' },
+  neon:    { bgIn: '#220a33', bgOut: '#04020a', a: '#ff4fd8', b: '#49e6ff', c: '#5a22e0', mesh: '#b76bff', haze: '#b04fff' },
+  drift:   { bgIn: '#2a150c', bgOut: '#060302', a: '#ffad66', b: '#ffe2b8', c: '#a53b33', mesh: '#e39a62', haze: '#d0704a' },
+};
+function backdrop(p) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+  const g = c.getContext('2d');
+  const rg = g.createRadialGradient(256, 236, 10, 256, 256, 380);
+  rg.addColorStop(0, p.bgIn); rg.addColorStop(1, p.bgOut);
+  g.fillStyle = rg; g.fillRect(0, 0, 512, 512);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+// ---------- GLSL noise (Ashima simplex 3D, MIT) ----------
+const NOISE = `
+vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
+vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
+vec4 permute(vec4 x){return mod289(((x*34.)+1.)*x);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-.85373472095314*r;}
+float snoise(vec3 v){const vec2 C=vec2(1./6.,1./3.);const vec4 D=vec4(0.,.5,1.,2.);
+vec3 i=floor(v+dot(v,C.yyy));vec3 x0=v-i+dot(i,C.xxx);vec3 g=step(x0.yzx,x0.xyz);vec3 l=1.-g;
+vec3 i1=min(g.xyz,l.zxy);vec3 i2=max(g.xyz,l.zxy);vec3 x1=x0-i1+C.xxx;vec3 x2=x0-i2+C.yyy;vec3 x3=x0-D.yyy;
+i=mod289(i);vec4 p=permute(permute(permute(i.z+vec4(0.,i1.z,i2.z,1.))+i.y+vec4(0.,i1.y,i2.y,1.))+i.x+vec4(0.,i1.x,i2.x,1.));
+float n_=.142857142857;vec3 ns=n_*D.wyz-D.xzx;vec4 j=p-49.*floor(p*ns.z*ns.z);vec4 x_=floor(j*ns.z);vec4 y_=floor(j-7.*x_);
+vec4 x=x_*ns.x+ns.yyyy;vec4 y=y_*ns.x+ns.yyyy;vec4 h=1.-abs(x)-abs(y);vec4 b0=vec4(x.xy,y.xy);vec4 b1=vec4(x.zw,y.zw);
+vec4 s0=floor(b0)*2.+1.;vec4 s1=floor(b1)*2.+1.;vec4 sh=-step(h,vec4(0.));vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+vec3 p0=vec3(a0.xy,h.x);vec3 p1=vec3(a0.zw,h.y);vec3 p2=vec3(a1.xy,h.z);vec3 p3=vec3(a1.zw,h.w);
+vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+vec4 m=max(.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.);m=m*m;
+return 42.*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));}
+vec3 field(vec3 p,float t){return vec3(snoise(p+vec3(0.,0.,t)),snoise(p+vec3(31.4,0.,t)),snoise(p+vec3(0.,47.2,t)));}
+float reachAt(vec2 ndc,vec2 ptr,float aspect,float k){vec2 q=ndc-ptr;q.x*=aspect;return exp(-dot(q,q)*k);}
+vec3 rotY(vec3 v,float a){float c=cos(a),s=sin(a);return vec3(c*v.x+s*v.z,v.y,-s*v.x+c*v.z);}
+vec3 rotAxis(vec3 v,vec3 a,float ang){return v*cos(ang)+cross(a,v)*sin(ang)+a*dot(a,v)*(1.-cos(ang));}
+// Liquid body in object space: slumps under its own weight, runs into smooth drips on the
+// lower half, and spreads into a pool where it meets the floor.
+vec3 liquidAt(vec3 p,float e,float t){
+  // In the last stretch of Disperse the body stops moving and slumps flat: a puddle is the end.
+  float settle=smoothstep(.6,1.,e);
+  vec3 q=p+field(p*1.1,t*.25)*.14*e*(1.-.45*e)*(1.-.9*settle);
+  float sag=.5+.5*snoise(p*1.3+7.);
+  q.y-=e*(.6+sag*.7)*(1.+(1.-p.y)*.3);
+  q.y-=smoothstep(.2,.7,snoise(vec3(p.xz*1.8,4.2)))*smoothstep(.3,-.9,p.y)*e*.9;
+  q.y-=settle*1.6;
+  float floorY=-1.5;
+  // Below the floor, matter spreads outward; what arrives last sits highest, so the puddle domes slightly.
+  if(q.y<floorY){float over=floorY-q.y;q.xz*=1.+over*.45;q.y=floorY+.2*(1.-smoothstep(0.,2.6,over))+sin(over*9.+t*2.)*.01*(1.-settle);}
+  return q;
+}
+`;
+
+// ---------- matter particles ----------
+const matterUniforms = {
+  uTime: { value: 0 }, uDisperse: { value: 0 }, uState: { value: 2 }, uSpin: { value: 0 },
+  uSize: { value: 0.022 }, uScale: { value: 400 }, uPixelRatio: { value: renderer.getPixelRatio() },
+  uPointer: { value: new THREE.Vector2(9, 9) }, uAspect: { value: 1 }, uPush: { value: 0 },
+  uMode: { value: 0 }, uStrength: { value: 1 }, uReachK: { value: 20.7 },
+  uTrail: { value: Array.from({ length: 16 }, () => new THREE.Vector3(9, 9, 0)) },
+  uOpacity: { value: 1 }, uColA: { value: new THREE.Color() }, uColB: { value: new THREE.Color() }, uColC: { value: new THREE.Color() },
+};
+// One vertex program places every particle for every Form. The sprite pass draws glows
+// (Solid, Gas); with DEPTH_PASS the same positions are drawn as spheres for the liquid.
+const MATTER_VS = `
+uniform float uTime,uDisperse,uState,uSpin,uSize,uScale,uPixelRatio,uAspect,uPush,uStrength,uReachK;
+uniform int uMode; uniform vec2 uPointer; uniform vec3 uTrail[16];
+attribute float aSeed; attribute vec3 aNormal; attribute vec3 aChunkC; attribute vec4 aChunkR;
+varying float vAlpha; varying float vSeed; varying float vDepth; varying float vBoost;
+#ifdef DEPTH_PASS
+uniform float uRadius, uDepthScale; varying vec3 vCenter; varying float vRad;
+#endif
+${NOISE}
+void main(){
+  float t=uTime;
+  vec3 p=rotY(position,uSpin);
+  // Scatter and Wake break the form apart locally: the cursor's reach, measured on the
+  // undisturbed form, adds to Disperse for the particles under it.
+  vec4 c0=projectionMatrix*modelViewMatrix*vec4(p,1.); vec2 n0=c0.xy/c0.w;
+  float wS=clamp(1.-uState,0.,1.); float wG=clamp(uState-1.,0.,1.); float wL=1.-wS-wG;
+  // Liquid reacts to a tighter cursor (about 0.6x the radius) so a touch disturbs less of the body.
+  float reachK=uReachK*mix(1.,2.8,wL);
+  float local=0.;
+  if(uMode<4) local=reachAt(n0,uPointer,uAspect,reachK)*uPush*(uMode==3?1.:.45);
+  if(uMode==4){for(int i=0;i<16;i++){local=max(local,reachAt(n0,uTrail[i].xy,uAspect,reachK*1.4)*uTrail[i].z);}}
+  local*=uStrength;
+  float d=clamp(uDisperse+local,0.,1.); float e=d*d*(3.-2.*d); vec3 n=rotY(aNormal,uSpin); vec3 cc=rotY(aChunkC,uSpin);
+  vec3 idle=n*snoise(p*2.+t*.4)*.02;
+  // solid: shatter into tumbling chunks, then crumble. Each particle has its own
+  // detach point, earlier near a chunk's edge, after which it flakes off and drifts as
+  // grit on the same currents as Gas. Full disperse is mostly dust with a few survivors.
+  vec3 axis=normalize(aChunkR.xyz+1e-4);
+  vec3 sp=cc+rotAxis(p-cc,axis,e*(1.2+aChunkR.w*3.5))+normalize(cc+1e-4)*e*(.7+aChunkR.w*2.);
+  sp.y-=e*e*.5;
+  float th=.15+aSeed*.85-min(length(position-aChunkC),.6)*.45;
+  float er=smoothstep(th,th+.3,e);
+  vec3 dust=sp+field(p*1.3+aSeed*2.,t*.14)*e*.8+normalize(p+1e-4)*e*aSeed*.5;
+  dust.y+=e*aSeed*.35;
+  sp=mix(sp,dust,er);
+  // liquid: the body slumps, runs and pools; about one in twenty particles breaks off as a drop
+  // that falls on its own loop and rejoins the pool
+  float drop=step(.94,aSeed);
+  vec3 lp=rotY(liquidAt(position,e,t),uSpin);
+  float dropOn=drop*(1.-smoothstep(.6,1.,e)); // no drops once it has settled into a puddle
+  lp+=n*dropOn*e*(.06+aSeed*.18);
+  lp.y-=dropOn*e*fract(t*.22+aSeed*7.)*1.3; lp.y=max(lp.y,-1.5);
+  // gas: diffuse outward, curl into fine wisps, rise, thin out
+  vec3 gp=p+normalize(p+1e-4)*e*(.3+aSeed*1.)+field(p*.7+aSeed,t*.12)*e*.85;
+  gp+=field(p*2.4+aSeed*3.,t*.35)*e*.32;
+  gp.y+=e*aSeed*.9;
+  gp+=field(p*1.6,t*.3)*.035*(1.-e);
+  vec3 pos=sp*wS+lp*wL+gp*wG+idle*(1.-e);
+  vec4 mv=modelViewMatrix*vec4(pos,1.);
+  vec4 clip=projectionMatrix*mv;
+  vec2 ndc=clip.xy/clip.w; vec2 dv=ndc-uPointer; dv.x*=uAspect;
+  float fall=(uMode<3?exp(-dot(dv,dv)*reachK):0.)*uPush*uStrength;
+  vec2 dir=dv/max(length(dv),1e-4); vec2 tang=vec2(-dir.y,dir.x); dir.x/=uAspect; tang.x/=uAspect;
+  if(uMode==0) mv.xy+=dir*fall*.55*(.4+aSeed);                                   // push away
+  if(uMode==1) mv.xy-=dir*fall*.5*(.4+aSeed)*smoothstep(0.,.12,length(dv));       // gather in
+  if(uMode==2) mv.xy+=(tang*.75-dir*.15)*fall*(.4+aSeed);                          // swirl round
+  gl_Position=projectionMatrix*mv;
+#ifdef DEPTH_PASS
+  float rad=uRadius*(.75+aSeed*.5)*mix(1.,.85,drop);
+  gl_PointSize=2.*rad*uDepthScale/-mv.z; vCenter=mv.xyz; vRad=rad;
+#else
+  float size=uSize*(1.-wG*.45)*(1.-wS*er*.4)*(1.+fall*1.2)*(.55+aSeed*.9);
+  gl_PointSize=size*uPixelRatio*uScale/-mv.z;
+#endif
+  vAlpha=mix(.6,1.,e)*(1.-wG*e*.5)*(1.-wL); vSeed=aSeed; vDepth=-mv.z;
+  vBoost=1.+min(local,1.)*5.+fall*1.5; // particles the cursor touches show even while the surface is up
+}`;
+const matterMaterial = new THREE.ShaderMaterial({
+  uniforms: matterUniforms, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  vertexShader: MATTER_VS,
+  fragmentShader: `
+uniform vec3 uColA,uColB,uColC; uniform float uOpacity;
+varying float vAlpha; varying float vSeed; varying float vDepth; varying float vBoost;
+void main(){
+  vec2 c=gl_PointCoord-.5; float r=dot(c,c)*4.; if(r>1.)discard;
+  float a=exp(-r*3.2)*vAlpha*uOpacity*vBoost;
+  vec3 col=mix(uColA,uColB,smoothstep(.2,.95,vSeed));
+  col=mix(col,uColC,smoothstep(6.5,9.5,vDepth)*.6);
+  gl_FragColor=vec4(col,a);
+}`,
+});
+let points = null;
+
+// ---------- liquid: screen-space fluid ----------
+// Particles are drawn as spheres into a depth image, the depth is blurred (edge-aware) so
+// neighbouring spheres merge into one surface, and that surface is shaded as clear liquid:
+// it refracts the scene behind it, reflects at grazing angles and catches sharp highlights.
+const depthUniforms = { ...matterUniforms, uRadius: { value: 0.062 }, uDepthScale: { value: 300 }, uProj: { value: new THREE.Matrix4() } };
+const depthMaterial = new THREE.ShaderMaterial({
+  uniforms: depthUniforms, defines: { DEPTH_PASS: '' }, vertexShader: MATTER_VS,
+  fragmentShader: `uniform mat4 uProj; varying vec3 vCenter; varying float vRad;
+void main(){
+  vec2 c=gl_PointCoord*2.-1.; c.y=-c.y; float r2=dot(c,c); if(r2>1.)discard;
+  vec3 vp=vCenter+vec3(c,sqrt(1.-r2))*vRad;
+  vec4 cp=uProj*vec4(vp,1.); gl_FragDepth=(cp.z/cp.w)*.5+.5;
+  gl_FragColor=vec4(-vp.z,1.,0.,1.);
+}`,
+});
+const thickMaterial = new THREE.ShaderMaterial({
+  uniforms: depthUniforms, defines: { DEPTH_PASS: '' }, vertexShader: MATTER_VS,
+  transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
+  fragmentShader: `varying vec3 vCenter; varying float vRad;
+void main(){ vec2 c=gl_PointCoord*2.-1.; float r2=dot(c,c); if(r2>1.)discard; gl_FragColor=vec4(2.*sqrt(1.-r2)*vRad,0.,0.,1.); }`,
+});
+const QUAD_VS = `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`;
+class FluidPass extends Pass {
+  constructor() {
+    super();
+    // Full float: half float terraces depth at this distance, which shows as stripes.
+    const opts = { type: THREE.FloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter };
+    this.depthRT = new THREE.WebGLRenderTarget(1, 1, { ...opts, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: true });
+    this.blurA = new THREE.WebGLRenderTarget(1, 1, { ...opts, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
+    this.blurB = this.blurA.clone();
+    this.thickRT = new THREE.WebGLRenderTarget(1, 1, { ...opts, type: THREE.HalfFloatType, depthBuffer: false });
+    this.thickScene = new THREE.Scene();
+    this.thickPoints = new THREE.Points(new THREE.BufferGeometry(), thickMaterial);
+    this.thickPoints.frustumCulled = false; this.thickScene.add(this.thickPoints);
+    this.liquidScene = new THREE.Scene();
+    this.liquidPoints = new THREE.Points(new THREE.BufferGeometry(), depthMaterial);
+    this.liquidPoints.frustumCulled = false; this.liquidScene.add(this.liquidPoints);
+    this.blurMat = new THREE.ShaderMaterial({
+      uniforms: { tIn: { value: null }, uStep: { value: new THREE.Vector2() }, uFalloff: { value: 6 } },
+      vertexShader: QUAD_VS,
+      fragmentShader: `uniform sampler2D tIn; uniform vec2 uStep; uniform float uFalloff; varying vec2 vUv;
+void main(){
+  float d0=texture2D(tIn,vUv).r; float cov=0.,cw=0.,ds=0.,dw=0.;
+  for(int i=-7;i<=7;i++){
+    vec4 s=texture2D(tIn,vUv+uStep*float(i)); float g=exp(-float(i*i)/24.);
+    cov+=s.g*g; cw+=g;
+    if(s.r>0. && d0>0.){ float k=(s.r-d0)*uFalloff; float w=g*exp(-k*k); ds+=s.r*w; dw+=w; }
+  }
+  gl_FragColor=vec4(d0>0.&&dw>0.?ds/dw:0.,cov/cw,0.,1.);
+}`,
+    });
+    this.compMat = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, tFluid: { value: null }, tThick: { value: null }, uTexel: { value: new THREE.Vector2() }, uTan: { value: new THREE.Vector2(1, 1) },
+        uMix: { value: 0 }, uTime: { value: 0 }, uShimmer: { value: 0 }, uTint: { value: new THREE.Color() }, uSkyLo: { value: new THREE.Color() }, uSkyHi: { value: new THREE.Color() } },
+      vertexShader: QUAD_VS,
+      fragmentShader: `uniform sampler2D tDiffuse,tFluid,tThick; uniform vec2 uTexel,uTan; uniform float uMix,uTime,uShimmer; uniform vec3 uTint,uSkyLo,uSkyHi; varying vec2 vUv;
+vec3 vpos(vec2 uv,float d){ return vec3((uv*2.-1.)*uTan,-1.)*d; }
+vec3 edge(vec2 uv,vec3 P,vec2 o){
+  float a=texture2D(tFluid,uv+o).r, b=texture2D(tFluid,uv-o).r;
+  vec3 f=a>0.?vpos(uv+o,a)-P:vec3(0.), r=b>0.?P-vpos(uv-o,b):vec3(0.);
+  if(a<=0.) return r; if(b<=0.) return f; return abs(r.z)<abs(f.z)?r:f;
+}
+void main(){
+  vec4 scene=texture2D(tDiffuse,vUv); vec4 fl=texture2D(tFluid,vUv);
+  float cov=smoothstep(.3,.62,fl.g)*uMix;
+  if(fl.r<=0.||cov<=0.){ gl_FragColor=scene; return; }
+  vec3 P=vpos(vUv,fl.r);
+  // A lone droplet pixel has no neighbours to take a slope from; face it at the camera
+  // rather than normalising a zero vector (NaN, which the glow pass would spread).
+  vec3 cr=cross(edge(vUv,P,vec2(uTexel.x,0.)),edge(vUv,P,vec2(0.,uTexel.y)));
+  vec3 N=dot(cr,cr)>1e-12?normalize(cr):vec3(0.,0.,1.);
+  if(N.z<0.) N=-N;
+  // A settled puddle shimmers: slow crossing ripples tilt the normals of up-facing liquid.
+  if(uShimmer>0.){
+    float up=smoothstep(.3,.8,N.y);
+    vec2 w=vec2(sin(vUv.x*95.+uTime*1.6+sin(vUv.y*55.+uTime*.9)*1.6),sin(vUv.y*120.-uTime*1.3+sin(vUv.x*65.-uTime*.7)*1.4));
+    N=normalize(N+vec3(w.x,0.,w.y)*.08*uShimmer*up);
+  }
+  vec3 V=normalize(-P); float ndv=max(dot(N,V),0.);
+  float fres=.03+.97*pow(1.-ndv,5.);
+  // Body: thicker liquid absorbs more of what's behind it and glows more with its own
+  // colour, so a pool reads dense and a drop or thin edge stays clear.
+  float th=texture2D(tThick,vUv).r;
+  vec3 behind=texture2D(tDiffuse,clamp(vUv+N.xy*.09,0.,1.)).rgb;
+  vec3 absorb=exp(-(vec3(1.)-uTint)*th*2.6);
+  vec3 body=behind*absorb+uTint*(1.-exp(-th*1.4))*.36;
+  vec3 refl=mix(uSkyLo,uSkyHi,N.y*.5+.5)*1.4;
+  vec3 L1=normalize(vec3(-.45,.75,.55)), L2=normalize(vec3(.6,.2,.8));
+  // Highlights fade out toward the silhouette, where normals from the depth edge are unreliable.
+  float inner=smoothstep(.62,.95,fl.g);
+  float spec=(pow(max(dot(N,normalize(L1+V)),0.),90.)*1.8+pow(max(dot(N,normalize(L2+V)),0.),28.)*.35)*inner;
+  vec3 col=mix(body,refl,fres*inner)+spec+uTint*pow(1.-ndv,3.)*.3;
+  if(any(isnan(col))||any(isinf(col))) col=scene.rgb; // never let one bad pixel reach the glow pass
+  gl_FragColor=vec4(mix(scene.rgb,col,cov),scene.a);
+}`,
+    });
+    this.quad = new FullScreenQuad(null);
+    this.clear = new THREE.Color();
+  }
+  setSize(w, h) {
+    const rw = Math.max(1, Math.round(w)), rh = Math.max(1, Math.round(h)); // full resolution: half res showed as stair-steps
+    this.depthRT.setSize(rw, rh); this.blurA.setSize(rw, rh); this.blurB.setSize(rw, rh);
+    this.thickRT.setSize(Math.max(1, Math.round(w / 2)), Math.max(1, Math.round(h / 2)));
+    this.compMat.uniforms.uTexel.value.set(1 / rw, 1 / rh);
+    this.texel = new THREE.Vector2(1 / rw, 1 / rh);
+    depthUniforms.uDepthScale.value = rh / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+  }
+  render(renderer, writeBuffer, readBuffer) {
+    renderer.getClearColor(this.clear); const alpha = renderer.getClearAlpha();
+    renderer.setClearColor(0x000000, 0);
+    renderer.setRenderTarget(this.depthRT); renderer.clear(); renderer.render(this.liquidScene, camera);
+    renderer.setRenderTarget(this.thickRT); renderer.clear(); renderer.render(this.thickScene, camera);
+    let src = this.depthRT;
+    const passes = []; for (let i = 0; i < 5; i++) passes.push([this.blurA, [1, 0]], [this.blurB, [0, 1]]);
+    for (const [dst, dir] of passes) {
+      this.blurMat.uniforms.tIn.value = src.texture;
+      // Dense taps: skipping pixels between taps aliased into a fine checker on the surface.
+      this.blurMat.uniforms.uStep.value.set(dir[0] * this.texel.x * 1.4, dir[1] * this.texel.y * 1.4);
+      this.quad.material = this.blurMat; renderer.setRenderTarget(dst); this.quad.render(renderer); src = dst;
+    }
+    renderer.setClearColor(this.clear, alpha);
+    this.compMat.uniforms.tDiffuse.value = readBuffer.texture; this.compMat.uniforms.tFluid.value = src.texture;
+    this.compMat.uniforms.tThick.value = this.thickRT.texture;
+    this.quad.material = this.compMat;
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer); this.quad.render(renderer);
+  }
+}
+const fluidPass = new FluidPass();
+
+// ---------- solid surface ----------
+const meshMaterial = new THREE.MeshPhysicalMaterial({ roughness: 0.32, metalness: 0.15, clearcoat: 0.7, clearcoatRoughness: 0.2, envMapIntensity: 0.7, transparent: true });
+let mesh = null;
+// uHoleMode: 0 off, 1 push, 2 attract, 3 vortex, 4 scatter, 5 wake (cursor mode + 1).
+const holeUniforms = { uHoleMode: { value: 0 }, uBuf: { value: new THREE.Vector2(1, 1) }, uBreak: { value: 0 } };
+meshMaterial.onBeforeCompile = (shader) => {
+  Object.assign(shader.uniforms, holeUniforms);
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vObj;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObj = position;');
+  Object.assign(shader.uniforms, { uPointer: matterUniforms.uPointer, uAspect: matterUniforms.uAspect, uPush: matterUniforms.uPush,
+    uStrength: matterUniforms.uStrength, uReachK: matterUniforms.uReachK, uTrail: matterUniforms.uTrail });
+  shader.fragmentShader = shader.fragmentShader.replace(/void main\(\)\s*\{/, `uniform int uHoleMode; uniform vec2 uBuf, uPointer; uniform float uAspect, uPush, uStrength, uReachK, uBreak; uniform vec3 uTrail[16];
+varying vec3 vObj;
+${NOISE}
+float hhash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+void main() {
+  // Breaking: the surface stays fully solid but cracks away in ragged patches, so there is
+  // never a see-through shell with the particle form showing inside it.
+  if(uBreak>0.){ float k=snoise(vObj*2.3)*.5+.5+snoise(vObj*7.5)*.12; if(k<uBreak) discard; }
+  if(uHoleMode>0){
+    vec2 ndc=gl_FragCoord.xy/uBuf*2.-1.; float h=0.;
+    if(uHoleMode<=4) h=reachAt(ndc,uPointer,uAspect,uReachK)*uPush*(uHoleMode==4?1.:.45);
+    if(uHoleMode==5){for(int i=0;i<16;i++){h=max(h,reachAt(ndc,uTrail[i].xy,uAspect,uReachK*1.4)*uTrail[i].z);}}
+    vec2 f=gl_FragCoord.xy; float wob=sin(f.x*.11+sin(f.y*.05)*2.)*sin(f.y*.13+sin(f.x*.04)*2.);
+    if(h*uStrength>.24+.1*wob+.05*hhash(f)) discard;
+  }`);
+};
+const rim = new THREE.DirectionalLight(0xffffff, 1.4); rim.position.set(-3, 2, -2); scene.add(rim);
+const key = new THREE.DirectionalLight(0xffffff, 0.6); key.position.set(2, 3, 4); scene.add(key);
+
+// ---------- haze ----------
+const HAZE_N = 220;
+const hazeGeo = new THREE.BufferGeometry();
+{
+  const pos = new Float32Array(HAZE_N * 3), seed = new Float32Array(HAZE_N);
+  for (let i = 0; i < HAZE_N; i++) {
+    const r = 0.6 + Math.random() * 2.6, th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+    pos[i * 3] = r * Math.sin(ph) * Math.cos(th); pos[i * 3 + 1] = r * Math.cos(ph) * 0.7; pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+    seed[i] = Math.random();
+  }
+  hazeGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  hazeGeo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+}
+const hazeUniforms = { uTime: { value: 0 }, uAmount: { value: 0.6 }, uScale: matterUniforms.uScale, uPixelRatio: matterUniforms.uPixelRatio, uCol: { value: new THREE.Color() } };
+const haze = new THREE.Points(hazeGeo, new THREE.ShaderMaterial({
+  uniforms: hazeUniforms, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  vertexShader: `uniform float uTime,uScale,uPixelRatio; attribute float aSeed; varying float vSeed;
+${NOISE}
+void main(){ vec3 p=position+field(position*.3+aSeed*4.,uTime*.05)*.6; vec4 mv=modelViewMatrix*vec4(p,1.);
+gl_Position=projectionMatrix*mv; gl_PointSize=(1.1+aSeed*1.6)*uPixelRatio*uScale/-mv.z; vSeed=aSeed; }`,
+  fragmentShader: `uniform vec3 uCol; uniform float uAmount; varying float vSeed;
+void main(){ vec2 c=gl_PointCoord-.5; float r=dot(c,c)*4.; if(r>1.)discard; float a=exp(-r*2.6)*.022*uAmount*(.5+vSeed); gl_FragColor=vec4(uCol,a); }`,
+}));
+scene.add(haze);
+
+// ---------- far dust ----------
+const DUST_N = 3500;
+const dustGeo = new THREE.BufferGeometry();
+{
+  const pos = new Float32Array(DUST_N * 3);
+  for (let i = 0; i < DUST_N; i++) {
+    const r = 15 + Math.random() * 20, th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+    pos[i * 3] = r * Math.sin(ph) * Math.cos(th); pos[i * 3 + 1] = r * Math.cos(ph); pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+  }
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+}
+function dot() {
+  const c = document.createElement('canvas'); c.width = c.height = 32;
+  const g = c.getContext('2d'); const rg = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  rg.addColorStop(0, '#fff'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(c);
+}
+const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ size: 0.11, map: dot(), sizeAttenuation: true, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending }));
+scene.add(dust);
+
+// ---------- shapes ----------
+function softBlob() {
+  const g = new THREE.SphereGeometry(1, 180, 140);
+  const p = g.attributes.position, v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    const k = 1 + 0.16 * Math.sin(2.6 * v.x + 1.1) * Math.sin(2.2 * v.y + 0.4) * Math.sin(2.4 * v.z + 2.0)
+              + 0.07 * Math.sin(4.3 * v.y + 3.0 * v.x) + 0.05 * Math.cos(3.7 * v.z - 2.1 * v.y);
+    v.multiplyScalar(k); p.setXYZ(i, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals(); return g;
+}
+const SHAPES = {
+  blob: () => softBlob(),
+  knot: () => new THREE.TorusKnotGeometry(0.72, 0.24, 360, 48),
+  sphere: () => new THREE.SphereGeometry(1, 160, 120),
+};
+
+function buildMatter(shapeId, count) {
+  if (points) { scene.remove(points); points.geometry.dispose(); }
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); }
+  const geo = SHAPES[shapeId]();
+  mesh = new THREE.Mesh(geo, meshMaterial); scene.add(mesh);
+  const sampler = new MeshSurfaceSampler(new THREE.Mesh(geo)).build();
+  const pos = new Float32Array(count * 3), nor = new Float32Array(count * 3), seed = new Float32Array(count);
+  const chunkC = new Float32Array(count * 3), chunkR = new Float32Array(count * 4);
+  const p = new THREE.Vector3(), n = new THREE.Vector3();
+  // Fragments: a weighted scatter of seeds (a few large slabs, more medium pieces, many
+  // small chips) carves the form into irregular cells of mixed size; warping each point
+  // by smooth noise before the lookup rags the cell edges. Some points break off alone.
+  const seeds = [];
+  const thin = shapeId === 'knot' ? 0.3 : 1;
+  for (const [nSeeds, weight, travel] of [[5, 0.26, 0.12], [16, 0.08, 0.42], [60, 0.018, 0.75]]) {
+    for (let k = 0; k < nSeeds; k++) {
+      sampler.sample(p, n); p.addScaledVector(n, -Math.random() * 0.5 * thin);
+      seeds.push([p.x, p.y, p.z, weight, Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5, Math.min(0.95, travel + Math.random() * 0.2)]);
+    }
+  }
+  const warp = (x, y, z, o) => 0.13 * Math.sin(3.1 * x + 1.7 * z + o) * Math.cos(2.7 * y - 1.3 * x + o * 0.5);
+  for (let i = 0; i < count; i++) {
+    sampler.sample(p, n);
+    // A third of the points fill the inside, so a broken form has body, not just a skin.
+    if (Math.random() < 0.33) p.addScaledVector(n, -Math.random() * (shapeId === 'knot' ? 0.22 : 0.85) * Math.random());
+    pos.set([p.x, p.y, p.z], i * 3); nor.set([n.x, n.y, n.z], i * 3); seed[i] = Math.random();
+    if (Math.random() < 0.12) { // a loose speck: its own piece, flies furthest
+      chunkC.set([p.x, p.y, p.z], i * 3); chunkR.set([Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5, 1], i * 4);
+      continue;
+    }
+    const wx = p.x + warp(p.x, p.y, p.z, 0), wy = p.y + warp(p.y, p.z, p.x, 2.1), wz = p.z + warp(p.z, p.x, p.y, 4.3);
+    let best = 0, bestD = Infinity;
+    for (let k = 0; k < seeds.length; k++) {
+      const sd = seeds[k]; const dx = wx - sd[0], dy = wy - sd[1], dz = wz - sd[2];
+      const dd = dx * dx + dy * dy + dz * dz - sd[3];
+      if (dd < bestD) { bestD = dd; best = k; }
+    }
+    const sd = seeds[best];
+    chunkC.set([sd[0], sd[1], sd[2]], i * 3); chunkR.set([sd[4], sd[5], sd[6], sd[7]], i * 4);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('aNormal', new THREE.BufferAttribute(nor, 3));
+  g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  g.setAttribute('aChunkC', new THREE.BufferAttribute(chunkC, 3));
+  g.setAttribute('aChunkR', new THREE.BufferAttribute(chunkR, 4));
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 6);
+  points = new THREE.Points(g, matterMaterial); scene.add(points);
+  fluidPass.liquidPoints.geometry = g; fluidPass.thickPoints.geometry = g;
+}
+const GAS_EXTRA = 1.6; // Gas draws this many times the chosen count, at a finer size
+
+// ---------- post ----------
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(fluidPass);
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.42, 0.65, 0.62);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// ---------- grain ----------
+{
+  const g = document.createElement('canvas'); g.width = 180; g.height = 180;
+  const ctx = g.getContext('2d'); const img = ctx.createImageData(180, 180);
+  for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+  ctx.putImageData(img, 0, 0);
+  document.getElementById('grain').style.backgroundImage = `url(${g.toDataURL()})`;
+}
+
+// ---------- state ----------
+const state = {
+  shape: 'blob', form: 2, motion: reduced ? 'manual' : 'loop', palette: 'whisper',
+  density: softwareGL ? 25000 : 60000, haze: 0.6, cursor: 0,
+};
+const CURSOR_NOTES = ['Moves particles out of the way.', 'Gathers particles toward the cursor.', 'Swirls particles around the cursor.',
+  'Breaks the form apart under the cursor, in its current Form.', 'Leaves a trail where the form comes apart, then heals.', 'The cursor leaves the form alone.'];
+const trail = []; const TRAIL_LIFE = 1.4; // seconds a Wake mark takes to heal
+let disperse = 0, formNow = 2, hoverTarget = 0, loopT = 0;
+const pointerNDC = new THREE.Vector2(9, 9); let pointerActive = false;
+
+function applyPalette() {
+  const p = PALETTES[state.palette];
+  matterUniforms.uColA.value.set(p.a); matterUniforms.uColB.value.set(p.b); matterUniforms.uColC.value.set(p.c);
+  hazeUniforms.uCol.value.set(p.haze); meshMaterial.color.set(p.mesh);
+  const cu = fluidPass.compMat.uniforms; cu.uTint.value.set(p.mesh); cu.uSkyLo.value.set(p.bgIn); cu.uSkyHi.value.set(p.b).multiplyScalar(0.55);
+  dust.material.color.set(p.b);
+  if (scene.background) scene.background.dispose();
+  scene.background = backdrop(p);
+  document.documentElement.style.setProperty('--accent', p.a);
+}
+function syncButtons() {
+  for (const seg of document.querySelectorAll('.seg')) {
+    const v = String(state[seg.dataset.key]);
+    for (const b of seg.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === v));
+  }
+  const notes = { manual: 'Drag the Disperse slider.', loop: 'Breathes apart and back together.', hover: 'Comes apart as the cursor nears it.' };
+  document.getElementById('motionNote').textContent = notes[state.motion];
+  document.getElementById('disperse').disabled = state.motion !== 'manual';
+  document.getElementById('cursorNote').textContent = CURSOR_NOTES[state.cursor];
+}
+for (const seg of document.querySelectorAll('.seg')) {
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    const k = seg.dataset.key; const prev = state[k];
+    state[k] = (k === 'form' || k === 'density' || k === 'cursor') ? Number(b.dataset.v) : b.dataset.v;
+    if (k === 'palette') applyPalette();
+    if ((k === 'shape' || k === 'density') && prev !== state[k]) buildMatter(state.shape, Math.round(state.density * GAS_EXTRA));
+    syncButtons();
+  });
+}
+const disperseIn = document.getElementById('disperse'), disperseOut = document.getElementById('disperseOut');
+disperseIn.addEventListener('input', () => { disperse = Number(disperseIn.value); });
+const hazeIn = document.getElementById('haze');
+hazeIn.addEventListener('input', () => { state.haze = Number(hazeIn.value); document.getElementById('hazeOut').textContent = state.haze.toFixed(2); });
+for (const [id, uni] of [['strength', (v) => { matterUniforms.uStrength.value = v; }], ['radius', (v) => { matterUniforms.uReachK.value = 1 / (v * v); }]]) {
+  const el = document.getElementById(id), out = document.getElementById(id + 'Out');
+  el.addEventListener('input', () => { const v = Number(el.value); uni(v); out.textContent = v.toFixed(2); });
+}
+const panel = document.getElementById('panel'), toggle = document.getElementById('toggle');
+function setPanel(open) { panel.hidden = !open; toggle.textContent = open ? 'Hide tools' : 'Show tools'; toggle.setAttribute('aria-expanded', String(open)); }
+toggle.addEventListener('click', () => setPanel(panel.hidden));
+addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'h' && !e.metaKey && !e.ctrlKey && !(e.target instanceof HTMLInputElement)) setPanel(panel.hidden); });
+canvas.addEventListener('pointermove', (e) => {
+  const r = canvas.getBoundingClientRect();
+  pointerNDC.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); pointerActive = true;
+  const lastMark = trail[trail.length - 1];
+  if (!lastMark || Math.hypot(lastMark.x - pointerNDC.x, lastMark.y - pointerNDC.y) > 0.035) {
+    trail.push({ x: pointerNDC.x, y: pointerNDC.y, born: performance.now() / 1000 });
+    if (trail.length > 16) trail.shift();
+  }
+});
+canvas.addEventListener('pointerleave', () => { pointerActive = false; });
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false); composer.setSize(w, h); bloom.setSize(w, h);
+  renderer.getDrawingBufferSize(holeUniforms.uBuf.value);
+  camera.aspect = w / h;
+  // Keep the whole form in frame on narrow screens: pull the camera back as the view narrows.
+  camera.position.setLength(w / h < 0.8 ? 12.5 : 8.6);
+  camera.updateProjectionMatrix();
+  matterUniforms.uScale.value = h / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+  matterUniforms.uAspect.value = w / h;
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  fluidPass.compMat.uniforms.uTan.value.set(tanHalf * camera.aspect, tanHalf);
+}
+addEventListener('resize', resize);
+
+// ---------- loop ----------
+let last = performance.now(), elapsed = 0;
+const ease = (x) => x * x * (3 - 2 * x);
+function frame() {
+  const now = performance.now(); const dt = Math.min((now - last) / 1000, 0.05); last = now; elapsed += dt; const t = elapsed;
+  if (state.motion === 'loop') {
+    loopT = (loopT + dt / 9) % 1; // 9 s cycle: hold, apart, hold, back
+    const ph = loopT;
+    disperse = ph < 0.18 ? 0 : ph < 0.45 ? ease((ph - 0.18) / 0.27) : ph < 0.7 ? 1 : ph < 0.97 ? 1 - ease((ph - 0.7) / 0.27) : 0;
+  } else if (state.motion === 'hover') {
+    const dist = pointerActive ? pointerNDC.length() : 9;
+    hoverTarget = pointerActive ? Math.max(0, Math.min(1, 1.25 - dist * 1.6)) : 0;
+    disperse += (hoverTarget - disperse) * Math.min(1, dt * 2.2);
+  }
+  if (state.motion !== 'manual') disperseIn.value = disperse;
+  disperseOut.textContent = disperse.toFixed(2);
+  formNow += (state.form - formNow) * Math.min(1, dt * 3);
+  if (Math.abs(state.form - formNow) < 0.01) formNow = state.form; // arrive exactly: a sliver of Liquid would leave its surface on
+  const wG = Math.max(0, Math.min(1, formNow - 1)); const wS = Math.max(0, Math.min(1, 1 - formNow)); const wL = 1 - wS - wG;
+  const spin = reduced ? 0 : t * 0.12;
+  matterUniforms.uTime.value = reduced ? 0 : t;
+  matterUniforms.uDisperse.value = disperse;
+  matterUniforms.uState.value = formNow;
+  matterUniforms.uSpin.value = spin;
+  matterUniforms.uPointer.value.copy(pointerNDC);
+  matterUniforms.uMode.value = reduced ? 5 : state.cursor;
+  holeUniforms.uHoleMode.value = reduced || state.cursor === 5 ? 0 : state.cursor + 1;
+  const nowS = now / 1000;
+  matterUniforms.uTrail.value.forEach((v, i) => {
+    const m = trail[trail.length - 1 - i];
+    const life = m ? Math.max(0, 1 - (nowS - m.born) / TRAIL_LIFE) : 0;
+    v.set(m ? m.x : 9, m ? m.y : 9, state.cursor === 4 ? life * life * (3 - 2 * life) : 0);
+  });
+  matterUniforms.uPush.value += ((pointerActive && !reduced ? 1 : 0) - matterUniforms.uPush.value) * Math.min(1, dt * 4);
+  // The surface shows only while the form holds; particles carry it once it moves.
+  // Solid hands its surface over to particles as it breaks; Liquid and Gas have none.
+  const meshOpacity = wS; // fades only when changing Form; breaking is handled by uBreak
+  holeUniforms.uBreak.value = Math.min(1.2, (disperse / 0.33) * 1.2);
+  // The liquid is the particles themselves, so it crossfades with Solid and Gas.
+  fluidPass.enabled = wL > 0.01; fluidPass.compMat.uniforms.uMix.value = wL;
+  fluidPass.compMat.uniforms.uTime.value = t; fluidPass.compMat.uniforms.uShimmer.value = wL * ease(Math.max(0, (disperse - 0.6) / 0.4));
+  depthUniforms.uProj.value.copy(camera.projectionMatrix);
+  meshMaterial.opacity = meshOpacity; if (mesh) { mesh.visible = meshOpacity > 0.01 && holeUniforms.uBreak.value < 1.15; mesh.rotation.y = spin; }
+  // Additive points pile up, so per-point brightness falls as the count rises; they
+  // stay faint while the surface is showing and take over as the form lets go.
+  const drawn = Math.round(state.density * (1 + (GAS_EXTRA - 1) * wG));
+  if (points) points.geometry.setDrawRange(0, drawn);
+  const gain = Math.sqrt(25000 / drawn);
+  matterUniforms.uOpacity.value = gain * (0.035 + 0.2 * Math.max(Math.min(1, disperse * 2.5), wG * 0.8)) * (1 + wL * 1.5 + wG * disperse * 0.5);
+  hazeUniforms.uTime.value = t; hazeUniforms.uAmount.value = state.haze * (0.45 + 0.55 * Math.max(wG * disperse, disperse * 0.6)) * (1 + wG * disperse * 0.3);
+  dust.rotation.y = t * 0.01;
+  controls.update();
+  composer.render();
+  requestAnimationFrame(frame);
+}
+
+applyPalette(); buildMatter(state.shape, Math.round(state.density * GAS_EXTRA)); syncButtons(); resize();
+// On a phone the panel would cover the form, so it starts tucked away.
+if (innerWidth <= 640) setPanel(false);
+if (reduced) document.getElementById('motionNote').textContent = 'Reduced motion is on: drag the Disperse slider.';
+window.__matter = { formNow: () => formNow, state, setDisperse: (v) => { state.motion = 'manual'; disperse = v; syncButtons(); }, gpu, softwareGL,
+  setPointer: (x, y) => { pointerNDC.set(x, y); pointerActive = true; trail.push({ x, y, born: performance.now() / 1000 }); if (trail.length > 16) trail.shift(); } };
+requestAnimationFrame(frame);
+</script>
