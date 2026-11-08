@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry, type Composition } from 'forma';
+import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry, MATTER_DEFAULTS, type Composition, type MatterSettings } from 'forma';
 import { builtInPresets } from 'forma/content';
 import { DefinitionPicker } from './DefinitionPicker';
 import { ParamGroup } from './ParamGroup';
@@ -22,18 +22,22 @@ export interface ControlPanelProps {
   onImportComposition(composition: Composition): void;
   presentation: PresentationState;
   onPresentationChange(patch: Partial<PresentationState>): void;
+  /** `undefined` turns matter off: the object is a plain solid again. */
+  onMatterChange(matter: MatterSettings | undefined): void;
 }
 
-type SectionId = 'presets' | 'shape' | 'material' | 'texture' | 'environment' | 'effects' | 'camera' | 'export';
+type SectionId = 'presets' | 'shape' | 'matter' | 'cursor' | 'material' | 'texture' | 'environment' | 'effects' | 'camera' | 'export';
 type ShapeFilter = 'all' | 'solid' | 'flat' | 'yours';
 
 /** Collapsible sections container: Shape / Material / Environment / Effects / Export.
  * Search box filters visible definitions by label/category (roadmap §6). */
 export function ControlPanel(props: ControlPanelProps) {
-  const { collapsed, composition, scene, presentation, onPresentationChange, onSlotSelect, onParamChange, onEffectStageSelect, onEffectParamChange, onSvgImport, onApplyComposition, onImportComposition } = props;
+  const { collapsed, composition, scene, presentation, onPresentationChange, onSlotSelect, onParamChange, onEffectStageSelect, onEffectParamChange, onSvgImport, onApplyComposition, onImportComposition, onMatterChange } = props;
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     presets: false,
     shape: true,
+    matter: true,
+    cursor: false,
     material: true,
     texture: false,
     environment: false,
@@ -116,6 +120,14 @@ export function ControlPanel(props: ControlPanelProps) {
         <div style={{ marginTop: 14 }}>
           <SvgImport onImport={onSvgImport} />
         </div>
+      </Section>
+
+      <Section id="matter" title="Matter" open={open.matter} onToggle={toggle}>
+        <MatterControls value={composition.matter} onChange={onMatterChange} />
+      </Section>
+
+      <Section id="cursor" title="Cursor" open={open.cursor} onToggle={toggle}>
+        <CursorControls value={composition.matter} onChange={onMatterChange} />
       </Section>
 
       <Section id="material" title="Material" open={isOpen('material', materialRegistry.list())} onToggle={toggle}>
@@ -234,6 +246,68 @@ function SurfacePresets({ selectedId, onSelect }: { selectedId: string; onSelect
         </button>;
       })}
     </div>
+  </div>;
+}
+
+/** One row of mutually exclusive choices, styled like the other filter tabs. */
+function Choice<T extends string>({ label, options, value, onChange }: { label: string; options: readonly (readonly [T, string])[]; value: T; onChange(v: T): void }) {
+  return <div className="filter-tabs" role="radiogroup" aria-label={label}>
+    {options.map(([v, text]) => (
+      <button key={v} type="button" role="radio" aria-checked={value === v} className={value === v ? 'active' : ''} onClick={() => onChange(v)}>{text}</button>
+    ))}
+  </div>;
+}
+
+const FORM_OPTIONS = [['off', 'Off'], ['solid', 'Solid'], ['liquid', 'Liquid'], ['gas', 'Gas']] as const;
+const MOTION_HELP: Record<MatterSettings['motion'], string> = {
+  manual: 'Drag Disperse to take it apart.',
+  loop: 'Breathes apart and back together.',
+  hover: 'Comes apart as the pointer nears it.',
+};
+
+function MatterControls({ value, onChange }: { value: MatterSettings | undefined; onChange(m: MatterSettings | undefined): void }) {
+  const set = (patch: Partial<MatterSettings>) => onChange({ ...(value ?? MATTER_DEFAULTS), ...patch });
+  return <div className="matter-controls">
+    <Choice label="Form" options={FORM_OPTIONS} value={value?.form ?? 'off'} onChange={(v) => (v === 'off' ? onChange(undefined) : set({ form: v }))} />
+    {!value && <p className="control-help">Turn the object into matter that can shatter, melt or drift apart.</p>}
+    {value && <>
+      <label className="param-row">
+        <span className="param-label"><span>Disperse</span><span className="value">{value.disperse.toFixed(2)}</span></span>
+        <input type="range" min="0" max="1" step="0.01" value={value.disperse} aria-label="Disperse" disabled={value.motion !== 'manual'} onChange={(event) => set({ disperse: Number(event.target.value) })} />
+      </label>
+      <Choice label="Motion" options={[['manual', 'Manual'], ['loop', 'Loop'], ['hover', 'Hover']] as const} value={value.motion} onChange={(motion) => set({ motion })} />
+      <p className="control-help">{MOTION_HELP[value.motion]}</p>
+      <Choice label="Particles" options={[['low', 'Low'], ['medium', 'Medium'], ['high', 'High']] as const} value={value.density} onChange={(density) => set({ density })} />
+    </>}
+  </div>;
+}
+
+const CURSOR_OPTIONS = [['push', 'Push'], ['attract', 'Attract'], ['vortex', 'Vortex'], ['scatter', 'Scatter'], ['wake', 'Wake'], ['off', 'Off']] as const;
+const CURSOR_HELP: Record<MatterSettings['cursor'], string> = {
+  push: 'Moves particles out of the way.',
+  attract: 'Gathers particles toward the pointer.',
+  vortex: 'Swirls particles around the pointer.',
+  scatter: 'Breaks the form apart under the pointer.',
+  wake: 'Leaves a trail where the form comes apart, then heals.',
+  off: 'The pointer leaves the form alone.',
+};
+
+function CursorControls({ value, onChange }: { value: MatterSettings | undefined; onChange(m: MatterSettings): void }) {
+  if (!value) return <p className="control-help">Turn on Matter to choose how the pointer plays with the form.</p>;
+  const set = (patch: Partial<MatterSettings>) => onChange({ ...value, ...patch });
+  return <div className="matter-controls">
+    <Choice label="Cursor" options={CURSOR_OPTIONS} value={value.cursor} onChange={(cursor) => set({ cursor })} />
+    <p className="control-help">{CURSOR_HELP[value.cursor]}</p>
+    {value.cursor !== 'off' && <>
+      <label className="param-row">
+        <span className="param-label"><span>Strength</span><span className="value">{value.strength.toFixed(2)}</span></span>
+        <input type="range" min="0" max="1.5" step="0.01" value={value.strength} aria-label="Cursor strength" onChange={(event) => set({ strength: Number(event.target.value) })} />
+      </label>
+      <label className="param-row">
+        <span className="param-label"><span>Radius</span><span className="value">{value.radius.toFixed(2)}</span></span>
+        <input type="range" min="0.08" max="0.5" step="0.01" value={value.radius} aria-label="Cursor radius" onChange={(event) => set({ radius: Number(event.target.value) })} />
+      </label>
+    </>}
   </div>;
 }
 

@@ -20,7 +20,7 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
     rollupOptions: {
-      external: (id) => id === 'three' || id.startsWith('three/') || id === 'cc-webgl',
+      external: (id) => id === 'three' || id.startsWith('three/') || id === 'cc-webgl' || id.startsWith('cc-webgl/'),
       output: {
         preserveModules: true,
         preserveModulesRoot: 'src',
