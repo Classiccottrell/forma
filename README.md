@@ -39,9 +39,10 @@ pad; ordered Texture → Colour → Finish effect stages, including Bloom, Colou
 Film Grain; backdrops, floor shadow, lens/turn/tilt/zoom; and undo/redo. Generic SVG
 import remains a separate upload path.
 
-Live at https://classiccottrell.github.io/forma/. Current milestone: R1, review → polish →
-release. The 2026-10-10 review findings are the polish backlog; see `BRIEF.md` for them, the
-full roadmap, and the dated update log.
+Live at https://classiccottrell.github.io/forma/. Current milestone: V2 — Matter: shapes
+that can hold their form, run like liquid or come apart like gas, inside haze and
+particles, for interactive websites. See `BRIEF.md` for the phased roadmap and the dated
+update log.
 
 The versioned browser bundle contract is `dist/forma.browser.v<package-version>.js`. Copy that file beside generated embed HTML, or pass a hosted URL
 to `generateEmbedCode(composition, { libraryUrl })`. See `examples/embed/index.html` for a local example.
