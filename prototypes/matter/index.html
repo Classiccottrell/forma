@@ -151,12 +151,12 @@ vec3 rotAxis(vec3 v,vec3 a,float ang){return v*cos(ang)+cross(a,v)*sin(ang)+a*do
 // Liquid body in object space: slumps under its own weight, runs into smooth drips on the
 // lower half, and spreads into a pool where it meets the floor.
 vec3 liquidAt(vec3 p,float e,float t){
-  vec3 q=p+field(p*1.1,t*.25)*.14*e;
+  vec3 q=p+field(p*1.1,t*.25)*.14*e*(1.-.45*e); // ripples calm as the melt goes on
   float sag=.5+.5*snoise(p*1.3+7.);
   q.y-=e*(.6+sag*.7)*(1.+(1.-p.y)*.3);
-  q.y-=smoothstep(.2,.7,snoise(vec3(p.xz*1.8,4.2)))*smoothstep(.3,-.9,p.y)*e*1.1;
+  q.y-=smoothstep(.2,.7,snoise(vec3(p.xz*1.8,4.2)))*smoothstep(.3,-.9,p.y)*e*.9;
   float floorY=-1.5;
-  if(q.y<floorY){float over=floorY-q.y;q.y=floorY+sin(over*9.+t*2.)*.01;q.xz*=1.+over*.85;}
+  if(q.y<floorY){float over=floorY-q.y;q.y=floorY+sin(over*9.+t*2.)*.01+over*.12;q.xz*=1.+over*.5;} // a thicker, tighter pool
   return q;
 }
 `;
@@ -187,20 +187,29 @@ void main(){
   // Scatter and Wake break the form apart locally: the cursor's reach, measured on the
   // undisturbed form, adds to Disperse for the particles under it.
   vec4 c0=projectionMatrix*modelViewMatrix*vec4(p,1.); vec2 n0=c0.xy/c0.w;
+  float wS=clamp(1.-uState,0.,1.); float wG=clamp(uState-1.,0.,1.); float wL=1.-wS-wG;
+  // Liquid reacts to a tighter cursor (about 0.6x the radius) so a touch disturbs less of the body.
+  float reachK=uReachK*mix(1.,2.8,wL);
   float local=0.;
-  if(uMode<4) local=reachAt(n0,uPointer,uAspect,uReachK)*uPush*(uMode==3?1.:.45);
-  if(uMode==4){for(int i=0;i<16;i++){local=max(local,reachAt(n0,uTrail[i].xy,uAspect,uReachK*1.4)*uTrail[i].z);}}
+  if(uMode<4) local=reachAt(n0,uPointer,uAspect,reachK)*uPush*(uMode==3?1.:.45);
+  if(uMode==4){for(int i=0;i<16;i++){local=max(local,reachAt(n0,uTrail[i].xy,uAspect,reachK*1.4)*uTrail[i].z);}}
   local*=uStrength;
   float d=clamp(uDisperse+local,0.,1.); float e=d*d*(3.-2.*d); vec3 n=rotY(aNormal,uSpin); vec3 cc=rotY(aChunkC,uSpin);
-  float wS=clamp(1.-uState,0.,1.); float wG=clamp(uState-1.,0.,1.); float wL=1.-wS-wG;
   vec3 idle=n*snoise(p*2.+t*.4)*.02;
-  // solid: shatter into tumbling chunks
+  // solid: shatter into tumbling chunks, then crumble. Each particle has its own
+  // detach point, earlier near a chunk's edge, after which it flakes off and drifts as
+  // grit on the same currents as Gas. Full disperse is mostly dust with a few survivors.
   vec3 axis=normalize(aChunkR.xyz+1e-4);
   vec3 sp=cc+rotAxis(p-cc,axis,e*(1.2+aChunkR.w*3.5))+normalize(cc+1e-4)*e*(.7+aChunkR.w*2.);
   sp.y-=e*e*.5;
-  // liquid: the body slumps, runs and pools; one in ten particles breaks off as a drop
+  float th=.15+aSeed*.85-min(length(position-aChunkC),.6)*.45;
+  float er=smoothstep(th,th+.3,e);
+  vec3 dust=sp+field(p*1.3+aSeed*2.,t*.14)*e*.8+normalize(p+1e-4)*e*aSeed*.5;
+  dust.y+=e*aSeed*.35;
+  sp=mix(sp,dust,er);
+  // liquid: the body slumps, runs and pools; about one in twenty particles breaks off as a drop
   // that falls on its own loop and rejoins the pool
-  float drop=step(.9,aSeed);
+  float drop=step(.94,aSeed);
   vec3 lp=rotY(liquidAt(position,e,t),uSpin);
   lp+=n*drop*e*(.06+aSeed*.18);
   lp.y-=drop*e*fract(t*.22+aSeed*7.)*1.3; lp.y=max(lp.y,-1.5);
@@ -213,7 +222,7 @@ void main(){
   vec4 mv=modelViewMatrix*vec4(pos,1.);
   vec4 clip=projectionMatrix*mv;
   vec2 ndc=clip.xy/clip.w; vec2 dv=ndc-uPointer; dv.x*=uAspect;
-  float fall=(uMode<3?exp(-dot(dv,dv)*uReachK):0.)*uPush*uStrength;
+  float fall=(uMode<3?exp(-dot(dv,dv)*reachK):0.)*uPush*uStrength;
   vec2 dir=dv/max(length(dv),1e-4); vec2 tang=vec2(-dir.y,dir.x); dir.x/=uAspect; tang.x/=uAspect;
   if(uMode==0) mv.xy+=dir*fall*.55*(.4+aSeed);                                   // push away
   if(uMode==1) mv.xy-=dir*fall*.5*(.4+aSeed)*smoothstep(0.,.12,length(dv));       // gather in
@@ -223,7 +232,7 @@ void main(){
   float rad=uRadius*(.75+aSeed*.5)*mix(1.,.85,drop);
   gl_PointSize=2.*rad*uDepthScale/-mv.z; vCenter=mv.xyz; vRad=rad;
 #else
-  float size=uSize*(1.-wG*.45)*(1.+fall*1.2)*(.55+aSeed*.9);
+  float size=uSize*(1.-wG*.45)*(1.-wS*er*.4)*(1.+fall*1.2)*(.55+aSeed*.9);
   gl_PointSize=size*uPixelRatio*uScale/-mv.z;
 #endif
   vAlpha=mix(.6,1.,e)*(1.-wG*e*.5)*(1.-wL); vSeed=aSeed; vDepth=-mv.z;
