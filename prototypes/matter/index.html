@@ -85,6 +85,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const canvas = document.getElementById('stage');
@@ -169,13 +170,16 @@ const matterUniforms = {
   uTrail: { value: Array.from({ length: 16 }, () => new THREE.Vector3(9, 9, 0)) },
   uOpacity: { value: 1 }, uColA: { value: new THREE.Color() }, uColB: { value: new THREE.Color() }, uColC: { value: new THREE.Color() },
 };
-const matterMaterial = new THREE.ShaderMaterial({
-  uniforms: matterUniforms, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  vertexShader: `
+// One vertex program places every particle for every Form. The sprite pass draws glows
+// (Solid, Gas); with DEPTH_PASS the same positions are drawn as spheres for the liquid.
+const MATTER_VS = `
 uniform float uTime,uDisperse,uState,uSpin,uSize,uScale,uPixelRatio,uAspect,uPush,uStrength,uReachK;
 uniform int uMode; uniform vec2 uPointer; uniform vec3 uTrail[16];
 attribute float aSeed; attribute vec3 aNormal; attribute vec3 aChunkC; attribute vec4 aChunkR;
-varying float vAlpha; varying float vSeed; varying float vDepth; varying float vBoost; varying float vLiquid;
+varying float vAlpha; varying float vSeed; varying float vDepth; varying float vBoost;
+#ifdef DEPTH_PASS
+uniform float uRadius, uDepthScale; varying vec3 vCenter; varying float vRad;
+#endif
 ${NOISE}
 void main(){
   float t=uTime;
@@ -194,11 +198,11 @@ void main(){
   vec3 axis=normalize(aChunkR.xyz+1e-4);
   vec3 sp=cc+rotAxis(p-cc,axis,e*(1.2+aChunkR.w*3.5))+normalize(cc+1e-4)*e*(.7+aChunkR.w*2.);
   sp.y-=e*e*.5;
-  // liquid: the clear surface carries the body; particles are only the droplets it sheds,
-  // each falling on its own loop and landing in the pool
-  float drop=step(.93,aSeed);
+  // liquid: the body slumps, runs and pools; one in ten particles breaks off as a drop
+  // that falls on its own loop and rejoins the pool
+  float drop=step(.9,aSeed);
   vec3 lp=rotY(liquidAt(position,e,t),uSpin);
-  lp+=n*drop*e*(.08+aSeed*.25);
+  lp+=n*drop*e*(.06+aSeed*.18);
   lp.y-=drop*e*fract(t*.22+aSeed*7.)*1.3; lp.y=max(lp.y,-1.5);
   // gas: diffuse outward, curl into fine wisps, rise, thin out
   vec3 gp=p+normalize(p+1e-4)*e*(.3+aSeed*1.)+field(p*.7+aSeed,t*.12)*e*.85;
@@ -215,20 +219,25 @@ void main(){
   if(uMode==1) mv.xy-=dir*fall*.5*(.4+aSeed)*smoothstep(0.,.12,length(dv));       // gather in
   if(uMode==2) mv.xy+=(tang*.75-dir*.15)*fall*(.4+aSeed);                          // swirl round
   gl_Position=projectionMatrix*mv;
-  float size=uSize*(1.-wG*.45)*(1.+fall*1.2)*(.55+aSeed*.9)*mix(1.,mix(.6,1.5,drop),wL);
+#ifdef DEPTH_PASS
+  float rad=uRadius*(.75+aSeed*.5)*mix(1.,.85,drop);
+  gl_PointSize=2.*rad*uDepthScale/-mv.z; vCenter=mv.xyz; vRad=rad;
+#else
+  float size=uSize*(1.-wG*.45)*(1.+fall*1.2)*(.55+aSeed*.9);
   gl_PointSize=size*uPixelRatio*uScale/-mv.z;
-  vAlpha=mix(.6,1.,e)*(1.-wG*e*.5)*mix(1.,drop*1.4*smoothstep(.05,.3,e),wL); vSeed=aSeed; vDepth=-mv.z; vLiquid=wL*drop;
+#endif
+  vAlpha=mix(.6,1.,e)*(1.-wG*e*.5)*(1.-wL); vSeed=aSeed; vDepth=-mv.z;
   vBoost=1.+min(local,1.)*5.+fall*1.5; // particles the cursor touches show even while the surface is up
-}`,
+}`;
+const matterMaterial = new THREE.ShaderMaterial({
+  uniforms: matterUniforms, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  vertexShader: MATTER_VS,
   fragmentShader: `
 uniform vec3 uColA,uColB,uColC; uniform float uOpacity;
-varying float vAlpha; varying float vSeed; varying float vDepth; varying float vBoost; varying float vLiquid;
+varying float vAlpha; varying float vSeed; varying float vDepth; varying float vBoost;
 void main(){
   vec2 c=gl_PointCoord-.5; float r=dot(c,c)*4.; if(r>1.)discard;
-  float ring=smoothstep(.45,.85,r)*(1.-smoothstep(.85,1.,r));
-  vec2 hs=c+vec2(.14,.14); float spot=exp(-dot(hs,hs)*90.);
-  float shape=mix(exp(-r*3.2),ring*.8+spot*1.6,vLiquid);
-  float a=shape*vAlpha*uOpacity*vBoost;
+  float a=exp(-r*3.2)*vAlpha*uOpacity*vBoost;
   vec3 col=mix(uColA,uColB,smoothstep(.2,.95,vSeed));
   col=mix(col,uColC,smoothstep(6.5,9.5,vDepth)*.6);
   gl_FragColor=vec4(col,a);
@@ -236,33 +245,136 @@ void main(){
 });
 let points = null;
 
+// ---------- liquid: screen-space fluid ----------
+// Particles are drawn as spheres into a depth image, the depth is blurred (edge-aware) so
+// neighbouring spheres merge into one surface, and that surface is shaded as clear liquid:
+// it refracts the scene behind it, reflects at grazing angles and catches sharp highlights.
+const depthUniforms = { ...matterUniforms, uRadius: { value: 0.062 }, uDepthScale: { value: 300 }, uProj: { value: new THREE.Matrix4() } };
+const depthMaterial = new THREE.ShaderMaterial({
+  uniforms: depthUniforms, defines: { DEPTH_PASS: '' }, vertexShader: MATTER_VS,
+  fragmentShader: `uniform mat4 uProj; varying vec3 vCenter; varying float vRad;
+void main(){
+  vec2 c=gl_PointCoord*2.-1.; c.y=-c.y; float r2=dot(c,c); if(r2>1.)discard;
+  vec3 vp=vCenter+vec3(c,sqrt(1.-r2))*vRad;
+  vec4 cp=uProj*vec4(vp,1.); gl_FragDepth=(cp.z/cp.w)*.5+.5;
+  gl_FragColor=vec4(-vp.z,1.,0.,1.);
+}`,
+});
+const thickMaterial = new THREE.ShaderMaterial({
+  uniforms: depthUniforms, defines: { DEPTH_PASS: '' }, vertexShader: MATTER_VS,
+  transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
+  fragmentShader: `varying vec3 vCenter; varying float vRad;
+void main(){ vec2 c=gl_PointCoord*2.-1.; float r2=dot(c,c); if(r2>1.)discard; gl_FragColor=vec4(2.*sqrt(1.-r2)*vRad,0.,0.,1.); }`,
+});
+const QUAD_VS = `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`;
+class FluidPass extends Pass {
+  constructor() {
+    super();
+    // Full float: half float terraces depth at this distance, which shows as stripes.
+    const opts = { type: THREE.FloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter };
+    this.depthRT = new THREE.WebGLRenderTarget(1, 1, { ...opts, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: true });
+    this.blurA = new THREE.WebGLRenderTarget(1, 1, { ...opts, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
+    this.blurB = this.blurA.clone();
+    this.thickRT = new THREE.WebGLRenderTarget(1, 1, { ...opts, type: THREE.HalfFloatType, depthBuffer: false });
+    this.thickScene = new THREE.Scene();
+    this.thickPoints = new THREE.Points(new THREE.BufferGeometry(), thickMaterial);
+    this.thickPoints.frustumCulled = false; this.thickScene.add(this.thickPoints);
+    this.liquidScene = new THREE.Scene();
+    this.liquidPoints = new THREE.Points(new THREE.BufferGeometry(), depthMaterial);
+    this.liquidPoints.frustumCulled = false; this.liquidScene.add(this.liquidPoints);
+    this.blurMat = new THREE.ShaderMaterial({
+      uniforms: { tIn: { value: null }, uStep: { value: new THREE.Vector2() }, uFalloff: { value: 6 } },
+      vertexShader: QUAD_VS,
+      fragmentShader: `uniform sampler2D tIn; uniform vec2 uStep; uniform float uFalloff; varying vec2 vUv;
+void main(){
+  float d0=texture2D(tIn,vUv).r; float cov=0.,cw=0.,ds=0.,dw=0.;
+  for(int i=-7;i<=7;i++){
+    vec4 s=texture2D(tIn,vUv+uStep*float(i)); float g=exp(-float(i*i)/24.);
+    cov+=s.g*g; cw+=g;
+    if(s.r>0. && d0>0.){ float k=(s.r-d0)*uFalloff; float w=g*exp(-k*k); ds+=s.r*w; dw+=w; }
+  }
+  gl_FragColor=vec4(d0>0.&&dw>0.?ds/dw:0.,cov/cw,0.,1.);
+}`,
+    });
+    this.compMat = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, tFluid: { value: null }, tThick: { value: null }, uTexel: { value: new THREE.Vector2() }, uTan: { value: new THREE.Vector2(1, 1) },
+        uMix: { value: 0 }, uTint: { value: new THREE.Color() }, uSkyLo: { value: new THREE.Color() }, uSkyHi: { value: new THREE.Color() } },
+      vertexShader: QUAD_VS,
+      fragmentShader: `uniform sampler2D tDiffuse,tFluid,tThick; uniform vec2 uTexel,uTan; uniform float uMix; uniform vec3 uTint,uSkyLo,uSkyHi; varying vec2 vUv;
+vec3 vpos(vec2 uv,float d){ return vec3((uv*2.-1.)*uTan,-1.)*d; }
+vec3 edge(vec2 uv,vec3 P,vec2 o){
+  float a=texture2D(tFluid,uv+o).r, b=texture2D(tFluid,uv-o).r;
+  vec3 f=a>0.?vpos(uv+o,a)-P:vec3(0.), r=b>0.?P-vpos(uv-o,b):vec3(0.);
+  if(a<=0.) return r; if(b<=0.) return f; return abs(r.z)<abs(f.z)?r:f;
+}
+void main(){
+  vec4 scene=texture2D(tDiffuse,vUv); vec4 fl=texture2D(tFluid,vUv);
+  float cov=smoothstep(.3,.62,fl.g)*uMix;
+  if(fl.r<=0.||cov<=0.){ gl_FragColor=scene; return; }
+  vec3 P=vpos(vUv,fl.r);
+  // A lone droplet pixel has no neighbours to take a slope from; face it at the camera
+  // rather than normalising a zero vector (NaN, which the glow pass would spread).
+  vec3 cr=cross(edge(vUv,P,vec2(uTexel.x,0.)),edge(vUv,P,vec2(0.,uTexel.y)));
+  vec3 N=dot(cr,cr)>1e-12?normalize(cr):vec3(0.,0.,1.);
+  if(N.z<0.) N=-N;
+  vec3 V=normalize(-P); float ndv=max(dot(N,V),0.);
+  float fres=.03+.97*pow(1.-ndv,5.);
+  // Body: thicker liquid absorbs more of what's behind it and glows more with its own
+  // colour, so a pool reads dense and a drop or thin edge stays clear.
+  float th=texture2D(tThick,vUv).r;
+  vec3 behind=texture2D(tDiffuse,clamp(vUv+N.xy*.09,0.,1.)).rgb;
+  vec3 absorb=exp(-(vec3(1.)-uTint)*th*2.6);
+  vec3 body=behind*absorb+uTint*(1.-exp(-th*1.4))*.36;
+  vec3 refl=mix(uSkyLo,uSkyHi,N.y*.5+.5)*1.4;
+  vec3 L1=normalize(vec3(-.45,.75,.55)), L2=normalize(vec3(.6,.2,.8));
+  // Highlights fade out toward the silhouette, where normals from the depth edge are unreliable.
+  float inner=smoothstep(.62,.95,fl.g);
+  float spec=(pow(max(dot(N,normalize(L1+V)),0.),90.)*1.8+pow(max(dot(N,normalize(L2+V)),0.),28.)*.35)*inner;
+  vec3 col=mix(body,refl,fres*inner)+spec+uTint*pow(1.-ndv,3.)*.3;
+  if(any(isnan(col))||any(isinf(col))) col=scene.rgb; // never let one bad pixel reach the glow pass
+  gl_FragColor=vec4(mix(scene.rgb,col,cov),scene.a);
+}`,
+    });
+    this.quad = new FullScreenQuad(null);
+    this.clear = new THREE.Color();
+  }
+  setSize(w, h) {
+    const rw = Math.max(1, Math.round(w)), rh = Math.max(1, Math.round(h)); // full resolution: half res showed as stair-steps
+    this.depthRT.setSize(rw, rh); this.blurA.setSize(rw, rh); this.blurB.setSize(rw, rh);
+    this.thickRT.setSize(Math.max(1, Math.round(w / 2)), Math.max(1, Math.round(h / 2)));
+    this.compMat.uniforms.uTexel.value.set(1 / rw, 1 / rh);
+    this.texel = new THREE.Vector2(1 / rw, 1 / rh);
+    depthUniforms.uDepthScale.value = rh / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+  }
+  render(renderer, writeBuffer, readBuffer) {
+    renderer.getClearColor(this.clear); const alpha = renderer.getClearAlpha();
+    renderer.setClearColor(0x000000, 0);
+    renderer.setRenderTarget(this.depthRT); renderer.clear(); renderer.render(this.liquidScene, camera);
+    renderer.setRenderTarget(this.thickRT); renderer.clear(); renderer.render(this.thickScene, camera);
+    let src = this.depthRT;
+    const passes = []; for (let i = 0; i < 5; i++) passes.push([this.blurA, [1, 0]], [this.blurB, [0, 1]]);
+    for (const [dst, dir] of passes) {
+      this.blurMat.uniforms.tIn.value = src.texture;
+      // Dense taps: skipping pixels between taps aliased into a fine checker on the surface.
+      this.blurMat.uniforms.uStep.value.set(dir[0] * this.texel.x * 1.4, dir[1] * this.texel.y * 1.4);
+      this.quad.material = this.blurMat; renderer.setRenderTarget(dst); this.quad.render(renderer); src = dst;
+    }
+    renderer.setClearColor(this.clear, alpha);
+    this.compMat.uniforms.tDiffuse.value = readBuffer.texture; this.compMat.uniforms.tFluid.value = src.texture;
+    this.compMat.uniforms.tThick.value = this.thickRT.texture;
+    this.quad.material = this.compMat;
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer); this.quad.render(renderer);
+  }
+}
+const fluidPass = new FluidPass();
+
 // ---------- solid surface ----------
-const meshMaterial = new THREE.MeshPhysicalMaterial({ roughness: 0.32, metalness: 0.15, clearcoat: 0.7, clearcoatRoughness: 0.2, envMapIntensity: 0.7, transparent: true,
-  ior: 1.33, thickness: 1.2, attenuationDistance: 2.2, specularIntensity: 1 });
-const meshTint = new THREE.Color(); const WHITE = new THREE.Color(1, 1, 1);
+const meshMaterial = new THREE.MeshPhysicalMaterial({ roughness: 0.32, metalness: 0.15, clearcoat: 0.7, clearcoatRoughness: 0.2, envMapIntensity: 0.7, transparent: true });
 let mesh = null;
 // uHoleMode: 0 off, 1 push, 2 attract, 3 vortex, 4 scatter, 5 wake (cursor mode + 1).
 const holeUniforms = { uHoleMode: { value: 0 }, uBuf: { value: new THREE.Vector2(1, 1) } };
-const liquidUniforms = { uMeshE: { value: 0 }, uMeshWL: { value: 0 } };
 meshMaterial.onBeforeCompile = (shader) => {
-  Object.assign(shader.uniforms, holeUniforms, liquidUniforms, { uTime: matterUniforms.uTime });
-  shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', `#include <common>
-uniform float uTime, uMeshE, uMeshWL;
-${NOISE}`)
-    .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
-vec3 lqPos = position;
-if (uMeshWL * uMeshE > .001) {
-  vec3 t1 = normalize(cross(objectNormal, abs(objectNormal.y) < .9 ? vec3(0., 1., 0.) : vec3(1., 0., 0.)));
-  vec3 t2 = cross(objectNormal, t1);
-  vec3 a = liquidAt(position, uMeshE, uTime);
-  vec3 ln = normalize(cross(liquidAt(position + t1 * .01, uMeshE, uTime) - a, liquidAt(position + t2 * .01, uMeshE, uTime) - a));
-  if (dot(ln, objectNormal) < 0.) ln = -ln;
-  lqPos = mix(position, a, uMeshWL);
-  objectNormal = normalize(mix(objectNormal, ln, uMeshWL));
-}`)
-    .replace('#include <begin_vertex>', `#include <begin_vertex>
-transformed = lqPos;`);
+  Object.assign(shader.uniforms, holeUniforms);
   Object.assign(shader.uniforms, { uPointer: matterUniforms.uPointer, uAspect: matterUniforms.uAspect, uPush: matterUniforms.uPush,
     uStrength: matterUniforms.uStrength, uReachK: matterUniforms.uReachK, uTrail: matterUniforms.uTrail });
   shader.fragmentShader = shader.fragmentShader.replace(/void main\(\)\s*\{/, `uniform int uHoleMode; uniform vec2 uBuf, uPointer; uniform float uAspect, uPush, uStrength, uReachK; uniform vec3 uTrail[16];
@@ -391,12 +503,14 @@ function buildMatter(shapeId, count) {
   g.setAttribute('aChunkR', new THREE.BufferAttribute(chunkR, 4));
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 6);
   points = new THREE.Points(g, matterMaterial); scene.add(points);
+  fluidPass.liquidPoints.geometry = g; fluidPass.thickPoints.geometry = g;
 }
 const GAS_EXTRA = 1.6; // Gas draws this many times the chosen count, at a finer size
 
 // ---------- post ----------
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
+composer.addPass(fluidPass);
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.42, 0.65, 0.62);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
@@ -424,7 +538,8 @@ const pointerNDC = new THREE.Vector2(9, 9); let pointerActive = false;
 function applyPalette() {
   const p = PALETTES[state.palette];
   matterUniforms.uColA.value.set(p.a); matterUniforms.uColB.value.set(p.b); matterUniforms.uColC.value.set(p.c);
-  hazeUniforms.uCol.value.set(p.haze); meshTint.set(p.mesh); meshMaterial.color.set(p.mesh); meshMaterial.attenuationColor.set(p.mesh);
+  hazeUniforms.uCol.value.set(p.haze); meshMaterial.color.set(p.mesh);
+  const cu = fluidPass.compMat.uniforms; cu.uTint.value.set(p.mesh); cu.uSkyLo.value.set(p.bgIn); cu.uSkyHi.value.set(p.b).multiplyScalar(0.55);
   dust.material.color.set(p.b);
   if (scene.background) scene.background.dispose();
   scene.background = backdrop(p);
@@ -483,6 +598,8 @@ function resize() {
   camera.updateProjectionMatrix();
   matterUniforms.uScale.value = h / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
   matterUniforms.uAspect.value = w / h;
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  fluidPass.compMat.uniforms.uTan.value.set(tanHalf * camera.aspect, tanHalf);
 }
 addEventListener('resize', resize);
 
@@ -521,14 +638,11 @@ function frame() {
   });
   matterUniforms.uPush.value += ((pointerActive && !reduced ? 1 : 0) - matterUniforms.uPush.value) * Math.min(1, dt * 4);
   // The surface shows only while the form holds; particles carry it once it moves.
-  // Solid hands over to particles as it breaks; Liquid keeps its clear, deforming surface
-  // all the way to the pool; Gas has no surface.
-  const liquidVis = Math.min(1, Math.max(0, (wL - 0.05) / 0.35));
-  const meshOpacity = wS * Math.max(0, 1 - disperse * 5) + liquidVis;
-  liquidUniforms.uMeshE.value = ease(disperse); liquidUniforms.uMeshWL.value = wL;
-  meshMaterial.transmission = wL > 0.05 ? wL : 0;
-  meshMaterial.roughness = 0.32 + (0.04 - 0.32) * wL; meshMaterial.metalness = 0.15 * (1 - wL);
-  meshMaterial.color.copy(meshTint).lerp(WHITE, wL * 0.85);
+  // Solid hands its surface over to particles as it breaks; Liquid and Gas have none.
+  const meshOpacity = wS * Math.max(0, 1 - disperse * 5);
+  // The liquid is the particles themselves, so it crossfades with Solid and Gas.
+  fluidPass.enabled = wL > 0.01; fluidPass.compMat.uniforms.uMix.value = wL;
+  depthUniforms.uProj.value.copy(camera.projectionMatrix);
   meshMaterial.opacity = meshOpacity; if (mesh) { mesh.visible = meshOpacity > 0.01; mesh.rotation.y = spin; }
   // Additive points pile up, so per-point brightness falls as the count rises; they
   // stay faint while the surface is showing and take over as the form lets go.
