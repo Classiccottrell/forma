@@ -183,6 +183,7 @@ export default function App() {
         onImportComposition={importComposition}
         presentation={presentation}
         onPresentationChange={(patch) => setPresentation((current) => ({ ...current, ...patch }))}
+        onMatterChange={(matter) => applyTracked({ matter })}
       />
       {creatorMode && <CreatorPanel composition={current} />}
     </div>

@@ -18,6 +18,28 @@ export interface Composition {
   environmentParams: Record<string, ParamValue>;
   effectIds: string[]; // ordered; empty array is valid (no effects)
   effectParams: Record<string, Record<string, ParamValue>>; // keyed by effectId
+  /** V2 matter: the form as particles that can hold together, shatter, melt or diffuse.
+   * Absent means a plain solid object, exactly as before matter existed. */
+  matter?: MatterSettings;
+}
+
+export type MatterForm = 'solid' | 'liquid' | 'gas';
+export type MatterMotion = 'manual' | 'loop' | 'hover';
+export type MatterCursorName = 'push' | 'attract' | 'vortex' | 'scatter' | 'wake' | 'off';
+export type MatterDensity = 'low' | 'medium' | 'high';
+
+export interface MatterSettings {
+  form: MatterForm;
+  /** 0 held together, 1 fully apart. Used when `motion` is 'manual'. */
+  disperse: number;
+  /** 'loop' breathes apart and back; 'hover' comes apart as the pointer nears. */
+  motion: MatterMotion;
+  cursor: MatterCursorName;
+  /** Cursor strength, 0..1.5. */
+  strength: number;
+  /** Cursor reach, as a share of the viewport height, 0.08..0.5. */
+  radius: number;
+  density: MatterDensity;
 }
 
 // --- Parameter schema (blueprint §1.1) --------------------------------------

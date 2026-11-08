@@ -83,11 +83,25 @@ export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>, initialCo
 
     const scheduler = new FrameScheduler();
     schedulerRef.current = scheduler;
-    scheduler.addTask(() => formaScene.render());
+    scheduler.addTask((frame) => {
+      runtime.updateMatter(frame.dt, frame.elapsed);
+      formaScene.render();
+    });
+
+    // The matter cursor reads the pointer over the viewport, in normalized device coordinates.
+    const onPointerMove = (event: PointerEvent) => {
+      const rect = el.getBoundingClientRect();
+      runtime.setMatterPointer({ x: ((event.clientX - rect.left) / rect.width) * 2 - 1, y: -((event.clientY - rect.top) / rect.height) * 2 + 1 });
+    };
+    const onPointerLeave = () => runtime.setMatterPointer(null);
+    el.addEventListener('pointermove', onPointerMove);
+    el.addEventListener('pointerleave', onPointerLeave);
     setScheduler(scheduler);
     scheduler.start();
 
     return () => {
+      el.removeEventListener('pointermove', onPointerMove);
+      el.removeEventListener('pointerleave', onPointerLeave);
       scheduler.stop();
       schedulerRef.current = null;
       runtime.dispose();

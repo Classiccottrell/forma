@@ -1,6 +1,7 @@
 import type { Composition } from '../types.js';
 import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry } from '../registry/instances.js';
 import { replaceRetiredShape } from './retiredShapes.js';
+import { parseMatterSettings } from './matterSettings.js';
 
 export function serializeComposition(c: Composition): string {
   return JSON.stringify({ ...c, textureId: c.textureId ?? 'none', textureParams: c.textureParams ?? {} });
@@ -42,7 +43,14 @@ export function deserializeComposition(s: string): Composition {
     assertKeysMatch(`effectParams.${id}`, c.effectParams[id] ?? {}, def.parameterSchema);
   }
 
-  return { ...c, textureId, textureParams };
+  if (c.matter === undefined) return { ...c, textureId, textureParams };
+  let matter;
+  try {
+    matter = parseMatterSettings(c.matter);
+  } catch (error) {
+    throw new Error(`deserializeComposition: ${(error as Error).message}`);
+  }
+  return { ...c, textureId, textureParams, matter };
 }
 
 function assertCompositionShape(value: unknown): asserts value is Composition {

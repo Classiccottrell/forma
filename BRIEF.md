@@ -248,6 +248,19 @@ linefield-style consumers; core cc-webgl stays as it is):
 - Tests: deterministic sampling for a seed, finite positions at every Form and Disperse,
   serialization of the new slot, and a headless render check per Form.
 
+**Progress (2026-11-08):** `cc-webgl/matter` merged (cc-webgl #1). Forma side built:
+`Composition.matter` (absent = plain solid, exactly as before; validated on import, with
+defaults for missing keys), `MatterLayer` in the runtime (particles sampled per shape in
+unit space, the FluidPass straight after the scene render, the Solid crack-away and
+cursor holes patched onto every material, motion and Wake trail ticked by the app's
+FrameScheduler), and Matter + Cursor sections in the editor. Per-shape fit: most shapes
+fill their inside toward the centre; tubes push in by their `tube` radius; Ring and Vase
+push in a little — checked by a test that every shape's particles stay inside its bounds.
+**Known gap, owned by Phase 1:** the editor camera frames the object to fill the view, so
+dispersed matter (Gas, the puddle) overflows it and the liquid looks lumpier than the
+prototype (its blur is a fixed pixel width; the object is ~3× bigger on screen). Phase 1's
+"room around the object" fixes both.
+
 ### Phase 3 — Atmosphere
 Space around the object instead of a backdrop behind it.
 - Depth haze and glow that the particles sit inside; a far dust/star field; film grain
@@ -497,6 +510,7 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-11-08 | Phase 2 matter in the product: `Composition.matter`, runtime `MatterLayer` on `cc-webgl/matter`, Matter and Cursor editor sections, per-shape inside fill. 132/132 tests (43 new, incl. every shape's particles staying inside it), M3 browser checks 15/15, editor checked headless on SwiftShader with 0 errors. App bundle +34 KB; now over the gzip budget too (256 KB / 250 KB). Framing gap handed to Phase 1. |
 | 2026-11-08 | Phase 0 matter prototype accepted by the owner after six rounds (`prototypes/matter/`, PR #18). Settled: Form + Disperse on one particle set; Solid cracks away then shatters into mixed fragments that crumble to dust; Liquid as screen-space fluid that settles into a shimmering puddle; Gas fine and wispy; six cursor modes with Wake as the favourite. Phase 2 spec written: shared pieces go into a new `cc-webgl/matter` subpath. |
 | 2026-11-08 | New direction: V2 — Matter. Forma becomes a tool for abstract, ambiguous 3D forms for interactive websites; shapes can be solid, liquid or gas, inside haze and particles, and meet linefield on the page. Vanta's generator is the finish reference for how objects are treated. Catalog fixed at the current 32 shapes. R1 findings folded into V2 phases. |
 | 2026-10-10 | R1 review of the live site (desktop + phone, headless SwiftShader, axe-core): 4 P1, 7 P2, 6 P3 findings recorded under R1. Export PNG (1024² RGBA) and Copy Code work mechanically; the copied snippet points at an unhosted bundle. |

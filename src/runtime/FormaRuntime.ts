@@ -7,6 +7,7 @@ import type { Composition, EnvironmentHandle, EffectHandle, TextureHandle } from
 import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry } from '../registry/instances.js';
 import { slotKey, changedHotKeys } from './diff.js';
 import { ensureGeometryUVs } from './uv.js';
+import { MatterLayer } from './MatterLayer.js';
 
 interface Slot<H> {
   registry: ResourceRegistry;
@@ -84,6 +85,8 @@ export class FormaRuntime {
 
   private _current: Composition | null = null;
   private disposed = false;
+  /** V2 matter: inactive (draws nothing) unless the composition has `matter` settings. */
+  private readonly matter: MatterLayer;
 
   constructor(opts: FormaRuntimeOptions) {
     this.scene = opts.scene;
@@ -106,6 +109,25 @@ export class FormaRuntime {
     (this.mesh.material as THREE.Material).dispose();
     this.resources.track(this.mesh);
     this.scene.add(this.mesh);
+    this.matter = new MatterLayer(this.scene, this.camera, this.renderer, this.composer, this.ensureOutputPassLast);
+  }
+
+  /** Advances matter (motion, Form easing, cursor trail) by one frame. Call before each
+   * render; a no-op while the composition has no `matter` settings. Seconds. */
+  updateMatter(dt: number, elapsed: number): void {
+    if (this.disposed) return;
+    this.matter.update(dt, elapsed);
+    this.mesh.visible = !this.matter.active || this.matter.meshVisible;
+  }
+
+  /** Test/introspection hook: the current matter particles, in the shape's unit space. */
+  getMatterGeometry(): THREE.BufferGeometry {
+    return this.matter.particleGeometry;
+  }
+
+  /** Pointer in normalized device coordinates for the matter cursor, or null when it leaves. */
+  setMatterPointer(ndc: { x: number; y: number } | null): void {
+    this.matter.setPointer(ndc);
   }
 
   get currentComposition(): Composition | null {
@@ -172,6 +194,8 @@ export class FormaRuntime {
     if (effectsChanged) this.rebuildEffectsSlot(next);
     else if (prev) this.updateEffectsSlotIfHotParamsChanged(prev, next);
 
+    this.matter.apply(next.matter);
+    if (!next.matter) this.mesh.visible = true;
     this._current = next;
   }
 
@@ -185,6 +209,7 @@ export class FormaRuntime {
     this.textureSlot.registry.disposeAll();
     this.environmentSlot.registry.disposeAll();
     this.effectsSlot.registry.disposeAll();
+    this.matter.dispose();
     this.resources.disposeAll();
     this.disposeExternal?.();
   }
@@ -200,6 +225,7 @@ export class FormaRuntime {
     this.shapeSlot.handle = geometry;
     this.mesh.geometry = geometry;
     this.frameShape();
+    this.matter.setShape(geometry, next.shapeId, next.shapeParams);
   }
 
   /** Keeps very different geometries legible in one viewport without per-shape UI tuning. */
@@ -218,6 +244,7 @@ export class FormaRuntime {
     const hot = changedHotKeys(def.parameterSchema, prev.shapeParams, next.shapeParams);
     if (hot.length === 0) return;
     def.update(this.shapeSlot.handle, next.shapeParams as any);
+    this.matter.setShape(this.shapeSlot.handle, next.shapeId, next.shapeParams);
   }
 
   // --- material --------------------------------------------------------------
@@ -230,6 +257,13 @@ export class FormaRuntime {
     this.materialSlot.handle = material;
     this.mesh.material = material;
     this.applyTexture(material);
+    this.matter.patchMaterial(material);
+    this.syncMatterColor(material);
+  }
+
+  private syncMatterColor(material: THREE.Material): void {
+    const color = (material as THREE.Material & { color?: THREE.Color }).color;
+    this.matter.setColor(color instanceof THREE.Color ? color : new THREE.Color(0xffffff));
   }
 
   private rebuildTextureSlot(next: Composition): void {
@@ -296,6 +330,7 @@ export class FormaRuntime {
     const hot = changedHotKeys(def.parameterSchema, prev.materialParams, next.materialParams);
     if (hot.length === 0) return;
     def.update(this.materialSlot.handle, next.materialParams as any);
+    this.syncMatterColor(this.materialSlot.handle);
   }
 
   // --- environment -------------------------------------------------------
