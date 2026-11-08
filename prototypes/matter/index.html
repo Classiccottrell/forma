@@ -53,6 +53,13 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   <div class="group"><span class="label">Motion</span>
     <div class="seg" data-key="motion"><button type="button" data-v="manual" aria-pressed="false">Manual</button><button type="button" data-v="loop" aria-pressed="true">Loop</button><button type="button" data-v="hover" aria-pressed="false">Hover</button></div>
     <p class="note" id="motionNote">Breathes apart and back together.</p></div>
+  <div class="group"><span class="label">Cursor</span>
+    <div class="seg" data-key="cursor"><button type="button" data-v="0" aria-pressed="true">Push</button><button type="button" data-v="1" aria-pressed="false">Attract</button><button type="button" data-v="2" aria-pressed="false">Vortex</button><button type="button" data-v="3" aria-pressed="false">Scatter</button><button type="button" data-v="4" aria-pressed="false">Wake</button><button type="button" data-v="5" aria-pressed="false">Off</button></div>
+    <p class="note" id="cursorNote">Moves particles out of the way.</p></div>
+  <div class="group"><label class="label" for="strength">Strength <output id="strengthOut">1.00</output></label>
+    <input id="strength" type="range" min="0" max="1.5" step="0.01" value="1"></div>
+  <div class="group"><label class="label" for="radius">Radius <output id="radiusOut">0.22</output></label>
+    <input id="radius" type="range" min="0.08" max="0.5" step="0.01" value="0.22"></div>
   <div class="group"><label class="label" for="haze">Haze <output id="hazeOut">0.60</output></label>
     <input id="haze" type="range" min="0" max="1" step="0.01" value="0.6"></div>
   <div class="group"><span class="label">Palette</span>
@@ -137,8 +144,20 @@ vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));p0*=n
 vec4 m=max(.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.);m=m*m;
 return 42.*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));}
 vec3 field(vec3 p,float t){return vec3(snoise(p+vec3(0.,0.,t)),snoise(p+vec3(31.4,0.,t)),snoise(p+vec3(0.,47.2,t)));}
+float reachAt(vec2 ndc,vec2 ptr,float aspect,float k){vec2 q=ndc-ptr;q.x*=aspect;return exp(-dot(q,q)*k);}
 vec3 rotY(vec3 v,float a){float c=cos(a),s=sin(a);return vec3(c*v.x+s*v.z,v.y,-s*v.x+c*v.z);}
 vec3 rotAxis(vec3 v,vec3 a,float ang){return v*cos(ang)+cross(a,v)*sin(ang)+a*dot(a,v)*(1.-cos(ang));}
+// Liquid body in object space: slumps under its own weight, runs into smooth drips on the
+// lower half, and spreads into a pool where it meets the floor.
+vec3 liquidAt(vec3 p,float e,float t){
+  vec3 q=p+field(p*1.1,t*.25)*.14*e;
+  float sag=.5+.5*snoise(p*1.3+7.);
+  q.y-=e*(.6+sag*.7)*(1.+(1.-p.y)*.3);
+  q.y-=smoothstep(.2,.7,snoise(vec3(p.xz*1.8,4.2)))*smoothstep(.3,-.9,p.y)*e*1.1;
+  float floorY=-1.5;
+  if(q.y<floorY){float over=floorY-q.y;q.y=floorY+sin(over*9.+t*2.)*.01;q.xz*=1.+over*.85;}
+  return q;
+}
 `;
 
 // ---------- matter particles ----------
@@ -146,53 +165,70 @@ const matterUniforms = {
   uTime: { value: 0 }, uDisperse: { value: 0 }, uState: { value: 2 }, uSpin: { value: 0 },
   uSize: { value: 0.022 }, uScale: { value: 400 }, uPixelRatio: { value: renderer.getPixelRatio() },
   uPointer: { value: new THREE.Vector2(9, 9) }, uAspect: { value: 1 }, uPush: { value: 0 },
+  uMode: { value: 0 }, uStrength: { value: 1 }, uReachK: { value: 20.7 },
+  uTrail: { value: Array.from({ length: 16 }, () => new THREE.Vector3(9, 9, 0)) },
   uOpacity: { value: 1 }, uColA: { value: new THREE.Color() }, uColB: { value: new THREE.Color() }, uColC: { value: new THREE.Color() },
 };
 const matterMaterial = new THREE.ShaderMaterial({
   uniforms: matterUniforms, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   vertexShader: `
-uniform float uTime,uDisperse,uState,uSpin,uSize,uScale,uPixelRatio,uAspect,uPush;
-uniform vec2 uPointer;
+uniform float uTime,uDisperse,uState,uSpin,uSize,uScale,uPixelRatio,uAspect,uPush,uStrength,uReachK;
+uniform int uMode; uniform vec2 uPointer; uniform vec3 uTrail[16];
 attribute float aSeed; attribute vec3 aNormal; attribute vec3 aChunkC; attribute vec4 aChunkR;
-varying float vAlpha; varying float vSeed; varying float vDepth;
+varying float vAlpha; varying float vSeed; varying float vDepth; varying float vBoost; varying float vLiquid;
 ${NOISE}
 void main(){
-  float t=uTime; float d=uDisperse; float e=d*d*(3.-2.*d);
-  vec3 p=rotY(position,uSpin); vec3 n=rotY(aNormal,uSpin); vec3 cc=rotY(aChunkC,uSpin);
+  float t=uTime;
+  vec3 p=rotY(position,uSpin);
+  // Scatter and Wake break the form apart locally: the cursor's reach, measured on the
+  // undisturbed form, adds to Disperse for the particles under it.
+  vec4 c0=projectionMatrix*modelViewMatrix*vec4(p,1.); vec2 n0=c0.xy/c0.w;
+  float local=0.;
+  if(uMode<4) local=reachAt(n0,uPointer,uAspect,uReachK)*uPush*(uMode==3?1.:.45);
+  if(uMode==4){for(int i=0;i<16;i++){local=max(local,reachAt(n0,uTrail[i].xy,uAspect,uReachK*1.4)*uTrail[i].z);}}
+  local*=uStrength;
+  float d=clamp(uDisperse+local,0.,1.); float e=d*d*(3.-2.*d); vec3 n=rotY(aNormal,uSpin); vec3 cc=rotY(aChunkC,uSpin);
   float wS=clamp(1.-uState,0.,1.); float wG=clamp(uState-1.,0.,1.); float wL=1.-wS-wG;
   vec3 idle=n*snoise(p*2.+t*.4)*.02;
   // solid: shatter into tumbling chunks
   vec3 axis=normalize(aChunkR.xyz+1e-4);
   vec3 sp=cc+rotAxis(p-cc,axis,e*(1.2+aChunkR.w*3.5))+normalize(cc+1e-4)*e*(.7+aChunkR.w*2.);
   sp.y-=e*e*.5;
-  // liquid: flow, sag, drip, pool
-  vec3 lp=p+field(p*1.1,t*.25)*.16*e;
-  lp.y-=e*(.7+aSeed*.7)*(1.+(1.-p.y)*.3);
-  lp.y-=step(.84,aSeed)*e*fract(t*.18+aSeed*7.)*1.4;
-  float floorY=-1.5;
-  if(lp.y<floorY){float over=floorY-lp.y;lp.y=floorY+sin(over*9.+t*2.)*.012;lp.xz*=1.+over*.85;}
-  // gas: diffuse, rise, thin out
-  vec3 gp=p+normalize(p+1e-4)*e*(.35+aSeed*1.15)+field(p*.7+aSeed,t*.12)*e*.95;
-  gp.y+=e*aSeed*.8;
+  // liquid: the clear surface carries the body; particles are only the droplets it sheds,
+  // each falling on its own loop and landing in the pool
+  float drop=step(.93,aSeed);
+  vec3 lp=rotY(liquidAt(position,e,t),uSpin);
+  lp+=n*drop*e*(.08+aSeed*.25);
+  lp.y-=drop*e*fract(t*.22+aSeed*7.)*1.3; lp.y=max(lp.y,-1.5);
+  // gas: diffuse outward, curl into fine wisps, rise, thin out
+  vec3 gp=p+normalize(p+1e-4)*e*(.3+aSeed*1.)+field(p*.7+aSeed,t*.12)*e*.85;
+  gp+=field(p*2.4+aSeed*3.,t*.35)*e*.32;
+  gp.y+=e*aSeed*.9;
   gp+=field(p*1.6,t*.3)*.035*(1.-e);
   vec3 pos=sp*wS+lp*wL+gp*wG+idle*(1.-e);
   vec4 mv=modelViewMatrix*vec4(pos,1.);
   vec4 clip=projectionMatrix*mv;
   vec2 ndc=clip.xy/clip.w; vec2 dv=ndc-uPointer; dv.x*=uAspect;
-  float fall=exp(-dot(dv,dv)*22.)*uPush;
-  vec2 dir=dv/max(length(dv),1e-4); dir.x/=uAspect;
-  mv.xy+=dir*fall*.55*(.4+aSeed);
+  float fall=(uMode<3?exp(-dot(dv,dv)*uReachK):0.)*uPush*uStrength;
+  vec2 dir=dv/max(length(dv),1e-4); vec2 tang=vec2(-dir.y,dir.x); dir.x/=uAspect; tang.x/=uAspect;
+  if(uMode==0) mv.xy+=dir*fall*.55*(.4+aSeed);                                   // push away
+  if(uMode==1) mv.xy-=dir*fall*.5*(.4+aSeed)*smoothstep(0.,.12,length(dv));       // gather in
+  if(uMode==2) mv.xy+=(tang*.75-dir*.15)*fall*(.4+aSeed);                          // swirl round
   gl_Position=projectionMatrix*mv;
-  float size=uSize*(1.+wG*e*1.7+fall*1.2)*(.55+aSeed*.9);
+  float size=uSize*(1.-wG*.45)*(1.+fall*1.2)*(.55+aSeed*.9)*mix(1.,mix(.6,1.5,drop),wL);
   gl_PointSize=size*uPixelRatio*uScale/-mv.z;
-  vAlpha=mix(.6,1.,e)*(1.-wG*e*.5); vSeed=aSeed; vDepth=-mv.z;
+  vAlpha=mix(.6,1.,e)*(1.-wG*e*.5)*mix(1.,drop*1.4*smoothstep(.05,.3,e),wL); vSeed=aSeed; vDepth=-mv.z; vLiquid=wL*drop;
+  vBoost=1.+min(local,1.)*5.+fall*1.5; // particles the cursor touches show even while the surface is up
 }`,
   fragmentShader: `
 uniform vec3 uColA,uColB,uColC; uniform float uOpacity;
-varying float vAlpha; varying float vSeed; varying float vDepth;
+varying float vAlpha; varying float vSeed; varying float vDepth; varying float vBoost; varying float vLiquid;
 void main(){
   vec2 c=gl_PointCoord-.5; float r=dot(c,c)*4.; if(r>1.)discard;
-  float a=exp(-r*3.2)*vAlpha*uOpacity;
+  float ring=smoothstep(.45,.85,r)*(1.-smoothstep(.85,1.,r));
+  vec2 hs=c+vec2(.14,.14); float spot=exp(-dot(hs,hs)*90.);
+  float shape=mix(exp(-r*3.2),ring*.8+spot*1.6,vLiquid);
+  float a=shape*vAlpha*uOpacity*vBoost;
   vec3 col=mix(uColA,uColB,smoothstep(.2,.95,vSeed));
   col=mix(col,uColC,smoothstep(6.5,9.5,vDepth)*.6);
   gl_FragColor=vec4(col,a);
@@ -201,8 +237,46 @@ void main(){
 let points = null;
 
 // ---------- solid surface ----------
-const meshMaterial = new THREE.MeshPhysicalMaterial({ roughness: 0.32, metalness: 0.15, clearcoat: 0.7, clearcoatRoughness: 0.2, envMapIntensity: 0.7, transparent: true });
+const meshMaterial = new THREE.MeshPhysicalMaterial({ roughness: 0.32, metalness: 0.15, clearcoat: 0.7, clearcoatRoughness: 0.2, envMapIntensity: 0.7, transparent: true,
+  ior: 1.33, thickness: 1.2, attenuationDistance: 2.2, specularIntensity: 1 });
+const meshTint = new THREE.Color(); const WHITE = new THREE.Color(1, 1, 1);
 let mesh = null;
+// uHoleMode: 0 off, 1 push, 2 attract, 3 vortex, 4 scatter, 5 wake (cursor mode + 1).
+const holeUniforms = { uHoleMode: { value: 0 }, uBuf: { value: new THREE.Vector2(1, 1) } };
+const liquidUniforms = { uMeshE: { value: 0 }, uMeshWL: { value: 0 } };
+meshMaterial.onBeforeCompile = (shader) => {
+  Object.assign(shader.uniforms, holeUniforms, liquidUniforms, { uTime: matterUniforms.uTime });
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', `#include <common>
+uniform float uTime, uMeshE, uMeshWL;
+${NOISE}`)
+    .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+vec3 lqPos = position;
+if (uMeshWL * uMeshE > .001) {
+  vec3 t1 = normalize(cross(objectNormal, abs(objectNormal.y) < .9 ? vec3(0., 1., 0.) : vec3(1., 0., 0.)));
+  vec3 t2 = cross(objectNormal, t1);
+  vec3 a = liquidAt(position, uMeshE, uTime);
+  vec3 ln = normalize(cross(liquidAt(position + t1 * .01, uMeshE, uTime) - a, liquidAt(position + t2 * .01, uMeshE, uTime) - a));
+  if (dot(ln, objectNormal) < 0.) ln = -ln;
+  lqPos = mix(position, a, uMeshWL);
+  objectNormal = normalize(mix(objectNormal, ln, uMeshWL));
+}`)
+    .replace('#include <begin_vertex>', `#include <begin_vertex>
+transformed = lqPos;`);
+  Object.assign(shader.uniforms, { uPointer: matterUniforms.uPointer, uAspect: matterUniforms.uAspect, uPush: matterUniforms.uPush,
+    uStrength: matterUniforms.uStrength, uReachK: matterUniforms.uReachK, uTrail: matterUniforms.uTrail });
+  shader.fragmentShader = shader.fragmentShader.replace(/void main\(\)\s*\{/, `uniform int uHoleMode; uniform vec2 uBuf, uPointer; uniform float uAspect, uPush, uStrength, uReachK; uniform vec3 uTrail[16];
+float reachAt(vec2 ndc,vec2 ptr,float aspect,float k){vec2 q=ndc-ptr;q.x*=aspect;return exp(-dot(q,q)*k);}
+float hhash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+void main() {
+  if(uHoleMode>0){
+    vec2 ndc=gl_FragCoord.xy/uBuf*2.-1.; float h=0.;
+    if(uHoleMode<=4) h=reachAt(ndc,uPointer,uAspect,uReachK)*uPush*(uHoleMode==4?1.:.45);
+    if(uHoleMode==5){for(int i=0;i<16;i++){h=max(h,reachAt(ndc,uTrail[i].xy,uAspect,uReachK*1.4)*uTrail[i].z);}}
+    vec2 f=gl_FragCoord.xy; float wob=sin(f.x*.11+sin(f.y*.05)*2.)*sin(f.y*.13+sin(f.x*.04)*2.);
+    if(h*uStrength>.24+.1*wob+.05*hhash(f)) discard;
+  }`);
+};
 const rim = new THREE.DirectionalLight(0xffffff, 1.4); rim.position.set(-3, 2, -2); scene.add(rim);
 const key = new THREE.DirectionalLight(0xffffff, 0.6); key.position.set(2, 3, 4); scene.add(key);
 
@@ -278,18 +352,36 @@ function buildMatter(shapeId, count) {
   const pos = new Float32Array(count * 3), nor = new Float32Array(count * 3), seed = new Float32Array(count);
   const chunkC = new Float32Array(count * 3), chunkR = new Float32Array(count * 4);
   const p = new THREE.Vector3(), n = new THREE.Vector3();
-  const cells = new Map(); const CELL = 2.3;
-  const hash = (x, y, z, s) => { const h = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + s * 19.3) * 43758.5453; return h - Math.floor(h); };
+  // Fragments: a weighted scatter of seeds (a few large slabs, more medium pieces, many
+  // small chips) carves the form into irregular cells of mixed size; warping each point
+  // by smooth noise before the lookup rags the cell edges. Some points break off alone.
+  const seeds = [];
+  const thin = shapeId === 'knot' ? 0.3 : 1;
+  for (const [nSeeds, weight, travel] of [[5, 0.26, 0.12], [16, 0.08, 0.42], [60, 0.018, 0.75]]) {
+    for (let k = 0; k < nSeeds; k++) {
+      sampler.sample(p, n); p.addScaledVector(n, -Math.random() * 0.5 * thin);
+      seeds.push([p.x, p.y, p.z, weight, Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5, Math.min(0.95, travel + Math.random() * 0.2)]);
+    }
+  }
+  const warp = (x, y, z, o) => 0.13 * Math.sin(3.1 * x + 1.7 * z + o) * Math.cos(2.7 * y - 1.3 * x + o * 0.5);
   for (let i = 0; i < count; i++) {
     sampler.sample(p, n);
     // A third of the points fill the inside, so a broken form has body, not just a skin.
     if (Math.random() < 0.33) p.addScaledVector(n, -Math.random() * (shapeId === 'knot' ? 0.22 : 0.85) * Math.random());
     pos.set([p.x, p.y, p.z], i * 3); nor.set([n.x, n.y, n.z], i * 3); seed[i] = Math.random();
-    const cx = Math.floor(p.x * CELL), cy = Math.floor(p.y * CELL), cz = Math.floor(p.z * CELL);
-    const key = `${cx},${cy},${cz}`;
-    if (!cells.has(key)) cells.set(key, [(cx + 0.5) / CELL, (cy + 0.5) / CELL, (cz + 0.5) / CELL, hash(cx, cy, cz, 1) - 0.5, hash(cx, cy, cz, 2) - 0.5, hash(cx, cy, cz, 3) - 0.5, hash(cx, cy, cz, 4)]);
-    const c = cells.get(key);
-    chunkC.set(c.slice(0, 3), i * 3); chunkR.set(c.slice(3), i * 4);
+    if (Math.random() < 0.12) { // a loose speck: its own piece, flies furthest
+      chunkC.set([p.x, p.y, p.z], i * 3); chunkR.set([Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5, 1], i * 4);
+      continue;
+    }
+    const wx = p.x + warp(p.x, p.y, p.z, 0), wy = p.y + warp(p.y, p.z, p.x, 2.1), wz = p.z + warp(p.z, p.x, p.y, 4.3);
+    let best = 0, bestD = Infinity;
+    for (let k = 0; k < seeds.length; k++) {
+      const sd = seeds[k]; const dx = wx - sd[0], dy = wy - sd[1], dz = wz - sd[2];
+      const dd = dx * dx + dy * dy + dz * dz - sd[3];
+      if (dd < bestD) { bestD = dd; best = k; }
+    }
+    const sd = seeds[best];
+    chunkC.set([sd[0], sd[1], sd[2]], i * 3); chunkR.set([sd[4], sd[5], sd[6], sd[7]], i * 4);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -300,6 +392,7 @@ function buildMatter(shapeId, count) {
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 6);
   points = new THREE.Points(g, matterMaterial); scene.add(points);
 }
+const GAS_EXTRA = 1.6; // Gas draws this many times the chosen count, at a finer size
 
 // ---------- post ----------
 const composer = new EffectComposer(renderer);
@@ -320,15 +413,18 @@ composer.addPass(new OutputPass());
 // ---------- state ----------
 const state = {
   shape: 'blob', form: 2, motion: reduced ? 'manual' : 'loop', palette: 'whisper',
-  density: softwareGL ? 25000 : 60000, haze: 0.6,
+  density: softwareGL ? 25000 : 60000, haze: 0.6, cursor: 0,
 };
+const CURSOR_NOTES = ['Moves particles out of the way.', 'Gathers particles toward the cursor.', 'Swirls particles around the cursor.',
+  'Breaks the form apart under the cursor, in its current Form.', 'Leaves a trail where the form comes apart, then heals.', 'The cursor leaves the form alone.'];
+const trail = []; const TRAIL_LIFE = 1.4; // seconds a Wake mark takes to heal
 let disperse = 0, formNow = 2, hoverTarget = 0, loopT = 0;
 const pointerNDC = new THREE.Vector2(9, 9); let pointerActive = false;
 
 function applyPalette() {
   const p = PALETTES[state.palette];
   matterUniforms.uColA.value.set(p.a); matterUniforms.uColB.value.set(p.b); matterUniforms.uColC.value.set(p.c);
-  hazeUniforms.uCol.value.set(p.haze); meshMaterial.color.set(p.mesh);
+  hazeUniforms.uCol.value.set(p.haze); meshTint.set(p.mesh); meshMaterial.color.set(p.mesh); meshMaterial.attenuationColor.set(p.mesh);
   dust.material.color.set(p.b);
   if (scene.background) scene.background.dispose();
   scene.background = backdrop(p);
@@ -342,14 +438,15 @@ function syncButtons() {
   const notes = { manual: 'Drag the Disperse slider.', loop: 'Breathes apart and back together.', hover: 'Comes apart as the cursor nears it.' };
   document.getElementById('motionNote').textContent = notes[state.motion];
   document.getElementById('disperse').disabled = state.motion !== 'manual';
+  document.getElementById('cursorNote').textContent = CURSOR_NOTES[state.cursor];
 }
 for (const seg of document.querySelectorAll('.seg')) {
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     const k = seg.dataset.key; const prev = state[k];
-    state[k] = (k === 'form' || k === 'density') ? Number(b.dataset.v) : b.dataset.v;
+    state[k] = (k === 'form' || k === 'density' || k === 'cursor') ? Number(b.dataset.v) : b.dataset.v;
     if (k === 'palette') applyPalette();
-    if ((k === 'shape' || k === 'density') && prev !== state[k]) buildMatter(state.shape, state.density);
+    if ((k === 'shape' || k === 'density') && prev !== state[k]) buildMatter(state.shape, Math.round(state.density * GAS_EXTRA));
     syncButtons();
   });
 }
@@ -357,6 +454,10 @@ const disperseIn = document.getElementById('disperse'), disperseOut = document.g
 disperseIn.addEventListener('input', () => { disperse = Number(disperseIn.value); });
 const hazeIn = document.getElementById('haze');
 hazeIn.addEventListener('input', () => { state.haze = Number(hazeIn.value); document.getElementById('hazeOut').textContent = state.haze.toFixed(2); });
+for (const [id, uni] of [['strength', (v) => { matterUniforms.uStrength.value = v; }], ['radius', (v) => { matterUniforms.uReachK.value = 1 / (v * v); }]]) {
+  const el = document.getElementById(id), out = document.getElementById(id + 'Out');
+  el.addEventListener('input', () => { const v = Number(el.value); uni(v); out.textContent = v.toFixed(2); });
+}
 const panel = document.getElementById('panel'), toggle = document.getElementById('toggle');
 function setPanel(open) { panel.hidden = !open; toggle.textContent = open ? 'Hide tools' : 'Show tools'; toggle.setAttribute('aria-expanded', String(open)); }
 toggle.addEventListener('click', () => setPanel(panel.hidden));
@@ -364,12 +465,18 @@ addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'h' && !e.metaK
 canvas.addEventListener('pointermove', (e) => {
   const r = canvas.getBoundingClientRect();
   pointerNDC.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); pointerActive = true;
+  const lastMark = trail[trail.length - 1];
+  if (!lastMark || Math.hypot(lastMark.x - pointerNDC.x, lastMark.y - pointerNDC.y) > 0.035) {
+    trail.push({ x: pointerNDC.x, y: pointerNDC.y, born: performance.now() / 1000 });
+    if (trail.length > 16) trail.shift();
+  }
 });
 canvas.addEventListener('pointerleave', () => { pointerActive = false; });
 
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false); composer.setSize(w, h); bloom.setSize(w, h);
+  renderer.getDrawingBufferSize(holeUniforms.uBuf.value);
   camera.aspect = w / h;
   // Keep the whole form in frame on narrow screens: pull the camera back as the view narrows.
   camera.position.setLength(w / h < 0.8 ? 12.5 : 8.6);
@@ -396,32 +503,51 @@ function frame() {
   if (state.motion !== 'manual') disperseIn.value = disperse;
   disperseOut.textContent = disperse.toFixed(2);
   formNow += (state.form - formNow) * Math.min(1, dt * 3);
-  const wG = Math.max(0, Math.min(1, formNow - 1));
+  if (Math.abs(state.form - formNow) < 0.01) formNow = state.form; // arrive exactly: a sliver of Liquid would leave its surface on
+  const wG = Math.max(0, Math.min(1, formNow - 1)); const wS = Math.max(0, Math.min(1, 1 - formNow)); const wL = 1 - wS - wG;
   const spin = reduced ? 0 : t * 0.12;
   matterUniforms.uTime.value = reduced ? 0 : t;
   matterUniforms.uDisperse.value = disperse;
   matterUniforms.uState.value = formNow;
   matterUniforms.uSpin.value = spin;
   matterUniforms.uPointer.value.copy(pointerNDC);
+  matterUniforms.uMode.value = reduced ? 5 : state.cursor;
+  holeUniforms.uHoleMode.value = reduced || state.cursor === 5 ? 0 : state.cursor + 1;
+  const nowS = now / 1000;
+  matterUniforms.uTrail.value.forEach((v, i) => {
+    const m = trail[trail.length - 1 - i];
+    const life = m ? Math.max(0, 1 - (nowS - m.born) / TRAIL_LIFE) : 0;
+    v.set(m ? m.x : 9, m ? m.y : 9, state.cursor === 4 ? life * life * (3 - 2 * life) : 0);
+  });
   matterUniforms.uPush.value += ((pointerActive && !reduced ? 1 : 0) - matterUniforms.uPush.value) * Math.min(1, dt * 4);
   // The surface shows only while the form holds; particles carry it once it moves.
-  const meshOpacity = Math.max(0, 1 - disperse * 5) * (1 - wG);
+  // Solid hands over to particles as it breaks; Liquid keeps its clear, deforming surface
+  // all the way to the pool; Gas has no surface.
+  const liquidVis = Math.min(1, Math.max(0, (wL - 0.05) / 0.35));
+  const meshOpacity = wS * Math.max(0, 1 - disperse * 5) + liquidVis;
+  liquidUniforms.uMeshE.value = ease(disperse); liquidUniforms.uMeshWL.value = wL;
+  meshMaterial.transmission = wL > 0.05 ? wL : 0;
+  meshMaterial.roughness = 0.32 + (0.04 - 0.32) * wL; meshMaterial.metalness = 0.15 * (1 - wL);
+  meshMaterial.color.copy(meshTint).lerp(WHITE, wL * 0.85);
   meshMaterial.opacity = meshOpacity; if (mesh) { mesh.visible = meshOpacity > 0.01; mesh.rotation.y = spin; }
   // Additive points pile up, so per-point brightness falls as the count rises; they
   // stay faint while the surface is showing and take over as the form lets go.
-  const gain = Math.sqrt(25000 / state.density);
-  matterUniforms.uOpacity.value = gain * (0.035 + 0.2 * Math.max(Math.min(1, disperse * 2.5), wG * 0.8));
-  hazeUniforms.uTime.value = t; hazeUniforms.uAmount.value = state.haze * (0.45 + 0.55 * Math.max(wG * disperse, disperse * 0.6));
+  const drawn = Math.round(state.density * (1 + (GAS_EXTRA - 1) * wG));
+  if (points) points.geometry.setDrawRange(0, drawn);
+  const gain = Math.sqrt(25000 / drawn);
+  matterUniforms.uOpacity.value = gain * (0.035 + 0.2 * Math.max(Math.min(1, disperse * 2.5), wG * 0.8)) * (1 + wL * 1.5 + wG * disperse * 0.5);
+  hazeUniforms.uTime.value = t; hazeUniforms.uAmount.value = state.haze * (0.45 + 0.55 * Math.max(wG * disperse, disperse * 0.6)) * (1 + wG * disperse * 0.3);
   dust.rotation.y = t * 0.01;
   controls.update();
   composer.render();
   requestAnimationFrame(frame);
 }
 
-applyPalette(); buildMatter(state.shape, state.density); syncButtons(); resize();
+applyPalette(); buildMatter(state.shape, Math.round(state.density * GAS_EXTRA)); syncButtons(); resize();
 // On a phone the panel would cover the form, so it starts tucked away.
 if (innerWidth <= 640) setPanel(false);
 if (reduced) document.getElementById('motionNote').textContent = 'Reduced motion is on: drag the Disperse slider.';
-window.__matter = { state, setDisperse: (v) => { state.motion = 'manual'; disperse = v; syncButtons(); }, gpu, softwareGL };
+window.__matter = { formNow: () => formNow, state, setDisperse: (v) => { state.motion = 'manual'; disperse = v; syncButtons(); }, gpu, softwareGL,
+  setPointer: (x, y) => { pointerNDC.set(x, y); pointerActive = true; trail.push({ x, y, born: performance.now() / 1000 }); if (trail.length > 16) trail.shift(); } };
 requestAnimationFrame(frame);
 </script>
