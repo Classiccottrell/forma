@@ -151,12 +151,16 @@ vec3 rotAxis(vec3 v,vec3 a,float ang){return v*cos(ang)+cross(a,v)*sin(ang)+a*do
 // Liquid body in object space: slumps under its own weight, runs into smooth drips on the
 // lower half, and spreads into a pool where it meets the floor.
 vec3 liquidAt(vec3 p,float e,float t){
-  vec3 q=p+field(p*1.1,t*.25)*.14*e*(1.-.45*e); // ripples calm as the melt goes on
+  // In the last stretch of Disperse the body stops moving and slumps flat: a puddle is the end.
+  float settle=smoothstep(.6,1.,e);
+  vec3 q=p+field(p*1.1,t*.25)*.14*e*(1.-.45*e)*(1.-.9*settle);
   float sag=.5+.5*snoise(p*1.3+7.);
   q.y-=e*(.6+sag*.7)*(1.+(1.-p.y)*.3);
   q.y-=smoothstep(.2,.7,snoise(vec3(p.xz*1.8,4.2)))*smoothstep(.3,-.9,p.y)*e*.9;
+  q.y-=settle*1.6;
   float floorY=-1.5;
-  if(q.y<floorY){float over=floorY-q.y;q.y=floorY+sin(over*9.+t*2.)*.01+over*.12;q.xz*=1.+over*.5;} // a thicker, tighter pool
+  // Below the floor, matter spreads outward; what arrives last sits highest, so the puddle domes slightly.
+  if(q.y<floorY){float over=floorY-q.y;q.xz*=1.+over*.45;q.y=floorY+.2*(1.-smoothstep(0.,2.6,over))+sin(over*9.+t*2.)*.01*(1.-settle);}
   return q;
 }
 `;
@@ -211,8 +215,9 @@ void main(){
   // that falls on its own loop and rejoins the pool
   float drop=step(.94,aSeed);
   vec3 lp=rotY(liquidAt(position,e,t),uSpin);
-  lp+=n*drop*e*(.06+aSeed*.18);
-  lp.y-=drop*e*fract(t*.22+aSeed*7.)*1.3; lp.y=max(lp.y,-1.5);
+  float dropOn=drop*(1.-smoothstep(.6,1.,e)); // no drops once it has settled into a puddle
+  lp+=n*dropOn*e*(.06+aSeed*.18);
+  lp.y-=dropOn*e*fract(t*.22+aSeed*7.)*1.3; lp.y=max(lp.y,-1.5);
   // gas: diffuse outward, curl into fine wisps, rise, thin out
   vec3 gp=p+normalize(p+1e-4)*e*(.3+aSeed*1.)+field(p*.7+aSeed,t*.12)*e*.85;
   gp+=field(p*2.4+aSeed*3.,t*.35)*e*.32;
@@ -307,9 +312,9 @@ void main(){
     });
     this.compMat = new THREE.ShaderMaterial({
       uniforms: { tDiffuse: { value: null }, tFluid: { value: null }, tThick: { value: null }, uTexel: { value: new THREE.Vector2() }, uTan: { value: new THREE.Vector2(1, 1) },
-        uMix: { value: 0 }, uTint: { value: new THREE.Color() }, uSkyLo: { value: new THREE.Color() }, uSkyHi: { value: new THREE.Color() } },
+        uMix: { value: 0 }, uTime: { value: 0 }, uShimmer: { value: 0 }, uTint: { value: new THREE.Color() }, uSkyLo: { value: new THREE.Color() }, uSkyHi: { value: new THREE.Color() } },
       vertexShader: QUAD_VS,
-      fragmentShader: `uniform sampler2D tDiffuse,tFluid,tThick; uniform vec2 uTexel,uTan; uniform float uMix; uniform vec3 uTint,uSkyLo,uSkyHi; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tDiffuse,tFluid,tThick; uniform vec2 uTexel,uTan; uniform float uMix,uTime,uShimmer; uniform vec3 uTint,uSkyLo,uSkyHi; varying vec2 vUv;
 vec3 vpos(vec2 uv,float d){ return vec3((uv*2.-1.)*uTan,-1.)*d; }
 vec3 edge(vec2 uv,vec3 P,vec2 o){
   float a=texture2D(tFluid,uv+o).r, b=texture2D(tFluid,uv-o).r;
@@ -326,6 +331,12 @@ void main(){
   vec3 cr=cross(edge(vUv,P,vec2(uTexel.x,0.)),edge(vUv,P,vec2(0.,uTexel.y)));
   vec3 N=dot(cr,cr)>1e-12?normalize(cr):vec3(0.,0.,1.);
   if(N.z<0.) N=-N;
+  // A settled puddle shimmers: slow crossing ripples tilt the normals of up-facing liquid.
+  if(uShimmer>0.){
+    float up=smoothstep(.3,.8,N.y);
+    vec2 w=vec2(sin(vUv.x*95.+uTime*1.6+sin(vUv.y*55.+uTime*.9)*1.6),sin(vUv.y*120.-uTime*1.3+sin(vUv.x*65.-uTime*.7)*1.4));
+    N=normalize(N+vec3(w.x,0.,w.y)*.08*uShimmer*up);
+  }
   vec3 V=normalize(-P); float ndv=max(dot(N,V),0.);
   float fres=.03+.97*pow(1.-ndv,5.);
   // Body: thicker liquid absorbs more of what's behind it and glows more with its own
@@ -381,15 +392,22 @@ const fluidPass = new FluidPass();
 const meshMaterial = new THREE.MeshPhysicalMaterial({ roughness: 0.32, metalness: 0.15, clearcoat: 0.7, clearcoatRoughness: 0.2, envMapIntensity: 0.7, transparent: true });
 let mesh = null;
 // uHoleMode: 0 off, 1 push, 2 attract, 3 vortex, 4 scatter, 5 wake (cursor mode + 1).
-const holeUniforms = { uHoleMode: { value: 0 }, uBuf: { value: new THREE.Vector2(1, 1) } };
+const holeUniforms = { uHoleMode: { value: 0 }, uBuf: { value: new THREE.Vector2(1, 1) }, uBreak: { value: 0 } };
 meshMaterial.onBeforeCompile = (shader) => {
   Object.assign(shader.uniforms, holeUniforms);
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vObj;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObj = position;');
   Object.assign(shader.uniforms, { uPointer: matterUniforms.uPointer, uAspect: matterUniforms.uAspect, uPush: matterUniforms.uPush,
     uStrength: matterUniforms.uStrength, uReachK: matterUniforms.uReachK, uTrail: matterUniforms.uTrail });
-  shader.fragmentShader = shader.fragmentShader.replace(/void main\(\)\s*\{/, `uniform int uHoleMode; uniform vec2 uBuf, uPointer; uniform float uAspect, uPush, uStrength, uReachK; uniform vec3 uTrail[16];
-float reachAt(vec2 ndc,vec2 ptr,float aspect,float k){vec2 q=ndc-ptr;q.x*=aspect;return exp(-dot(q,q)*k);}
+  shader.fragmentShader = shader.fragmentShader.replace(/void main\(\)\s*\{/, `uniform int uHoleMode; uniform vec2 uBuf, uPointer; uniform float uAspect, uPush, uStrength, uReachK, uBreak; uniform vec3 uTrail[16];
+varying vec3 vObj;
+${NOISE}
 float hhash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
 void main() {
+  // Breaking: the surface stays fully solid but cracks away in ragged patches, so there is
+  // never a see-through shell with the particle form showing inside it.
+  if(uBreak>0.){ float k=snoise(vObj*2.3)*.5+.5+snoise(vObj*7.5)*.12; if(k<uBreak) discard; }
   if(uHoleMode>0){
     vec2 ndc=gl_FragCoord.xy/uBuf*2.-1.; float h=0.;
     if(uHoleMode<=4) h=reachAt(ndc,uPointer,uAspect,uReachK)*uPush*(uHoleMode==4?1.:.45);
@@ -648,11 +666,13 @@ function frame() {
   matterUniforms.uPush.value += ((pointerActive && !reduced ? 1 : 0) - matterUniforms.uPush.value) * Math.min(1, dt * 4);
   // The surface shows only while the form holds; particles carry it once it moves.
   // Solid hands its surface over to particles as it breaks; Liquid and Gas have none.
-  const meshOpacity = wS * Math.max(0, 1 - disperse * 5);
+  const meshOpacity = wS; // fades only when changing Form; breaking is handled by uBreak
+  holeUniforms.uBreak.value = Math.min(1.2, (disperse / 0.33) * 1.2);
   // The liquid is the particles themselves, so it crossfades with Solid and Gas.
   fluidPass.enabled = wL > 0.01; fluidPass.compMat.uniforms.uMix.value = wL;
+  fluidPass.compMat.uniforms.uTime.value = t; fluidPass.compMat.uniforms.uShimmer.value = wL * ease(Math.max(0, (disperse - 0.6) / 0.4));
   depthUniforms.uProj.value.copy(camera.projectionMatrix);
-  meshMaterial.opacity = meshOpacity; if (mesh) { mesh.visible = meshOpacity > 0.01; mesh.rotation.y = spin; }
+  meshMaterial.opacity = meshOpacity; if (mesh) { mesh.visible = meshOpacity > 0.01 && holeUniforms.uBreak.value < 1.15; mesh.rotation.y = spin; }
   // Additive points pile up, so per-point brightness falls as the count rises; they
   // stay faint while the surface is showing and take over as the form lets go.
   const drawn = Math.round(state.density * (1 + (GAS_EXTRA - 1) * wG));
