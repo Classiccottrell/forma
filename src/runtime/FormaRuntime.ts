@@ -8,6 +8,7 @@ import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, 
 import { slotKey, changedHotKeys } from './diff.js';
 import { ensureGeometryUVs } from './uv.js';
 import { MatterLayer } from './MatterLayer.js';
+import { createReflectionMap } from '../scene/reflections.js';
 
 interface Slot<H> {
   registry: ResourceRegistry;
@@ -347,6 +348,9 @@ export class FormaRuntime {
     // `create` builds the rig at its authored values; this applies the
     // composition's own lighting so a saved or imported one renders as saved.
     def.update?.(handle, params as any);
+    // Every environment gets a world to reflect; an HDR, where there is one, replaces
+    // this when it finishes loading.
+    this.applyReflectionMap(params);
 
     const hdrPath = def.hdrPath;
     if (!hdrPath || !this.environmentBaseUrl) return;
@@ -372,6 +376,22 @@ export class FormaRuntime {
       this.scene.environmentIntensity = Number(live.environmentStrength ?? 1);
       this.scene.environmentRotation.y = THREE.MathUtils.degToRad(Number(live.environmentRotation ?? 0));
     }, undefined, () => { /* existing lights remain the fallback */ });
+  }
+
+  /** Builds the environment's procedural reflection map (see createReflectionMap) from
+   * its background and key light, and owns it in the environment slot. */
+  private applyReflectionMap(params: Record<string, unknown>): void {
+    const key = this.scene.children.find((o): o is THREE.DirectionalLight => o instanceof THREE.DirectionalLight && o.visible);
+    const background = this.scene.background as THREE.Color | THREE.Texture | null;
+    const target = createReflectionMap(this.renderer, background, key ? key.color.clone() : new THREE.Color(1, 1, 1));
+    if (!target) return;
+    this.scene.environment = target.texture;
+    this.scene.environmentIntensity = Number(params.environmentStrength ?? 1);
+    this.scene.environmentRotation.y = THREE.MathUtils.degToRad(Number(params.environmentRotation ?? 0));
+    this.environmentSlot.registry.track(() => {
+      if (this.scene.environment === target.texture) this.scene.environment = null;
+      target.dispose();
+    });
   }
 
   private invalidateEnvironmentLoad(): void {
