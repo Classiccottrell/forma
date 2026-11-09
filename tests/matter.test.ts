@@ -100,8 +100,7 @@ describe('matter layer', () => {
     expect(runtime.scene.children.some((o) => o instanceof THREE.Points)).toBe(false);
   });
 
-  // Every shape (svg-extrude needs a real DOMParser, as in the content smoke test).
-  const shapeIds = shapeRegistry.list().map((d) => d.id).filter((id) => id !== 'svg-extrude');
+  const shapeIds = shapeRegistry.list().map((d) => d.id);
   it.each(shapeIds)('%s: particles are finite and stay inside the shape', (shapeId) => {
     const runtime = matterRuntime();
     runtime.applyComposition(composition(shapeId, low()));

@@ -44,7 +44,7 @@ function pickEnvironmentFor(materialId: string): string {
  * look intentional. Must run after content registration. `applyComposition` consumes
  * the result directly — no new runtime method needed (roadmap §5). */
 export function surpriseMe(): Composition {
-  const shapeIds = shapeRegistry.list().map((s) => s.id).filter((id) => id !== 'svg-extrude');
+  const shapeIds = shapeRegistry.list().map((s) => s.id);
   const materialIds = materialRegistry.list().map((m) => m.id);
 
   let shapeId = pick(shapeIds);

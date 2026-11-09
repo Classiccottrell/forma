@@ -56,6 +56,11 @@ describe('serialize round-trip', () => {
     expect(round).toEqual({ ...baseComposition(), shapeId: 'sphere', shapeParams: shapeRegistry.require('sphere').defaultParameters });
   });
 
+  it('opens a composition saved with the dropped SVG Import shape as a Card', () => {
+    const saved = serializeComposition({ ...baseComposition(), shapeId: 'svg-extrude', shapeParams: { svg: '<svg/>', size: 1.5, depth: 0.25, bevelEnabled: true, bevelSize: 0.02, curveSegments: 12 } });
+    expect(deserializeComposition(saved)).toMatchObject({ shapeId: 'card', shapeParams: shapeRegistry.require('card').defaultParameters });
+  });
+
   it('opens a composition saved with the retired Bevelled Box as a Box', () => {
     const saved = serializeComposition({ ...baseComposition(), shapeId: 'bevelled-box', shapeParams: { size: 1.2, depth: 1.2, bevel: 0.08 } });
     expect(deserializeComposition(saved)).toMatchObject({ shapeId: 'box', shapeParams: shapeRegistry.require('box').defaultParameters });

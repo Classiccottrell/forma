@@ -18,10 +18,7 @@ function mulberry32(seed: number): () => number {
 describe('leak-free repeated-switching stress test (blueprint §5.5)', () => {
   it('merged report returns to post-warm-up baseline every cycle, across >=50 cycles', () => {
     const runtime = makeHeadlessRuntime();
-    // `svg-extrude` excluded: SVGLoader.parse() needs a real 'image/svg+xml'-capable
-    // DOMParser, which happy-dom doesn't support (see content-smoke.test.ts) — covered
-    // instead by real headless-browser Playwright checks against a live dev server.
-    const shapes = shapeRegistry.list().filter((s) => s.id !== 'svg-extrude');
+    const shapes = shapeRegistry.list();
     const materials = materialRegistry.list();
     const environments = environmentRegistry.list();
     // M2 expansion (roadmap §2/§3): full cartesian product would be

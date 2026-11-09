@@ -10,6 +10,7 @@ const RETIRED: Readonly<Record<string, string>> = {
   polo: 'sphere',
   cap: 'sphere',
   'bevelled-box': 'box',
+  'svg-extrude': 'card', // SVG Import (uploaded artwork), dropped 2026-11-09: a flat slab is the closest stand-in
 };
 
 /** Shapes that kept their id but were rebuilt with different parameters. A saved

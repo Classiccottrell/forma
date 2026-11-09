@@ -2,8 +2,8 @@
 
 ## Goal
 Forma is a free, open-source, browser-based/self-hostable 3D shape playground — an
-original implementation of the "pick a shape, apply material + lighting, optionally
-extrude an SVG, export a transparent PNG or self-contained embed snippet" concept.
+original implementation of the "pick a shape, apply material + lighting, export a
+transparent PNG or self-contained embed snippet" concept (SVG upload was dropped 2026-11-09).
 MIT licensed, no signup, runs client-side. Built on a typed
 shape/material/environment/effect composition engine (`src/`, already proven via a
 dev harness) now growing a real product UI and content library on top of that proven
@@ -150,9 +150,9 @@ generative line-art backgrounds project) on the page, so the two can share a sce
 ## Status
 **M0–M4 complete; live at https://classiccottrell.github.io/forma/. Current milestone:
 V2 — Matter (below), which absorbs the R1 review findings. The shape catalog is fixed at
-31 shapes (owner decision, 2026-11-08; Bevelled Box removed 2026-11-09).**
+30 shapes (owner decision, 2026-11-08; Bevelled Box and SVG Import removed 2026-11-09).**
 
-Current content: 31 shapes / 21 materials / 8 textures / 10 environments / 9 effects.
+Current content: 30 shapes / 21 materials / 8 textures / 10 environments / 9 effects.
 
 ## V2 — Matter (current)
 
@@ -161,7 +161,8 @@ review in headless Chrome on SwiftShader (never the owner's Chrome on the iMac �
 the GPU note in the agent memory) plus the owner's own look. A phase is done when the
 owner accepts it, not when its checks pass.
 
-**Catalog:** 31 shapes. Kept all 32 on 2026-11-08; on 2026-11-09 the owner removed Bevelled
+**Catalog:** 30 shapes. Kept all 32 on 2026-11-08; on 2026-11-09 the owner dropped SVG Import
+(uploaded artwork; saved files open on Card) and removed Bevelled
 Box and had the other near-duplicates made distinct (see Phase 1 progress).
 
 ### Phase 0 — Prototype the matter feel (DONE, accepted 2026-11-08)
@@ -557,6 +558,7 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-11-09 | SVG upload dropped (owner's call after the Phase 1 review): the SVG Import shape, its upload box, the "Yours" filter and the SVG parser are gone; saved files with an uploaded SVG open on Card. 30 shapes. App bundle −22 KB, now inside the gzip budget (248.7 KB / 250 KB); raw JS still over (917.8 KB / 900 KB). |
 | 2026-11-09 | Phase 1 complete, awaiting owner review: framing (#20), inside-out shapes fixed and Sphere/Soft Blob smoothed (#22), near-duplicates made distinct and Bevelled Box removed (#23, 31 shapes), reflections in every environment (#24), chrome Soft Blob opening scene and Holographic Gas preset (#25), real contact shadow. |
 | 2026-11-08 | Phase 1 framing: the editor fits the object to the area left of the panel with room around it; square PNG exports keep the whole object; floor shadow follows it. 137/137 tests (5 new), M3 browser checks 15/15 (now pinned to headless Chrome on SwiftShader with a renderer interlock), screenshots checked on desktop, panel closed, Gas, Liquid puddle, phone and a 1024² export. |
 | 2026-11-08 | Phase 2 matter in the product: `Composition.matter`, runtime `MatterLayer` on `cc-webgl/matter`, Matter and Cursor editor sections, per-shape inside fill. 132/132 tests (43 new, incl. every shape's particles staying inside it), M3 browser checks 15/15, editor checked headless on SwiftShader with 0 errors. App bundle +34 KB; now over the gzip budget too (256 KB / 250 KB). Framing gap handed to Phase 1. |

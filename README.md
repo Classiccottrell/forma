@@ -31,13 +31,13 @@ cd app && npm install   # editor product app — its own package.json, React + f
 
 ### Current H3 roadmap status
 
-The catalog is 31 shapes, 21 materials, 8 textures, 10 environments and 9 effects, which
+The catalog is 30 shapes, 21 materials, 8 textures, 10 environments and 9 effects, which
 meets the H3 targets. The reference-driven slices are in: All/Solid/Flat/Yours shape
 filters; Material Library/Settings views with surface presets and a Physical Studio
 material; environment strength, rotation, light colour/intensity and a directional-light
 pad; ordered Texture → Colour → Finish effect stages, including Bloom, Colour Grade and
-Film Grain; backdrops, floor shadow, lens/turn/tilt/zoom; and undo/redo. Generic SVG
-import remains a separate upload path.
+Film Grain; backdrops, floor shadow, lens/turn/tilt/zoom; and undo/redo. SVG upload was
+dropped on 2026-11-09; files saved with an uploaded SVG open on Card.
 
 Live at https://classiccottrell.github.io/forma/. Current milestone: V2 — Matter: shapes
 that can hold their form, run like liquid or come apart like gas, inside haze and
@@ -82,7 +82,7 @@ HDR loading, while omitted URLs retain the synchronous light fallback.
 ### Editor UX (M3)
 
 - **Search** (`ControlPanel`'s search box) filters shape/material/texture/environment/effect picker grids live; a section with a match auto-expands while searching, without disturbing the user's manual collapse/expand state.
-- **Keyboard shortcut**: `H` toggles the control panel. Inert while a text input/textarea/select/contenteditable has focus (search box, SVG-paste textarea) and requires no modifier keys (so it never collides with a browser/OS shortcut).
+- **Keyboard shortcut**: `H` toggles the control panel. Inert while a text input/textarea/select/contenteditable has focus (for example the search box) and requires no modifier keys (so it never collides with a browser/OS shortcut).
 - **Reset actions**: "↺ Reset" (topbar) restores the default sphere/matte/studio composition; "⌂ Reset view" (viewport toolbelt) restores the default camera orbit — including clearing residual OrbitControls damping momentum, which `OrbitControls.reset()` alone does not do (see code comment in `app/src/components/Viewport.tsx`).
 - **Mobile**: panel defaults collapsed under 640px width, goes full-width when opened; topbar wraps; OrbitControls' built-in touch handling drives orbit/zoom.
 - **`prefers-reduced-motion`**: auto-spin toggle is disabled outright when the OS preference is set (`app/src/hooks/useReducedMotion.ts`).
@@ -130,14 +130,6 @@ run's logs.
   requests) for a tool where the user already waits once on first load and
   then interacts entirely client-side with no navigation. Treated as an
   explicit non-goal, not deferred work.
-- **SVG extrusion cap**: uploaded SVGs over 100KB are rejected in favor of the
-  built-in default glyph (M2) — prevents pathological `ExtrudeGeometry` cost
-  from adversarial input.
-- **`svg-extrude` test coverage gap**: excluded from `tests/leak-check.test.ts`
-  and `tests/content-smoke.test.ts`'s automated shape lists because happy-dom's
-  `DOMParser` doesn't support `image/svg+xml` parsing (returns a null
-  `documentElement` — a happy-dom limitation, not a Forma bug). Covered instead
-  by real headless-browser Playwright checks (see M2 log entry in `BRIEF.md`).
 
 ## Contributing
 

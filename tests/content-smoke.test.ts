@@ -12,13 +12,7 @@ describe('content smoke test — every shape/material creates cleanly from defau
   ensureHarnessContentRegistered();
 
   it('every registered shape builds non-empty, finite geometry from its defaults', () => {
-    // `svg-extrude` is excluded here: SVGLoader.parse() calls DOMParser with mime type
-    // 'image/svg+xml', which happy-dom does not support (returns a null
-    // documentElement) — same class of gap materials.ts/environments.ts already
-    // document (CanvasTexture unreliable under happy-dom). Verified instead via real
-    // headless-browser Playwright checks against a live app dev server (M2 report).
     for (const def of shapeRegistry.list()) {
-      if (def.id === 'svg-extrude') continue;
       const geometry = def.create(shapeRegistry.require(def.id).defaultParameters, {
         registry: { track: () => {} } as never,
       });
@@ -38,9 +32,8 @@ describe('content smoke test — every shape/material creates cleanly from defau
     expect(['heart', 'plus', 'arrow', 'star', 'sparkle'].every((id) => shapeRegistry.get(id))).toBe(true);
   });
 
-  it('every default non-SVG shape has usable UVs after the runtime fallback', () => {
+  it('every default shape has usable UVs after the runtime fallback', () => {
     for (const def of shapeRegistry.list()) {
-      if (def.id === 'svg-extrude') continue;
       const geometry = def.create(def.defaultParameters, { registry: { track: () => {} } } as never);
       ensureGeometryUVs(geometry);
       const position = geometry.getAttribute('position');
