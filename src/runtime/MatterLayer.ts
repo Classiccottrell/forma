@@ -59,6 +59,7 @@ export class MatterLayer {
   private elapsed = 0;
   private pointer = new THREE.Vector2(9, 9);
   private pointerActive = false;
+  private readonly screenCentre = new THREE.Vector3();
   private readonly trail: { x: number; y: number; born: number }[] = [];
   private readonly reducedMotion: boolean;
   private readonly size = new THREE.Vector2();
@@ -189,13 +190,15 @@ void main() {
     this.resampleIfNeeded(s);
     const u = this.uniforms;
 
-    // Disperse: from the slider, a 9 s breathe, or the pointer's distance from centre.
+    // Disperse: from the slider, a 9 s breathe, or the pointer's distance from the
+    // object's centre on screen (not the canvas centre: framing can shift it clear of a panel).
     if (s.motion === 'loop' && !this.reducedMotion) {
       this.loopT = (this.loopT + dt / 9) % 1;
       const p = this.loopT;
       this.disperseNow = p < 0.18 ? 0 : p < 0.45 ? ease((p - 0.18) / 0.27) : p < 0.7 ? 1 : p < 0.97 ? 1 - ease((p - 0.7) / 0.27) : 0;
     } else if (s.motion === 'hover' && !this.reducedMotion) {
-      const target = this.pointerActive ? clamp01(1.25 - this.pointer.length() * 1.6) : 0;
+      const centre = this.screenCentre.set(0, 0, 0).project(this.camera);
+      const target = this.pointerActive ? clamp01(1.25 - Math.hypot(this.pointer.x - centre.x, this.pointer.y - centre.y) * 1.6) : 0;
       this.disperseNow += (target - this.disperseNow) * Math.min(1, dt * 2.2);
     } else {
       this.disperseNow = s.disperse;

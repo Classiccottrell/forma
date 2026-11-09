@@ -41,7 +41,7 @@ export function ExportPanel({ scene, composition, onImportComposition }: ExportP
     setStatus('exporting…');
     try {
       const blob = await exportPNG(
-        { renderer: scene.renderer, scene: scene.scene, camera: scene.camera, composer: scene.composer },
+        { renderer: scene.renderer, scene: scene.scene, camera: scene.camera, composer: scene.composer, framing: scene.framing },
         { width, height, transparentBackground: true }
       );
       const url = URL.createObjectURL(blob);

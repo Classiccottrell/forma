@@ -8,6 +8,7 @@ import {
   environmentRegistry,
   type Composition,
   type FormaScene,
+  type Framing,
   FrameScheduler,
 } from 'forma';
 import { registerAllContent } from 'forma/content';
@@ -47,7 +48,13 @@ export interface UseFormaRuntimeResult {
 /** Mounts one `FormaRuntime` + owned scene bootstrap into `hostRef.current` (mount
  * once, per roadmap §6 hook list), exposes an `apply()` that merges a partial patch
  * into the live Composition and re-applies it (React-friendly wrapper). */
-export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>, initialComposition = defaultComposition()): UseFormaRuntimeResult {
+export interface UseFormaRuntimeOptions {
+  /** Fit the camera to the canvas (see `CreateFormaSceneOptions.framing`). Without it
+   * the camera stays at a fixed distance. */
+  framing?: Framing;
+}
+
+export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>, initialComposition = defaultComposition(), options: UseFormaRuntimeOptions = {}): UseFormaRuntimeResult {
   const [current, setCurrent] = useState<Composition>(() => initialComposition);
   const [scene, setScene] = useState<FormaScene | null>(null);
   const [scheduler, setScheduler] = useState<FrameScheduler | null>(null);
@@ -65,6 +72,7 @@ export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>, initialCo
     const formaScene = createFormaScene({
       el,
       cameraZ: 3.2,
+      framing: options.framing,
       onContextLost: () => {
         setContextLost(true);
         schedulerRef.current?.stop();
