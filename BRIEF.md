@@ -249,6 +249,14 @@ while Spring stays an even coil; Plus is soft and pillowy while Cross stays cris
 Box removed**; saved files fall back to Box. Ids are unchanged, and files saved with Gem's or
 Badge's old parameters open as the new shape at its defaults.
 
+**Progress (2026-11-09):** real reflections everywhere. Only Studio and Softbox loaded an
+HDR, so chrome, glass and gold were a black ball with a pinprick highlight in the other
+eight environments. Every environment now gets a procedural reflection map
+(`src/scene/reflections.ts`): its own background on a sphere plus a key soft-box in the key
+light's colour and a cool rim panel, prefiltered with PMREM. Strength and Rotation drive it
+like the HDR, and an HDR replaces it when it loads. Matte gains gentle ambient fill without
+washing out.
+
 ### Phase 2 — Matter
 Build the Phase 0 behaviour into the product for all 32 shapes. Split by ownership:
 
