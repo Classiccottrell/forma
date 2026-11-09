@@ -19,6 +19,8 @@ export { generateEmbedCode } from './runtime/embed.js';
 export { exportPNG } from './export/exportPNG.js';
 
 export { createFormaScene } from './scene/createFormaScene.js';
+export { ContactShadow, SHADOW_CASTER_LAYER } from './scene/ContactShadow.js';
+export type { ContactShadowSettings } from './scene/ContactShadow.js';
 export type { CreateFormaSceneOptions, FormaScene } from './scene/createFormaScene.js';
 export { computeFraming, applyFraming, DEFAULT_FRAMING_FILL, DEFAULT_SUBJECT_RADIUS } from './scene/framing.js';
 export type { Framing, FramingInsets, FramingResult } from './scene/framing.js';

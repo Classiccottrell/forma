@@ -9,6 +9,7 @@ import { slotKey, changedHotKeys } from './diff.js';
 import { ensureGeometryUVs } from './uv.js';
 import { MatterLayer } from './MatterLayer.js';
 import { createReflectionMap } from '../scene/reflections.js';
+import { ContactShadow, SHADOW_CASTER_LAYER, type ContactShadowSettings } from '../scene/ContactShadow.js';
 
 interface Slot<H> {
   registry: ResourceRegistry;
@@ -88,6 +89,7 @@ export class FormaRuntime {
   private disposed = false;
   /** V2 matter: inactive (draws nothing) unless the composition has `matter` settings. */
   private readonly matter: MatterLayer;
+  private readonly shadow: ContactShadow;
 
   constructor(opts: FormaRuntimeOptions) {
     this.scene = opts.scene;
@@ -111,14 +113,28 @@ export class FormaRuntime {
     this.resources.track(this.mesh);
     this.scene.add(this.mesh);
     this.matter = new MatterLayer(this.scene, this.camera, this.renderer, this.composer, this.ensureOutputPassLast);
+    this.mesh.layers.enable(SHADOW_CASTER_LAYER);
+    this.shadow = new ContactShadow(this.scene);
   }
 
-  /** Advances matter (motion, Form easing, cursor trail) by one frame. Call before each
-   * render; a no-op while the composition has no `matter` settings. Seconds. */
-  updateMatter(dt: number, elapsed: number): void {
+  /** Per-frame work before each render: matter (motion, Form easing, cursor trail) and
+   * the contact shadow. Seconds. */
+  update(dt: number, elapsed: number): void {
     if (this.disposed) return;
     this.matter.update(dt, elapsed);
     this.mesh.visible = !this.matter.active || this.matter.meshVisible;
+    this.shadow.setFade(this.matter.surfaceAmount);
+    this.shadow.render(this.renderer, this.scene);
+  }
+
+  /** @deprecated Use `update`, which also renders the contact shadow. */
+  updateMatter(dt: number, elapsed: number): void {
+    this.update(dt, elapsed);
+  }
+
+  /** The soft contact shadow under the object (Presentation's Floor shadow controls). */
+  setContactShadow(settings: ContactShadowSettings): void {
+    this.shadow.set(settings);
   }
 
   /** Test/introspection hook: the current matter particles, in the shape's unit space. */
@@ -211,6 +227,7 @@ export class FormaRuntime {
     this.environmentSlot.registry.disposeAll();
     this.effectsSlot.registry.disposeAll();
     this.matter.dispose();
+    this.shadow.dispose();
     this.resources.disposeAll();
     this.disposeExternal?.();
   }
@@ -237,6 +254,7 @@ export class FormaRuntime {
     const scale = 1.2 / sphere.radius;
     this.mesh.position.copy(sphere.center).multiplyScalar(-scale);
     this.mesh.scale.setScalar(scale);
+    this.shadow?.placeUnder(this.mesh);
   }
 
   private updateShapeSlotIfHotParamsChanged(prev: Composition, next: Composition): void {
@@ -246,6 +264,7 @@ export class FormaRuntime {
     if (hot.length === 0) return;
     def.update(this.shapeSlot.handle, next.shapeParams as any);
     this.matter.setShape(this.shapeSlot.handle, next.shapeId, next.shapeParams);
+    this.shadow.placeUnder(this.mesh);
   }
 
   // --- material --------------------------------------------------------------
