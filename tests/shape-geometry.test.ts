@@ -162,3 +162,27 @@ describe('hand-built shape geometry, across each parameter box', () => {
     }
   });
 });
+
+// A shape turned inside out (triangle winding reversed) has negative signed volume. Under
+// `side: FrontSide` its outward faces are culled and you see the inside through the gaps,
+// which reads as a washed-out, see-through front. A negative scale (a mirror) does exactly
+// that, which is how Heart, Plus, Arrow, Sparkle and SVG Import used to be flipped upright.
+function signedVolume(geometry: THREE.BufferGeometry): number {
+  const g = geometry.index ? geometry.toNonIndexed() : geometry;
+  const p = g.getAttribute('position');
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  let v = 0;
+  for (let i = 0; i < p.count; i += 3) {
+    a.fromBufferAttribute(p, i); b.fromBufferAttribute(p, i + 1); c.fromBufferAttribute(p, i + 2);
+    v += a.dot(b.clone().cross(c)) / 6;
+  }
+  return v;
+}
+
+describe('every shape faces outward', () => {
+  it.each(['heart', 'plus', 'arrow', 'sparkle', 'svg-extrude', 'star', 'cross', 'sphere', 'box'])('%s has positive signed volume', (id) => {
+    const geometry = build(id);
+    expect(signedVolume(geometry)).toBeGreaterThan(0);
+    geometry.dispose();
+  });
+});
