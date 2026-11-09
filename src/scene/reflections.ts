@@ -12,6 +12,9 @@ export function createReflectionMap(
   renderer: THREE.WebGLRenderer,
   background: THREE.Color | THREE.Texture | null,
   keyColor: THREE.Color,
+  /** 0..1 lightness of the backdrop. Dark backdrops get a horizon band and floor glow,
+   * or a mirror finish reflects nothing and the object's body disappears. */
+  backdropLuminance = 0.5,
 ): THREE.WebGLRenderTarget | null {
   const scene = new THREE.Scene();
   const disposables: { dispose(): void }[] = [];
@@ -38,6 +41,22 @@ export function createReflectionMap(
     };
     panel(keyColor.clone().lerp(new THREE.Color(1, 1, 1), 0.5).multiplyScalar(2.4), 5, 3.5, [-5, 5, 5]);
     panel(new THREE.Color(0.75, 0.82, 1).multiplyScalar(1.3), 2, 6, [6, 1, -5]);
+
+    const darkness = Math.min(1, Math.max(0, 1 - backdropLuminance / 0.3));
+    if (darkness > 0) {
+      const glow = keyColor.clone().lerp(new THREE.Color(1, 1, 1), 0.4);
+      const bandMaterial = new THREE.MeshBasicMaterial({ color: glow.clone().multiplyScalar(0.55 * darkness), side: THREE.BackSide, toneMapped: false });
+      const bandGeometry = new THREE.CylinderGeometry(9, 9, 1.6, 48, 1, true);
+      const floorMaterial = new THREE.MeshBasicMaterial({ color: glow.clone().multiplyScalar(0.18 * darkness), side: THREE.DoubleSide, toneMapped: false });
+      const floorGeometry = new THREE.CircleGeometry(8, 48);
+      disposables.push(bandMaterial, bandGeometry, floorMaterial, floorGeometry);
+      const band = new THREE.Mesh(bandGeometry, bandMaterial);
+      band.position.y = -0.4;
+      const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -4;
+      scene.add(band, floor);
+    }
 
     const pmrem = new THREE.PMREMGenerator(renderer);
     const target = pmrem.fromScene(scene, 0.03);

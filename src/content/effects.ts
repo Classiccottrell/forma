@@ -295,11 +295,11 @@ const bloom = defineEffect({
   parameterSchema: {
     // UnrealBloomPass reads these as plain properties every frame, so all three
     // are live-mutable — no rebuild on a slider drag.
-    strength: { kind: 'number', min: 0, max: 3, step: 0.05, default: 0.8, rebuild: false },
-    radius: { kind: 'number', min: 0, max: 1, step: 0.05, default: 0.4, rebuild: false },
+    strength: { kind: 'number', min: 0, max: 3, step: 0.05, default: 0.5, rebuild: false },
+    radius: { kind: 'number', min: 0, max: 1, step: 0.05, default: 0.35, rebuild: false },
     threshold: { kind: 'number', min: 0, max: 1, step: 0.01, default: 0.85, rebuild: false },
   },
-  defaultParameters: { strength: 0.8, radius: 0.4, threshold: 0.85 },
+  defaultParameters: { strength: 0.5, radius: 0.35, threshold: 0.85 },
   create(params, ctx) {
     const pass = new UnrealBloomPass(
       passResolution(ctx.renderer),
@@ -485,6 +485,11 @@ const filmGrainShader = {
       }
 
       float n = rand(vUv + fract(time)) - 0.5;
+      // Grain is added in linear light, where a fixed step is a big jump on a dark
+      // pixel once encoded to sRGB, so dark areas speckle. Scale it with brightness
+      // so grain sits in the image (and behind text over dark areas) instead.
+      float lum = dot(max(texel.rgb, 0.0), vec3(0.2126, 0.7152, 0.0722));
+      n *= mix(0.12, 1.0, sqrt(clamp(lum, 0.0, 1.0)));
       // Lower bound only. The composer's buffers are half-float, so values
       // above 1 are real highlights and must survive to OutputPass (and to any
       // pass after this one). Below 0 must not: grain can push a dark pixel

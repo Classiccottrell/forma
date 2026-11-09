@@ -1,4 +1,5 @@
 import type { Composition } from '../types.js';
+import { ATMOSPHERE_DEFAULTS } from '../runtime/atmosphereSettings.js';
 import { shapeRegistry, materialRegistry, environmentRegistry, effectRegistry } from '../registry/instances.js';
 
 /** "Surprise me" (roadmap §5): a coherent random combination, not a fully unweighted
@@ -18,6 +19,22 @@ const REFLECTIVE_MATERIALS = new Set(['chrome', 'gold', 'copper', 'metal', 'obsi
 // Materials that read best against a moody/dark backdrop.
 const COOL_MATERIALS = new Set(['glass', 'frosted-glass', 'ice', 'obsidian', 'wireframe', 'rubber']);
 
+// Legibility (R1 P2). Near-black materials vanish into a near-black backdrop, and bloom
+// on an already-bright backdrop blows the whole frame out to white. Environments not
+// listed count as mid-tone and pass either way, so new ones are safe by default.
+const DARK_MATERIALS = new Set(['obsidian', 'rubber', 'carbon']);
+const DARK_ENVIRONMENTS = new Set(['midnight', 'forest-night', 'deep-space', 'aurora-atmosphere']);
+const BRIGHT_ENVIRONMENTS = new Set(['softbox', 'paper-warm']);
+const BLOWOUT_EFFECTS = new Set(['bloom']);
+
+/** False for combinations that come out unreadable: a dark material on a dark
+ * backdrop, or bloom on a bright one. */
+export function isLegible(c: Pick<Composition, 'materialId' | 'environmentId' | 'effectIds'>): boolean {
+  if (DARK_MATERIALS.has(c.materialId) && DARK_ENVIRONMENTS.has(c.environmentId)) return false;
+  if (BRIGHT_ENVIRONMENTS.has(c.environmentId) && c.effectIds.some((id) => BLOWOUT_EFFECTS.has(id))) return false;
+  return true;
+}
+
 // Materials that pair well with a saturated/stylized backdrop.
 const STYLIZED_MATERIALS = new Set(['toon', 'neon-plastic', 'velvet']);
 
@@ -29,12 +46,13 @@ function pick<T>(arr: readonly T[]): T {
  * uniform pick across all registered environments if none of the bias rules match
  * (keeps this forward-compatible with new environments added later). */
 function pickEnvironmentFor(materialId: string): string {
-  const allIds = environmentRegistry.list().map((e) => e.id);
+  const allIds = environmentRegistry.list().map((e) => e.id)
+    .filter((id) => isLegible({ materialId, environmentId: id, effectIds: [] }));
   const has = (id: string) => allIds.includes(id);
 
   let preferred: string[] = [];
   if (REFLECTIVE_MATERIALS.has(materialId)) preferred = ['studio', 'softbox'].filter(has);
-  else if (COOL_MATERIALS.has(materialId)) preferred = ['midnight', 'gradient-sky'].filter(has);
+  else if (COOL_MATERIALS.has(materialId)) preferred = ['midnight', 'deep-space', 'gradient-sky'].filter(has);
   else if (STYLIZED_MATERIALS.has(materialId)) preferred = ['neon-room', 'sunset'].filter(has);
 
   return preferred.length > 0 ? pick(preferred) : pick(allIds);
@@ -65,7 +83,8 @@ export function surpriseMe(): Composition {
   // Effects: bias toward zero or one, never stack several at once (keeps the result
   // readable rather than chaotic) — 50% none, 50% one real effect.
   const realEffectIds = effectRegistry.list().map((e) => e.id).filter((id) => id !== 'none');
-  const effectIds: string[] = Math.random() < 0.5 || realEffectIds.length === 0 ? [] : [pick(realEffectIds)];
+  const usableEffectIds = realEffectIds.filter((id) => isLegible({ materialId, environmentId, effectIds: [id] }));
+  const effectIds: string[] = Math.random() < 0.5 || usableEffectIds.length === 0 ? [] : [pick(usableEffectIds)];
   const effectParams: Composition['effectParams'] = {};
   for (const id of effectIds) {
     effectParams[id] = { ...effectRegistry.require(id).defaultParameters };
@@ -82,5 +101,7 @@ export function surpriseMe(): Composition {
     environmentParams: { ...environmentDef.defaultParameters },
     effectIds,
     effectParams,
+    // Haze and dust read best against a dark backdrop; add them there half the time.
+    ...(DARK_ENVIRONMENTS.has(environmentId) && Math.random() < 0.5 ? { atmosphere: { ...ATMOSPHERE_DEFAULTS } } : {}),
   };
 }

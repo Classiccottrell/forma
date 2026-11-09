@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { serializeComposition, deserializeComposition, shapeRegistry, materialRegistry, environmentRegistry, effectRegistry } from '../src/index.js';
 import { builtInPresets } from '../src/content/presets.js';
-import { surpriseMe } from '../src/content/surpriseMe.js';
+import { surpriseMe, isLegible } from '../src/content/surpriseMe.js';
 import { ensureHarnessContentRegistered } from './testUtils.js';
 
 ensureHarnessContentRegistered();
@@ -73,6 +73,16 @@ describe('surpriseMe', () => {
         expect(SPARSE.has(c.shapeId)).toBe(false);
       }
     }
+  });
+
+  it('never produces an unreadable scene (dark on dark, bloom on a bright sky)', () => {
+    expect(isLegible({ materialId: 'obsidian', environmentId: 'midnight', effectIds: [] })).toBe(false);
+    expect(isLegible({ materialId: 'carbon', environmentId: 'deep-space', effectIds: [] })).toBe(false);
+    expect(isLegible({ materialId: 'chrome', environmentId: 'softbox', effectIds: ['bloom'] })).toBe(false);
+    expect(isLegible({ materialId: 'obsidian', environmentId: 'softbox', effectIds: ['vignette'] })).toBe(true);
+    expect(isLegible({ materialId: 'glass', environmentId: 'midnight', effectIds: ['bloom'] })).toBe(true);
+    expect(isLegible({ materialId: 'chrome', environmentId: 'gradient-sky', effectIds: ['bloom'] })).toBe(true);
+    for (let i = 0; i < 400; i++) expect(isLegible(surpriseMe())).toBe(true);
   });
 
   it('produces variation across repeated calls', () => {
