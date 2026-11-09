@@ -199,6 +199,7 @@ export default function App() {
         presentation={presentation}
         onPresentationChange={(patch) => setPresentation((current) => ({ ...current, ...patch }))}
         onMatterChange={(matter) => applyTracked({ matter })}
+        onAtmosphereChange={(atmosphere) => applyTracked({ atmosphere })}
       />
       {creatorMode && <CreatorPanel composition={current} />}
     </div>

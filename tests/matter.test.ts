@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
-  FormaRuntime, serializeComposition, deserializeComposition, parseMatterSettings, MATTER_DEFAULTS,
+  FormaRuntime, serializeComposition, deserializeComposition, parseMatterSettings, MATTER_DEFAULTS, parseAtmosphereSettings, ATMOSPHERE_DEFAULTS,
   shapeRegistry, materialRegistry, environmentRegistry, type Composition, type MatterSettings,
 } from '../src/index.js';
 import { ensureHarnessContentRegistered } from './testUtils.js';
@@ -57,6 +57,34 @@ describe('matter settings in saved compositions', () => {
   ])('rejects %j', (matter, message) => {
     const s = JSON.stringify({ ...composition(), matter });
     expect(() => deserializeComposition(s)).toThrow(message);
+  });
+});
+
+describe('atmosphere settings in saved compositions', () => {
+  it('round-trips, fills missing keys, and stays absent when absent', () => {
+    const c = { ...composition(), atmosphere: { haze: 0.3, dust: 0.8 } };
+    expect(deserializeComposition(serializeComposition(c)).atmosphere).toEqual({ haze: 0.3, dust: 0.8 });
+    expect(parseAtmosphereSettings({ haze: 0.2 })).toEqual({ ...ATMOSPHERE_DEFAULTS, haze: 0.2 });
+    expect(deserializeComposition(serializeComposition(composition())).atmosphere).toBeUndefined();
+  });
+
+  it.each([[{ haze: 2 }, /haze must be a number from 0 to 1/], [{ fog: 1 }, /fog is not an atmosphere setting/], [[], /must be an object/]])('rejects %j', (atmosphere, message) => {
+    expect(() => deserializeComposition(JSON.stringify({ ...composition(), atmosphere }))).toThrow(message);
+  });
+
+  it('adds its haze and dust only while on, and removes them on dispose', () => {
+    const runtime = matterRuntime();
+    const points = () => runtime.scene.children.filter((o) => o instanceof THREE.Points && o.visible).length;
+    runtime.applyComposition(composition());
+    const base = points();
+    runtime.applyComposition({ ...composition(), atmosphere: { haze: 0.5, dust: 0.5 } });
+    runtime.update(1 / 60, 0);
+    expect(points()).toBe(base + 2);
+    runtime.applyComposition(composition());
+    expect(points()).toBe(base);
+    const before = runtime.scene.children.length;
+    runtime.dispose();
+    expect(runtime.scene.children.length).toBeLessThan(before);
   });
 });
 
