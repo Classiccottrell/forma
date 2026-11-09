@@ -56,6 +56,21 @@ describe('serialize round-trip', () => {
     expect(round).toEqual({ ...baseComposition(), shapeId: 'sphere', shapeParams: shapeRegistry.require('sphere').defaultParameters });
   });
 
+  it('opens a composition saved with the retired Bevelled Box as a Box', () => {
+    const saved = serializeComposition({ ...baseComposition(), shapeId: 'bevelled-box', shapeParams: { size: 1.2, depth: 1.2, bevel: 0.08 } });
+    expect(deserializeComposition(saved)).toMatchObject({ shapeId: 'box', shapeParams: shapeRegistry.require('box').defaultParameters });
+  });
+
+  // Faceted Gem became Quartz Crystal and Badge became Coin, keeping their ids but not their
+  // parameters; files saved with the old parameters open as the new shape at its defaults.
+  it.each([
+    ['gem', { radius: 1, facets: 0 }],
+    ['badge', { width: 1.2, height: 0.55, depth: 0.16, roundness: 0.2, smoothness: 6 }],
+  ])('opens a %s saved with its old parameters', (shapeId, shapeParams) => {
+    const round = deserializeComposition(serializeComposition({ ...baseComposition(), shapeId, shapeParams }));
+    expect(round).toMatchObject({ shapeId, shapeParams: shapeRegistry.require(shapeId).defaultParameters });
+  });
+
   it('leaves compositions on current shapes untouched', () => {
     const c = baseComposition();
     expect(replaceRetiredShape(c)).toBe(c);

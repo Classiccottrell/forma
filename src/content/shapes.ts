@@ -58,8 +58,17 @@ const pill = defineShape({
   },
   defaultParameters: { width: 1.8, height: 0.65, depth: 0.3, roundness: 0.3, smoothness: 6 },
   create(params, ctx) {
-    const radius = Math.max(0, Math.min(params.roundness, params.width / 2, params.height / 2));
-    const geometry = new RoundedBoxGeometry(params.width, params.height, params.depth, Math.max(1, Math.round(params.smoothness)), radius);
+    // A true stadium: the ends are full half-circles (radius = half the height), which
+    // is what separates a pill from Card's square-cornered slab. Roundness softens the
+    // front and back edges, up to half the depth.
+    const h = Math.min(params.height, params.width);
+    const bevel = Math.max(0, Math.min(params.roundness, params.depth / 2 - 0.005));
+    const body = Math.max(0.01, params.depth - bevel * 2);
+    const smooth = Math.max(1, Math.round(params.smoothness));
+    const geometry = new THREE.ExtrudeGeometry(makeRoundedRectShape(params.width - bevel * 2, h - bevel * 2, (h - bevel * 2) / 2), {
+      depth: body, bevelEnabled: bevel > 0, bevelSize: bevel, bevelThickness: bevel, bevelSegments: smooth, curveSegments: smooth * 4, steps: 1,
+    });
+    geometry.center();
     ctx.registry.track(geometry);
     return geometry;
   },
@@ -85,29 +94,48 @@ const card = defineShape({
   },
 });
 
+// Was Badge, a rounded slab that read the same as Card; its id stays 'badge' so saved
+// files and presets keep working (old slab params upgrade to these defaults on load).
 const badge = defineShape({
   id: 'badge',
-  label: 'Badge',
-  category: 'ui',
+  label: 'Coin',
+  category: 'primitive',
   parameterSchema: {
-    width: { kind: 'number', min: 0.2, max: 3, step: 0.05, default: 1.2, rebuild: true },
-    height: { kind: 'number', min: 0.2, max: 2, step: 0.05, default: 0.55, rebuild: true },
-    depth: { kind: 'number', min: 0.05, max: 1, step: 0.05, default: 0.16, rebuild: true },
-    roundness: { kind: 'number', min: 0, max: 1.5, step: 0.01, default: 0.2, rebuild: true },
-    smoothness: { kind: 'number', min: 1, max: 8, step: 1, default: 6, rebuild: true },
+    diameter: { kind: 'number', min: 0.4, max: 2.6, step: 0.05, default: 1.5, rebuild: true },
+    thickness: { kind: 'number', min: 0.06, max: 0.6, step: 0.01, default: 0.18, rebuild: true },
+    rim: { kind: 'number', min: 0, max: 0.3, step: 0.01, default: 0.12, rebuild: true },
   },
-  defaultParameters: { width: 1.2, height: 0.55, depth: 0.16, roundness: 0.2, smoothness: 6 },
+  defaultParameters: { diameter: 1.5, thickness: 0.18, rim: 0.12 },
   create(params, ctx) {
-    const radius = Math.max(0, Math.min(params.roundness, params.width / 2, params.height / 2, params.depth / 2));
-    const geometry = new RoundedBoxGeometry(params.width, params.height, params.depth, Math.max(1, Math.round(params.smoothness)), radius);
+    // A turned profile: rounded outer edge, a raised rim, and a face recessed inside it.
+    const r = params.diameter / 2;
+    const t = params.thickness / 2;
+    const rim = Math.min(params.rim, r * 0.4);
+    const inset = rim > 0 ? t * 0.35 : 0;
+    const e = Math.min(t * 0.6, r * 0.1); // outer edge rounding
+    const pts: THREE.Vector2[] = [new THREE.Vector2(0, -t + inset)];
+    if (rim > 0) pts.push(new THREE.Vector2(r - rim, -t + inset), new THREE.Vector2(r - rim * 0.8, -t));
+    else pts.push(new THREE.Vector2(r - e, -t));
+    // Rounded outer edge: a half-ellipse from bottom to top face, bulging out to r.
+    for (let i = 0; i <= 8; i++) {
+      const a = -Math.PI / 2 + (i / 8) * Math.PI;
+      pts.push(new THREE.Vector2(r - e + Math.cos(a) * e, Math.sin(a) * t));
+    }
+    if (rim > 0) pts.push(new THREE.Vector2(r - rim * 0.8, t), new THREE.Vector2(r - rim, t - inset));
+    else pts.push(new THREE.Vector2(r - e, t));
+    pts.push(new THREE.Vector2(0, t - inset));
+    const geometry = new THREE.LatheGeometry(pts, 64);
+    geometry.rotateX(Math.PI / 2); // face the camera, like the other flat shapes
+    geometry.computeVertexNormals();
     ctx.registry.track(geometry);
     return geometry;
   },
 });
 
+// Was Tab, a thin rounded slab like Card; id kept, params unchanged.
 const tab = defineShape({
   id: 'tab',
-  label: 'Tab',
+  label: 'Tag',
   category: 'ui',
   parameterSchema: {
     width: { kind: 'number', min: 0.2, max: 3, step: 0.05, default: 1.6, rebuild: true },
@@ -116,10 +144,31 @@ const tab = defineShape({
     roundness: { kind: 'number', min: 0, max: 1.5, step: 0.01, default: 0.12, rebuild: true },
     smoothness: { kind: 'number', min: 1, max: 8, step: 1, default: 5, rebuild: true },
   },
-  defaultParameters: { width: 1.6, height: 0.48, depth: 0.14, roundness: 0.12, smoothness: 5 },
+  defaultParameters: { width: 1.6, height: 0.8, depth: 0.1, roundness: 0.1, smoothness: 5 },
   create(params, ctx) {
-    const radius = Math.max(0, Math.min(params.roundness, params.width / 2, params.height / 2, params.depth / 2));
-    const geometry = new RoundedBoxGeometry(params.width, params.height, params.depth, Math.max(1, Math.round(params.smoothness)), radius);
+    // A label tag: rounded rectangle with the left end cut to a blunt point, and a
+    // punched hole near that end.
+    const w = params.width / 2, h = params.height / 2;
+    const r = Math.max(0, Math.min(params.roundness, h * 0.9, w * 0.4));
+    const cut = Math.min(h * 0.9, w * 0.45);
+    const shape = new THREE.Shape()
+      .moveTo(-w + cut, -h)
+      .lineTo(w - r, -h)
+      .quadraticCurveTo(w, -h, w, -h + r)
+      .lineTo(w, h - r)
+      .quadraticCurveTo(w, h, w - r, h)
+      .lineTo(-w + cut, h)
+      .lineTo(-w, 0)
+      .closePath();
+    const hole = new THREE.Path();
+    hole.absarc(-w + cut * 0.95, 0, Math.min(h * 0.22, cut * 0.4), 0, Math.PI * 2, true);
+    shape.holes.push(hole);
+    const bevel = Math.min(params.depth * 0.3, 0.03);
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: Math.max(0.01, params.depth - bevel * 2), bevelEnabled: true, bevelSize: bevel, bevelThickness: bevel,
+      bevelSegments: 2, curveSegments: Math.max(4, Math.round(params.smoothness) * 4), steps: 1,
+    });
+    geometry.center();
     ctx.registry.track(geometry);
     return geometry;
   },
@@ -291,25 +340,35 @@ const capsule = defineShape({
 // A faceted icosahedron, not a cut stone — `diamond` below is the real brilliant
 // cut. The label says so; the `id` stays `gem` because presets reference it and
 // serialized compositions are keyed by id.
+// Was Faceted Gem, which was the same geometry as Icosahedron; id kept so saved files
+// load (the old {radius, facets} params upgrade to these defaults).
 const gem = defineShape({
   id: 'gem',
-  label: 'Faceted Gem',
+  label: 'Quartz Crystal',
   category: 'faceted',
   parameterSchema: {
-    radius: { kind: 'number', min: 0.3, max: 2, step: 0.05, default: 1, rebuild: true },
-    facets: { kind: 'number', min: 0, max: 2, step: 1, default: 0, rebuild: true },
+    radius: { kind: 'number', min: 0.15, max: 0.9, step: 0.05, default: 0.42, rebuild: true },
+    length: { kind: 'number', min: 0.3, max: 2.4, step: 0.05, default: 1.3, rebuild: true },
+    tip: { kind: 'number', min: 0.1, max: 1, step: 0.05, default: 0.45, rebuild: true },
   },
-  defaultParameters: { radius: 1, facets: 0 },
+  defaultParameters: { radius: 0.42, length: 1.3, tip: 0.45 },
   create(params, ctx) {
-    const geometry = new THREE.IcosahedronGeometry(params.radius, params.facets);
-    // Flat facets: de-index so each triangle owns its own vertices, then recompute
-    // per-face normals — this is the shape-side half of "faceted look" (material's
-    // flatShading alone won't facet a shared-vertex geometry).
-    const nonIndexed = geometry.toNonIndexed();
-    nonIndexed.computeVertexNormals();
-    geometry.dispose();
-    ctx.registry.track(nonIndexed);
-    return nonIndexed;
+    // A double-terminated quartz point: a hexagonal prism with a six-sided pyramid at
+    // each end, tilted so its length reads at a glance. Flat-shaded facets.
+    const half = params.length / 2;
+    const profile = [
+      new THREE.Vector2(0, -half - params.tip),
+      new THREE.Vector2(params.radius, -half),
+      new THREE.Vector2(params.radius, half),
+      new THREE.Vector2(0, half + params.tip),
+    ];
+    const lathe = new THREE.LatheGeometry(profile, 6);
+    const geometry = lathe.toNonIndexed();
+    lathe.dispose();
+    geometry.rotateZ(-Math.PI / 7);
+    geometry.computeVertexNormals();
+    ctx.registry.track(geometry);
+    return geometry;
   },
 });
 
@@ -332,12 +391,15 @@ const knot = defineShape({
 });
 
 class HelixCurve extends THREE.Curve<THREE.Vector3> {
-  constructor(private turns: number, private radius: number, private height: number) {
+  /** `topRadius` is a share of `radius` at the top end: 1 is an even coil (Spring),
+   * less than 1 tapers it into a cone (Spiral). */
+  constructor(private turns: number, private radius: number, private height: number, private topRadius = 1) {
     super();
   }
   getPoint(t: number, target: THREE.Vector3 = new THREE.Vector3()): THREE.Vector3 {
     const angle = t * Math.PI * 2 * this.turns;
-    return target.set(Math.cos(angle) * this.radius, (t - 0.5) * this.height, Math.sin(angle) * this.radius);
+    const r = this.radius * (1 + (this.topRadius - 1) * t);
+    return target.set(Math.cos(angle) * r, (t - 0.5) * this.height, Math.sin(angle) * r);
   }
 }
 
@@ -353,8 +415,10 @@ const spiral = defineShape({
   },
   defaultParameters: { turns: 3, radius: 0.6, height: 1.6, tube: 0.08 },
   create(params, ctx) {
-    const curve = new HelixCurve(params.turns, params.radius, params.height);
-    const geometry = new THREE.TubeGeometry(curve, Math.max(32, Math.round(params.turns * 24)), params.tube, 8, false);
+    // Tapers from the full radius at the base to a fifth of it at the top: a cone
+    // spiral, distinct from Spring's even coil.
+    const curve = new HelixCurve(params.turns, params.radius, params.height, 0.2);
+    const geometry = new THREE.TubeGeometry(curve, Math.max(32, Math.round(params.turns * 32)), params.tube, 8, false);
     ctx.registry.track(geometry);
     return geometry;
   },
@@ -436,8 +500,45 @@ function turnUpsideDown(geometry: THREE.BufferGeometry): void {
   geometry.rotateX(Math.PI);
 }
 
-function extrudedSymbol(shape: THREE.Shape, params: { width: number; height: number; depth: number; roundness: number; bevelEnabled: boolean }, ctx: Parameters<NonNullable<typeof star['create']>>[1]): THREE.BufferGeometry {
-  const geometry = new THREE.ExtrudeGeometry(shape, { depth: params.depth, bevelEnabled: params.bevelEnabled, bevelSize: params.roundness, bevelThickness: params.roundness, steps: 1 });
+/** A width × height rectangle centred on the origin, corners rounded by `r`. */
+function makeRoundedRectShape(width: number, height: number, r: number): THREE.Shape {
+  const w = width / 2, h = height / 2;
+  const c = Math.max(0, Math.min(r, w, h));
+  return new THREE.Shape()
+    .moveTo(-w + c, -h)
+    .lineTo(w - c, -h)
+    .absarc(w - c, -h + c, c, -Math.PI / 2, 0, false)
+    .lineTo(w, h - c)
+    .absarc(w - c, h - c, c, 0, Math.PI / 2, false)
+    .lineTo(-w + c, h)
+    .absarc(-w + c, h - c, c, Math.PI / 2, Math.PI, false)
+    .lineTo(-w, -h + c)
+    .absarc(-w + c, -h + c, c, Math.PI, Math.PI * 1.5, false);
+}
+
+/** A plus outline with every corner rounded (outer corners by `r`, inner by r/2). */
+function makeRoundedCrossShape(armWidth: number, armLength: number, r: number): THREE.Shape {
+  const a = armWidth / 2, l = armLength / 2;
+  const ri = r / 2;
+  const s = new THREE.Shape().moveTo(-a + r, l);
+  const corner = (cx: number, cy: number, x: number, y: number) => s.quadraticCurveTo(cx, cy, x, y);
+  s.lineTo(a - r, l); corner(a, l, a, l - r);
+  s.lineTo(a, a + ri); corner(a, a, a + ri, a);
+  s.lineTo(l - r, a); corner(l, a, l, a - r);
+  s.lineTo(l, -a + r); corner(l, -a, l - r, -a);
+  s.lineTo(a + ri, -a); corner(a, -a, a, -a - ri);
+  s.lineTo(a, -l + r); corner(a, -l, a - r, -l);
+  s.lineTo(-a + r, -l); corner(-a, -l, -a, -l + r);
+  s.lineTo(-a, -a - ri); corner(-a, -a, -a - ri, -a);
+  s.lineTo(-l + r, -a); corner(-l, -a, -l, -a + r);
+  s.lineTo(-l, a - r); corner(-l, a, -l + r, a);
+  s.lineTo(-a - ri, a); corner(-a, a, -a, a + ri);
+  s.lineTo(-a, l - r); corner(-a, l, -a + r, l);
+  return s;
+}
+
+function extrudedSymbol(shape: THREE.Shape, params: { width: number; height: number; depth: number; roundness: number; bevelEnabled: boolean }, ctx: Parameters<NonNullable<typeof star['create']>>[1], bevelSegments = 3): THREE.BufferGeometry {
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: params.depth, bevelEnabled: params.bevelEnabled, bevelSize: params.roundness, bevelThickness: params.roundness, bevelSegments, curveSegments: 12, steps: 1 });
   geometry.computeBoundingBox();
   const bounds = geometry.boundingBox!;
   geometry.scale(params.width / Math.max(bounds.max.x - bounds.min.x, 1e-6), params.height / Math.max(bounds.max.y - bounds.min.y, 1e-6), 1);
@@ -473,9 +574,11 @@ const heart = defineShape({
 });
 
 const plus = defineShape({
-  id: 'plus', label: 'Plus', category: 'symbol', parameterSchema: { width: { kind: 'number', min: 0.4, max: 2.5, step: 0.05, default: 1.4, rebuild: true }, height: { kind: 'number', min: 0.4, max: 2.5, step: 0.05, default: 1.4, rebuild: true }, depth: { kind: 'number', min: 0.05, max: 1, step: 0.05, default: 0.3, rebuild: true }, roundness: { kind: 'number', min: 0, max: 0.15, step: 0.005, default: 0.03, rebuild: true }, bevelEnabled: { kind: 'boolean', default: true, rebuild: true } },
-  defaultParameters: { width: 1.4, height: 1.4, depth: 0.3, roundness: 0.03, bevelEnabled: true },
-  create(params, ctx) { return extrudedSymbol(makeCrossShape(0.5, 1.6), params, ctx); },
+  id: 'plus', label: 'Plus', category: 'symbol', parameterSchema: { width: { kind: 'number', min: 0.4, max: 2.5, step: 0.05, default: 1.4, rebuild: true }, height: { kind: 'number', min: 0.4, max: 2.5, step: 0.05, default: 1.4, rebuild: true }, depth: { kind: 'number', min: 0.05, max: 1, step: 0.05, default: 0.2, rebuild: true }, roundness: { kind: 'number', min: 0, max: 0.24, step: 0.005, default: 0.16, rebuild: true }, bevelEnabled: { kind: 'boolean', default: true, rebuild: true } },
+  defaultParameters: { width: 1.4, height: 1.4, depth: 0.2, roundness: 0.16, bevelEnabled: true },
+  // Soft and pillowy (a deep, many-segment bevel on rounded arms), so it reads apart from
+  // Cross's crisp edges.
+  create(params, ctx) { return extrudedSymbol(makeRoundedCrossShape(0.5, 1.6, 0.18), params, ctx, 8); },
 });
 
 const arrow = defineShape({
@@ -892,89 +995,6 @@ const diamond = defineShape({
   },
 });
 
-/**
- * Chamfered box: 6 rectangles + 12 edge chamfers + 8 corner chamfers = 26 faces.
- * Every vertex is a permutation of the half-extents with one axis at full size
- * and the other two pulled in by the chamfer, which is the exact vertex set of a
- * chamfered box — so the faces are planar by construction and the chamfer is
- * uniform on all twelve edges.
- *
- * That last part is why this is no longer an `ExtrudeGeometry` with
- * `bevelEnabled`: extrusion bevels only the front and back rims and leaves the
- * four side edges sharp, so the shape read "bevelled" from one axis and
- * hard-edged from the other two.
- */
-function chamferedBoxTriangles(hx: number, hy: number, hz: number, chamfer: number): Tri[] {
-  const h = [hx, hy, hz];
-  // Keep every reduced extent strictly positive — the parameter ranges allow a
-  // chamfer larger than the smallest half-extent, which would invert the solid.
-  const c = Math.min(chamfer, 0.98 * Math.min(hx, hy, hz));
-  // Coordinates are assembled per-axis so the three families of faces can be
-  // written once and rotated, rather than three times by hand. In the frame for
-  // family `a`: `major` is axis a, `u` is axis (a+1)%3, `v` is axis (a+2)%3.
-  const axis = (a: number, major: number, u: number, v: number): THREE.Vector3 =>
-    a === 0 ? new THREE.Vector3(major, u, v) : a === 1 ? new THREE.Vector3(v, major, u) : new THREE.Vector3(u, v, major);
-
-  const tris: Tri[] = [];
-  for (let a = 0; a < 3; a++) {
-    const H = h[a];
-    const U = h[(a + 1) % 3] - c;
-    const V = h[(a + 2) % 3] - c;
-    for (const sa of [1, -1]) {
-      // Rectangular face on axis `a`.
-      quad(tris, axis(a, sa * H, U, V), axis(a, sa * H, -U, V), axis(a, sa * H, -U, -V), axis(a, sa * H, U, -V));
-      for (const sb of [1, -1]) {
-        // Edge chamfer between face (a, sa) and its `u`-axis neighbour
-        // (axis (a+1)%3, sign sb) — written entirely in the `a` frame, which is
-        // why each axis pair is visited exactly once across the outer loop.
-        quad(
-          tris,
-          axis(a, sa * H, sb * U, V),
-          axis(a, sa * H, sb * U, -V),
-          axis(a, sa * (H - c), sb * (U + c), -V),
-          axis(a, sa * (H - c), sb * (U + c), V),
-        );
-      }
-    }
-  }
-  // Corner chamfers: one triangle per octant, through the three vertices that
-  // carry the full half-extent on a different axis each.
-  for (const sx of [1, -1]) {
-    for (const sy of [1, -1]) {
-      for (const sz of [1, -1]) {
-        tris.push([
-          new THREE.Vector3(sx * hx, sy * (hy - c), sz * (hz - c)),
-          new THREE.Vector3(sx * (hx - c), sy * hy, sz * (hz - c)),
-          new THREE.Vector3(sx * (hx - c), sy * (hy - c), sz * hz),
-        ]);
-      }
-    }
-  }
-  return tris;
-}
-
-const bevelledBox = defineShape({
-  id: 'bevelled-box',
-  label: 'Bevelled Box',
-  category: 'faceted',
-  parameterSchema: {
-    size: { kind: 'number', min: 0.4, max: 2.4, step: 0.05, default: 1.2, rebuild: true },
-    depth: { kind: 'number', min: 0.2, max: 2.4, step: 0.05, default: 1.2, rebuild: true },
-    bevel: { kind: 'number', min: 0, max: 0.2, step: 0.01, default: 0.08, rebuild: true },
-  },
-  defaultParameters: { size: 1.2, depth: 1.2, bevel: 0.08 },
-  create(params, ctx) {
-    // At zero chamfer the 12 edge faces and 8 corner faces collapse to
-    // degenerate triangles, whose normals are undefined — fall back to the
-    // primitive the shape is a chamfered version of.
-    const geometry = params.bevel <= 0
-      ? new THREE.BoxGeometry(params.size, params.size, params.depth)
-      : facetedGeometry(chamferedBoxTriangles(params.size / 2, params.size / 2, params.depth / 2, params.bevel));
-    ctx.registry.track(geometry);
-    return geometry;
-  },
-});
-
 const spring = defineShape({
   id: 'spring',
   label: 'Spring',
@@ -1195,7 +1215,6 @@ export function registerShapes(): void {
     cross,
     pyramid,
     diamond,
-    bevelledBox,
     spring,
     vase,
     svgExtrude,
