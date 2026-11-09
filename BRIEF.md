@@ -208,7 +208,7 @@ Iterated with the owner over six rounds; what it settled:
   depth (half float terraced into stripes); make Form easing *arrive* exactly (a sliver
   of a previous Form left its surface on).
 
-### Phase 1 — Object finish (the reference's lesson)
+### Phase 1 — Object finish (the reference's lesson) — DONE, awaiting owner review (2026-11-09)
 The current treatment is what makes the shapes look unfinished. Fix the stage first.
 - Frame the object in the visible area, left of the panel, with room around it; square
   PNG exports keep the whole object (R1 P1 framing).
@@ -256,6 +256,15 @@ eight environments. Every environment now gets a procedural reflection map
 light's colour and a cool rim panel, prefiltered with PMREM. Strength and Rotation drive it
 like the HDR, and an HDR replaces it when it loads. Matte gains gentle ambient fill without
 washing out.
+
+**Progress (2026-11-09):** opening scene and contact shadow; Phase 1 complete pending the
+owner's review. The editor opens on a chrome Soft Blob on Gradient Sky (owner's pick), with
+Holographic Gas as a preset; materials can give matter their own palette (`particleColors`).
+The floor shadow is now a real contact shadow (`src/scene/ContactShadow.ts`): the object's
+footprint rendered from below, blurred, on a ground plane in world space, so it matches each
+shape, holds still while orbiting, appears in PNG exports, and fades as matter cracks the
+surface away; Presentation's Floor shadow / Strength / Softness drive it. Picker thumbnails
+were checked: all 31 are real renders in one material, light and angle.
 
 ### Phase 2 — Matter
 Build the Phase 0 behaviour into the product for all 32 shapes. Split by ownership:
@@ -548,6 +557,7 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-11-09 | Phase 1 complete, awaiting owner review: framing (#20), inside-out shapes fixed and Sphere/Soft Blob smoothed (#22), near-duplicates made distinct and Bevelled Box removed (#23, 31 shapes), reflections in every environment (#24), chrome Soft Blob opening scene and Holographic Gas preset (#25), real contact shadow. |
 | 2026-11-08 | Phase 1 framing: the editor fits the object to the area left of the panel with room around it; square PNG exports keep the whole object; floor shadow follows it. 137/137 tests (5 new), M3 browser checks 15/15 (now pinned to headless Chrome on SwiftShader with a renderer interlock), screenshots checked on desktop, panel closed, Gas, Liquid puddle, phone and a 1024² export. |
 | 2026-11-08 | Phase 2 matter in the product: `Composition.matter`, runtime `MatterLayer` on `cc-webgl/matter`, Matter and Cursor editor sections, per-shape inside fill. 132/132 tests (43 new, incl. every shape's particles staying inside it), M3 browser checks 15/15, editor checked headless on SwiftShader with 0 errors. App bundle +34 KB; now over the gzip budget too (256 KB / 250 KB). Framing gap handed to Phase 1. |
 | 2026-11-08 | Phase 0 matter prototype accepted by the owner after six rounds (`prototypes/matter/`, PR #18). Settled: Form + Disperse on one particle set; Solid cracks away then shatters into mixed fragments that crumble to dust; Liquid as screen-space fluid that settles into a shimmering puddle; Gas fine and wispy; six cursor modes with Wake as the favourite. Phase 2 spec written: shared pieces go into a new `cc-webgl/matter` subpath. |
