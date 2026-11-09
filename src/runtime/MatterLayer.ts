@@ -146,13 +146,21 @@ void main() {
     material.needsUpdate = true;
   }
 
-  /** Colours from the current mesh material, so matter matches the object it came from. */
-  setColor(color: THREE.Color): void {
+  /** Colours from the current mesh material, so matter matches the object it came from.
+   * `palette` (bright, highlight, deep) overrides the colours derived from `color`. */
+  setColor(color: THREE.Color, palette?: readonly [string, string, string]): void {
     const white = new THREE.Color(1, 1, 1);
-    this.uniforms.uColA.value.copy(color).lerp(white, 0.35);
-    this.uniforms.uColB.value.copy(color).lerp(white, 0.85);
-    this.uniforms.uColC.value.copy(color).multiplyScalar(0.5);
-    this.fluid?.setPalette(color, color.clone().multiplyScalar(0.15), white.clone().multiplyScalar(0.55));
+    if (palette) {
+      this.uniforms.uColA.value.set(palette[0]);
+      this.uniforms.uColB.value.set(palette[1]);
+      this.uniforms.uColC.value.set(palette[2]);
+    } else {
+      this.uniforms.uColA.value.copy(color).lerp(white, 0.35);
+      this.uniforms.uColB.value.copy(color).lerp(white, 0.85);
+      this.uniforms.uColC.value.copy(color).multiplyScalar(0.5);
+    }
+    const tint = palette ? new THREE.Color(palette[0]) : color;
+    this.fluid?.setPalette(tint, tint.clone().multiplyScalar(0.15), white.clone().multiplyScalar(0.55));
   }
 
   apply(settings: MatterSettings | undefined): void {

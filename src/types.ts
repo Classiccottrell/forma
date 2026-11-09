@@ -151,6 +151,10 @@ export interface MaterialDefinition<S extends ParamSchemaMap = ParamSchemaMap> e
    * ctx.registry.track(...) — texture disposal is not inferred by the registry here. */
   create(params: ParamsOf<S>, ctx: MaterialCreateContext): THREE.Material;
   update?(material: THREE.Material, params: ParamsOf<S>): void;
+  /** Colours matter particles take from this material: bright, highlight, deep. Omit to
+   * derive them from the material's `color`. Set it where the look doesn't live in
+   * `color` (Holographic's colour comes from iridescence, so its base colour is pale). */
+  particleColors?: readonly [string, string, string];
 }
 
 export interface TextureHandle {

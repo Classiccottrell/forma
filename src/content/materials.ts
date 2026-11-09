@@ -453,6 +453,7 @@ const holographic = defineMaterial({
   id: 'holographic',
   label: 'Holographic',
   category: 'stylized',
+  particleColors: ['#7af0ff', '#ff9ae8', '#6b5cff'],
   parameterSchema: {
     color: { kind: 'color', default: '#d9e7ff', rebuild: false },
     iridescence: { kind: 'number', min: 0, max: 1, step: 0.05, default: 0.9, rebuild: false },

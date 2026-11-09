@@ -259,13 +259,14 @@ export class FormaRuntime {
     this.mesh.material = material;
     this.applyTexture(material);
     this.matter.patchMaterial(material);
-    this.syncMatterColor(material);
+    this.syncMatterColor(material, next.materialId);
   }
 
-  private syncMatterColor(material: THREE.Material): void {
+  private syncMatterColor(material: THREE.Material, materialId: string): void {
     const color = (material as THREE.Material & { color?: THREE.Color }).color;
-    this.matter.setColor(color instanceof THREE.Color ? color : new THREE.Color(0xffffff));
+    this.matter.setColor(color instanceof THREE.Color ? color : new THREE.Color(0xffffff), materialRegistry.get(materialId)?.particleColors);
   }
+
 
   private rebuildTextureSlot(next: Composition): void {
     this.invalidateTexturePackLoad();
@@ -331,7 +332,7 @@ export class FormaRuntime {
     const hot = changedHotKeys(def.parameterSchema, prev.materialParams, next.materialParams);
     if (hot.length === 0) return;
     def.update(this.materialSlot.handle, next.materialParams as any);
-    this.syncMatterColor(this.materialSlot.handle);
+    this.syncMatterColor(this.materialSlot.handle, next.materialId);
   }
 
   // --- environment -------------------------------------------------------

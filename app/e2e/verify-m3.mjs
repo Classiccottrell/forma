@@ -114,8 +114,8 @@ async function main() {
     await page.waitForTimeout(100);
     const selectedAfterReset = await shapeGrid.locator('.picker-cell.selected').first().textContent();
     record(
-      'reset composition returns shape selection to default (Sphere)',
-      !!selectedAfterReset && /sphere/i.test(selectedAfterReset) && selectedBeforeReset !== selectedAfterReset,
+      'reset composition returns shape selection to default (Soft Blob)',
+      !!selectedAfterReset && /soft blob/i.test(selectedAfterReset) && selectedBeforeReset !== selectedAfterReset,
       `before=${selectedBeforeReset} after=${selectedAfterReset}`
     );
     await ctx.close();
