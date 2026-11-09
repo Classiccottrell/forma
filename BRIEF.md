@@ -150,9 +150,9 @@ generative line-art backgrounds project) on the page, so the two can share a sce
 ## Status
 **M0–M4 complete; live at https://classiccottrell.github.io/forma/. Current milestone:
 V2 — Matter (below), which absorbs the R1 review findings. The shape catalog is fixed at
-the current 32 for now (owner decision, 2026-11-08).**
+31 shapes (owner decision, 2026-11-08; Bevelled Box removed 2026-11-09).**
 
-Current content: 32 shapes / 21 materials / 8 textures / 10 environments / 9 effects.
+Current content: 31 shapes / 21 materials / 8 textures / 10 environments / 9 effects.
 
 ## V2 — Matter (current)
 
@@ -161,7 +161,8 @@ review in headless Chrome on SwiftShader (never the owner's Chrome on the iMac �
 the GPU note in the agent memory) plus the owner's own look. A phase is done when the
 owner accepts it, not when its checks pass.
 
-**Catalog:** keep all 32 current shapes. No additions or removals until V2 ships.
+**Catalog:** 31 shapes. Kept all 32 on 2026-11-08; on 2026-11-09 the owner removed Bevelled
+Box and had the other near-duplicates made distinct (see Phase 1 progress).
 
 ### Phase 0 — Prototype the matter feel (DONE, accepted 2026-11-08)
 `prototypes/matter/index.html` (standalone, three.js from a CDN, no Forma imports) is the
@@ -239,6 +240,14 @@ with quintic-faded noise at half the frequency: a few broad lobes, no lattice cr
 Sphere uses 16 × 12 segments per detail step. Still open in Phase 1: the default scene,
 contact shadow and reflections, distinct near-duplicates (owner's call on how), and
 uniform thumbnails.
+
+**Progress (2026-11-09):** near-duplicates made distinct, per the owner's picks. Faceted Gem
+(the same geometry as Icosahedron) is now **Quartz Crystal**, a double-pointed hexagonal
+prism; Pill has true stadium ends; Badge is now **Coin** (a turned disc with a raised rim);
+Tab is now **Tag** (a label with a cut point and a punched hole); Spiral tapers into a cone
+while Spring stays an even coil; Plus is soft and pillowy while Cross stays crisp. **Bevelled
+Box removed**; saved files fall back to Box. Ids are unchanged, and files saved with Gem's or
+Badge's old parameters open as the new shape at its defaults.
 
 ### Phase 2 — Matter
 Build the Phase 0 behaviour into the product for all 32 shapes. Split by ownership:

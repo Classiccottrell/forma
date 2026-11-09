@@ -113,14 +113,10 @@ describe('hand-built shape geometry, across each parameter box', () => {
 
   const cases: [string, string[], boolean][] = [
     ['diamond', ['tablePercent', 'crownPercent', 'pavilionPercent', 'girdlePercent', 'starLength', 'lowerHalves'], true],
-    ['bevelled-box', ['size', 'depth', 'bevel'], true],
   ];
   for (const [id, keys, convex] of cases) {
     it(`${id}: closed, consistently wound, outward-facing${convex ? ' and convex' : ''}`, () => {
       for (const params of corners(id, keys)) {
-        // bevelled-box at bevel 0 falls back to BoxGeometry, which is not a
-        // single welded solid; its chamfered range is what this checks.
-        if (id === 'bevelled-box' && params.bevel === 0) continue;
         const geometry = build(id, params);
         expect(solidProblems(geometry), `${id} ${JSON.stringify(params)}`).toEqual([]);
         if (convex) expect(isConvex(geometry), `${id} ${JSON.stringify(params)} convex`).toBe(true);
@@ -180,7 +176,7 @@ function signedVolume(geometry: THREE.BufferGeometry): number {
 }
 
 describe('every shape faces outward', () => {
-  it.each(['heart', 'plus', 'arrow', 'sparkle', 'svg-extrude', 'star', 'cross', 'sphere', 'box'])('%s has positive signed volume', (id) => {
+  it.each(['heart', 'plus', 'arrow', 'sparkle', 'svg-extrude', 'star', 'cross', 'sphere', 'box', 'gem', 'pill', 'badge', 'tab'])('%s has positive signed volume', (id) => {
     const geometry = build(id);
     expect(signedVolume(geometry)).toBeGreaterThan(0);
     geometry.dispose();

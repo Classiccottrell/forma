@@ -65,7 +65,7 @@ const BUILT_IN_PRESET_SPECS: PresetSpec[] = [
   },
   {
     id: 'chrome-badge-studio',
-    name: 'Chrome Badge',
+    name: 'Chrome Coin',
     tags: ['ui', 'reflective', 'studio'],
     spec: { shapeId: 'badge', materialId: 'chrome', environmentId: 'studio' },
   },
