@@ -22,15 +22,16 @@ function ensureContentRegistered(): void {
 
 export function defaultComposition(): Composition {
   ensureContentRegistered();
+  // The opening scene: a chrome Soft Blob on Gradient Sky (owner's pick, 2026-11-09).
   return {
-    shapeId: 'sphere',
-    shapeParams: { ...shapeRegistry.require('sphere').defaultParameters },
-    materialId: 'matte',
-    materialParams: { ...materialRegistry.require('matte').defaultParameters },
+    shapeId: 'soft-blob',
+    shapeParams: { ...shapeRegistry.require('soft-blob').defaultParameters },
+    materialId: 'chrome',
+    materialParams: { ...materialRegistry.require('chrome').defaultParameters },
     textureId: 'none',
     textureParams: {},
-    environmentId: 'studio',
-    environmentParams: { ...environmentRegistry.require('studio').defaultParameters },
+    environmentId: 'gradient-sky',
+    environmentParams: { ...environmentRegistry.require('gradient-sky').defaultParameters },
     effectIds: [],
     effectParams: {},
   };

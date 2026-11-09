@@ -1,4 +1,5 @@
-import type { Composition, Preset } from '../types.js';
+import type { Composition, MatterSettings, Preset } from '../types.js';
+import { MATTER_DEFAULTS } from '../runtime/matterSettings.js';
 import { shapeRegistry, materialRegistry, environmentRegistry, effectRegistry } from '../registry/instances.js';
 
 const PRESET_VERSION = 1;
@@ -16,6 +17,8 @@ function composition(spec: {
   environmentId: string;
   effectIds?: string[];
   effectOverrides?: Record<string, Record<string, Composition['shapeParams'][string]>>;
+  /** Matter settings, over the defaults. Omit for a plain solid object. */
+  matter?: Partial<MatterSettings>;
 }): Composition {
   const shapeDef = shapeRegistry.require(spec.shapeId);
   const materialDef = materialRegistry.require(spec.materialId);
@@ -37,6 +40,7 @@ function composition(spec: {
     environmentParams: { ...environmentDef.defaultParameters },
     effectIds,
     effectParams,
+    ...(spec.matter ? { matter: { ...MATTER_DEFAULTS, ...spec.matter } } : {}),
   };
 }
 
@@ -51,6 +55,20 @@ interface PresetSpec {
  * code (roadmap §5). Hand-picked combinations chosen for visual coherence: material
  * reflectivity matched to environment, effect chosen to complement the mood. */
 const BUILT_IN_PRESET_SPECS: PresetSpec[] = [
+  {
+    // The editor's opening scene (see app defaultComposition), kept as a preset so it is
+    // one click away after you have changed everything.
+    id: 'chrome-blob-gradient-sky',
+    name: 'Chrome Blob',
+    tags: ['reflective', 'organic', 'sky'],
+    spec: { shapeId: 'soft-blob', materialId: 'chrome', environmentId: 'gradient-sky' },
+  },
+  {
+    id: 'holographic-gas-midnight',
+    name: 'Holographic Gas',
+    tags: ['matter', 'gas', 'night'],
+    spec: { shapeId: 'soft-blob', materialId: 'holographic', environmentId: 'midnight', matter: { form: 'gas', motion: 'loop' } },
+  },
   {
     id: 'clay-pill-softbox',
     name: 'Soft Clay Pill',

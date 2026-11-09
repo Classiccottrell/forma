@@ -114,8 +114,8 @@ async function main() {
     await page.waitForTimeout(100);
     const selectedAfterReset = await shapeGrid.locator('.picker-cell.selected').first().textContent();
     record(
-      'reset composition returns shape selection to default (Sphere)',
-      !!selectedAfterReset && /sphere/i.test(selectedAfterReset) && selectedBeforeReset !== selectedAfterReset,
+      'reset composition returns shape selection to default (Soft Blob)',
+      !!selectedAfterReset && /soft blob/i.test(selectedAfterReset) && selectedBeforeReset !== selectedAfterReset,
       `before=${selectedBeforeReset} after=${selectedAfterReset}`
     );
     await ctx.close();
@@ -236,7 +236,7 @@ async function main() {
     const undone = await shapeGrid.locator('.picker-cell.selected').textContent();
     await page.getByRole('button', { name: 'Redo last change' }).click();
     const redone = await shapeGrid.locator('.picker-cell.selected').textContent();
-    record('history: undo and redo restore composition selection', /sphere/i.test(undone ?? '') && /box/i.test(redone ?? ''), `undo=${undone} redo=${redone}`);
+    record('history: undo and redo restore composition selection', /soft blob/i.test(undone ?? '') && /box/i.test(redone ?? ''), `undo=${undone} redo=${redone}`);
     await ctx.close();
   }
 

@@ -9,8 +9,8 @@ ensureHarnessContentRegistered();
 describe('built-in presets', () => {
   const presets = builtInPresets();
 
-  it('ships exactly eight curated presets', () => {
-    expect(presets).toHaveLength(8);
+  it('ships exactly ten curated presets', () => {
+    expect(presets).toHaveLength(10);
   });
 
   it('every preset id is unique', () => {
