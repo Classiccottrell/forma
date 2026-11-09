@@ -236,7 +236,7 @@ async function main() {
     const undone = await shapeGrid.locator('.picker-cell.selected').textContent();
     await page.getByRole('button', { name: 'Redo last change' }).click();
     const redone = await shapeGrid.locator('.picker-cell.selected').textContent();
-    record('history: undo and redo restore composition selection', /sphere/i.test(undone ?? '') && /box/i.test(redone ?? ''), `undo=${undone} redo=${redone}`);
+    record('history: undo and redo restore composition selection', /soft blob/i.test(undone ?? '') && /box/i.test(redone ?? ''), `undo=${undone} redo=${redone}`);
     await ctx.close();
   }
 
