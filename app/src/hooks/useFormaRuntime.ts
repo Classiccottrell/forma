@@ -93,7 +93,7 @@ export function useFormaRuntime(hostRef: React.RefObject<HTMLElement>, initialCo
     const scheduler = new FrameScheduler();
     schedulerRef.current = scheduler;
     scheduler.addTask((frame) => {
-      runtime.updateMatter(frame.dt, frame.elapsed);
+      runtime.update(frame.dt, frame.elapsed);
       formaScene.render();
     });
 

@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
 import type { Composition, FormaScene, ParamValue } from 'forma';
-import { DEFAULT_SUBJECT_RADIUS } from 'forma';
 import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry } from 'forma';
 const SVG_EXTRUDE_SHAPE_ID = 'svg-extrude';
 import { useFormaRuntime, defaultComposition } from './hooks/useFormaRuntime';
@@ -17,18 +15,6 @@ import CreatorPanel from './components/CreatorPanel';
  * liquid puddle) stays in view. Module-level: the runtime reads it once at mount. */
 const EDITOR_RUNTIME_OPTIONS = { framing: {} };
 
-/** Where the framed object sits on the canvas, in CSS px: centre and bounding radius. */
-function projectSubject(scene: FormaScene): { x: number; y: number; r: number } {
-  const { camera, renderer } = scene;
-  const canvas = renderer.domElement;
-  camera.updateMatrixWorld();
-  const centre = new THREE.Vector3().project(camera);
-  const side = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(scene.framing?.subjectRadius ?? DEFAULT_SUBJECT_RADIUS).project(camera);
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
-  return { x: ((centre.x + 1) / 2) * w, y: ((1 - centre.y) / 2) * h, r: (Math.abs(side.x - centre.x) / 2) * w };
-}
-
 /** True while a shortcut should NOT fire — focus is in a text input, textarea,
  * select, or contenteditable element (search box, SVG-paste textarea, etc.). */
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -43,9 +29,8 @@ export default function App() {
     return <HomePage gallery={new URLSearchParams(window.location.search).get('variant') === 'gallery'} />;
   }
   const hostRef = useRef<HTMLDivElement>(null);
-  const { scene, scheduler, apply: applyRaw, current, contextLost } = useFormaRuntime(hostRef, undefined, EDITOR_RUNTIME_OPTIONS);
+  const { runtime, scene, scheduler, apply: applyRaw, current, contextLost } = useFormaRuntime(hostRef, undefined, EDITOR_RUNTIME_OPTIONS);
   const topbarRef = useRef<HTMLDivElement>(null);
-  const [subjectOnScreen, setSubjectOnScreen] = useState<{ x: number; y: number; r: number } | null>(null);
 
   /** The single application boundary. Every path — stage picks, presets,
    * Surprise Me, imports, undo and redo — lands here, so this is where effects
@@ -59,8 +44,12 @@ export default function App() {
   const [presentation, setPresentation] = useState<PresentationState>(DEFAULT_PRESENTATION);
   const historyRef = useRef<{ past: Composition[]; future: Composition[] }>({ past: [], future: [] });
 
-  // Frame the object in the part of the viewport the top bar and panel leave visible,
-  // and keep the floor shadow under it.
+  // The contact shadow is rendered under the object by the runtime; Presentation drives it.
+  useEffect(() => {
+    runtime?.setContactShadow({ enabled: presentation.floorShadow, strength: presentation.shadowStrength, softness: presentation.shadowSoftness });
+  }, [runtime, presentation.floorShadow, presentation.shadowStrength, presentation.shadowSoftness]);
+
+  // Frame the object in the part of the viewport the top bar and panel leave visible.
   useEffect(() => {
     if (!scene) return;
     const measure = () => {
@@ -68,7 +57,6 @@ export default function App() {
       const right = collapsed || !panel ? 0 : panel.offsetWidth;
       const top = topbarRef.current?.offsetHeight ?? 0;
       scene.setFramingInsets({ top, right });
-      setSubjectOnScreen(projectSubject(scene));
     };
     measure();
     window.addEventListener('resize', measure);
@@ -170,7 +158,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell" data-environment={current.environmentId} data-backdrop={presentation.backdrop} data-floor-shadow={presentation.floorShadow ? 'true' : 'false'} style={{ '--shadow-strength': presentation.shadowStrength, '--shadow-softness': `${presentation.shadowSoftness * 28}px`, ...(subjectOnScreen && { '--subject-x': `${subjectOnScreen.x}px`, '--subject-y': `${subjectOnScreen.y}px`, '--subject-r': `${subjectOnScreen.r}px` }) } as React.CSSProperties}>
+    <div className="app-shell" data-environment={current.environmentId} data-backdrop={presentation.backdrop}>
       <Viewport hostRef={hostRef} scene={scene} scheduler={scheduler} contextLost={contextLost} environmentId={current.environmentId} presentation={presentation} onPresentationChange={(patch) => setPresentation((current) => ({ ...current, ...patch }))} />
       <OnboardingHint />
 

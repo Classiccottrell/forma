@@ -259,6 +259,11 @@ void main() {
     return this.points.geometry;
   }
 
+  /** 0..1: how much of the solid surface is left (1 while matter is off). */
+  get surfaceAmount(): number {
+    return this.settings ? Math.max(0, 1 - this.crack.uBreak.value / 1.15) : 1;
+  }
+
   /** Whether the mesh should draw at all this frame (it is fully cracked away otherwise). */
   get meshVisible(): boolean {
     return this.crack.uBreak.value < 1.15;

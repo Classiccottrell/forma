@@ -61,9 +61,6 @@ body {
 }
 .app-shell[data-backdrop='gradient'] .viewport-host { background-image: linear-gradient(180deg, #202634, #7b7088 58%, #d49a7f); }
 .app-shell[data-backdrop='transparent'] .viewport-host { background-color: #17191f; background-image: repeating-conic-gradient(#20232a 0 25%, #17191f 0 50%); background-size: 24px 24px; }
-.app-shell[data-floor-shadow='true'] .viewport-host::after { content: ''; position: absolute; left: 50%; bottom: 8%; width: 42%; height: 14%; border-radius: 50%; background: rgba(0, 0, 0, var(--shadow-strength)); filter: blur(var(--shadow-softness)); transform: translateX(-50%); pointer-events: none; }
-/* Framed editor: the shadow follows the object (centre + bounding radius set by App). */
-.app-shell[data-floor-shadow='true'][style*='--subject-x'] .viewport-host::after { left: var(--subject-x); top: calc(var(--subject-y) + var(--subject-r) * 1.1); bottom: auto; width: calc(var(--subject-r) * 1.7); height: calc(var(--subject-r) * 0.24); transform: translate(-50%, -50%); }
 
 .viewport-fallback {
   position: absolute;
