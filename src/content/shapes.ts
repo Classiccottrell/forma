@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 import { defineShape, shapeRegistry } from '../registry/instances.js';
 
@@ -18,7 +18,8 @@ const sphere = defineShape({
   },
   defaultParameters: { radius: 1, detail: 3 },
   create(params, ctx) {
-    const geometry = new THREE.SphereGeometry(params.radius, params.detail * 8, params.detail * 6);
+    // 16 × 12 segments per detail step: at 8 × 6 the default outline was visibly polygonal.
+    const geometry = new THREE.SphereGeometry(params.radius, params.detail * 16, params.detail * 12);
     ctx.registry.track(geometry);
     return geometry;
   },
@@ -216,8 +217,10 @@ function hash3(x: number, y: number, z: number): number {
 }
 function valueNoise3(x: number, y: number, z: number): number {
   const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z);
-  const fx = x - x0, fy = y - y0, fz = z - z0;
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+  // Quintic fade: plain trilinear weights only join in value, not slope, so a displaced
+  // surface creased along the lattice planes.
+  const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+  const fx = fade(x - x0), fy = fade(y - y0), fz = fade(z - z0);
   let acc = 0;
   for (let dz = 0; dz <= 1; dz++) {
     for (let dy = 0; dy <= 1; dy++) {
@@ -242,12 +245,21 @@ const softBlob = defineShape({
   },
   defaultParameters: { radius: 1, detail: 4, strength: 0.25, frequency: 1.6 },
   create(params, ctx) {
-    const geometry = new THREE.IcosahedronGeometry(params.radius, params.detail);
+    // IcosahedronGeometry gives every triangle its own vertices, so its normals come out
+    // flat and the blob read crumpled. Weld it first (dropping the seam UVs and normals
+    // that would stop the weld; the runtime adds UVs back), so it shades smoothly.
+    const ico = new THREE.IcosahedronGeometry(params.radius, params.detail * 4);
+    ico.deleteAttribute('uv');
+    ico.deleteAttribute('normal');
+    const geometry = mergeVertices(ico);
+    ico.dispose();
     const pos = geometry.attributes.position as THREE.BufferAttribute;
     const v = new THREE.Vector3();
+    // A few broad lobes rather than many small bumps.
+    const f = params.frequency * 1.5;
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i).normalize();
-      const n = valueNoise3(v.x * params.frequency * 3, v.y * params.frequency * 3, v.z * params.frequency * 3);
+      const n = valueNoise3(v.x * f, v.y * f, v.z * f);
       const displaced = params.radius + (n - 0.5) * 2 * params.strength;
       v.multiplyScalar(displaced);
       pos.setXYZ(i, v.x, v.y, v.z);
@@ -416,11 +428,20 @@ function makeArrowShape(): THREE.Shape {
     .closePath();
 }
 
+/** Turns geometry upside down. A half turn about X, never a negative scale: a mirror
+ * reverses triangle winding, so the outward faces are culled as back faces and the shape
+ * reads see-through. The half turn also flips z, which an extrusion centred on its depth
+ * doesn't show (front and back caps match). */
+function turnUpsideDown(geometry: THREE.BufferGeometry): void {
+  geometry.rotateX(Math.PI);
+}
+
 function extrudedSymbol(shape: THREE.Shape, params: { width: number; height: number; depth: number; roundness: number; bevelEnabled: boolean }, ctx: Parameters<NonNullable<typeof star['create']>>[1]): THREE.BufferGeometry {
   const geometry = new THREE.ExtrudeGeometry(shape, { depth: params.depth, bevelEnabled: params.bevelEnabled, bevelSize: params.roundness, bevelThickness: params.roundness, steps: 1 });
   geometry.computeBoundingBox();
   const bounds = geometry.boundingBox!;
-  geometry.scale(params.width / Math.max(bounds.max.x - bounds.min.x, 1e-6), -params.height / Math.max(bounds.max.y - bounds.min.y, 1e-6), 1);
+  geometry.scale(params.width / Math.max(bounds.max.x - bounds.min.x, 1e-6), params.height / Math.max(bounds.max.y - bounds.min.y, 1e-6), 1);
+  turnUpsideDown(geometry);
   geometry.center();
   ctx.registry.track(geometry);
   return geometry;
@@ -443,7 +464,8 @@ const heart = defineShape({
       bevelSize: bevel,
       bevelSegments: 2,
     });
-    geometry.scale(scale, -scale, scale);
+    geometry.scale(scale, scale, scale);
+    turnUpsideDown(geometry);
     geometry.center();
     ctx.registry.track(geometry);
     return geometry;
@@ -1119,7 +1141,8 @@ function createSvgGeometry(params: { svg: string; size: number; depth: number; b
   geometry.computeBoundingBox();
   const bounds = geometry.boundingBox!;
   const scale = params.size / Math.max(bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, 1e-6);
-  geometry.scale(scale, -scale, scale);
+  geometry.scale(scale, scale, scale);
+  turnUpsideDown(geometry); // SVG's y axis points down
   geometry.center();
   geometry.computeVertexNormals();
   ctx.registry.track(geometry);

@@ -230,6 +230,16 @@ screen centre, and the CSS floor shadow follows the object. Embeds keep a fixed 
 until Phase 4. Closes the Phase 2 framing gap: Gas stays mostly in view and the liquid
 puddle fits and reads smoother.
 
+**Progress (2026-11-09):** geometry fixes. Heart, Plus, Arrow, Sparkle and SVG Import
+were flipped upright with a negative scale, which reversed their winding: the outward
+faces were culled and you saw the inside, the "washed-out front". They now turn over with
+a half-turn instead (a test checks every one has positive signed volume). Soft Blob is
+welded before displacement (smooth shading instead of flat facets), on a finer icosphere,
+with quintic-faded noise at half the frequency: a few broad lobes, no lattice creases.
+Sphere uses 16 × 12 segments per detail step. Still open in Phase 1: the default scene,
+contact shadow and reflections, distinct near-duplicates (owner's call on how), and
+uniform thumbnails.
+
 ### Phase 2 — Matter
 Build the Phase 0 behaviour into the product for all 32 shapes. Split by ownership:
 
