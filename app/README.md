@@ -148,12 +148,17 @@ default) instead.
 
 ### Vercel
 
-- Framework preset: Vite.
-- Root directory: repo root (same reasoning as Cloudflare — `file:..` needs the
-  library present in the checkout).
-- Build command override:
-  `npm install && npm run build && cd app && npm install && npm run build`
-- Output directory: `app/dist`
+Configured by `vercel.json` at the repo root; import the repo with **Root
+Directory left at the repo root** and no dashboard overrides.
+
+- Install: Vercel clones only this repo, but the library depends on `cc-webgl`
+  as a sibling folder (`file:../cc-webgl`), so the install step clones and builds
+  it next to the checkout first, the same way the GitHub Pages workflow does.
+  Then it installs the library and the app.
+- Build: the library (`npm run build`), then the app.
+- Output: `app/dist`.
+- Routing: the site is one page that picks the homepage or the editor from the
+  URL, so `/editor` is rewritten to `index.html`.
 - `FORMA_BASE`: leave unset (Vercel serves from the domain root).
 
 ## Testing this app

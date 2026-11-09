@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "[ -d ../cc-webgl ] || git clone --depth 1 https://github.com/Classiccottrell/cc-webgl ../cc-webgl; npm --prefix ../cc-webgl ci && npm --prefix ../cc-webgl run build && npm ci && npm --prefix app ci",
+  "buildCommand": "npm run build && npm --prefix app run build",
+  "outputDirectory": "app/dist",
+  "rewrites": [
+    { "source": "/editor", "destination": "/index.html" },
+    { "source": "/editor/", "destination": "/index.html" }
+  ]
+}
