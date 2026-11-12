@@ -22,6 +22,8 @@ export interface ControlPanelProps {
   onPresentationChange(patch: Partial<PresentationState>): void;
   /** `undefined` turns matter off: the object is a plain solid again. */
   onMatterChange(matter: MatterSettings | undefined): void;
+  /** Editor-only stand-in for page scroll while the Scroll trigger is chosen, 0..1. */
+  onScrollPreview?(progress: number): void;
   /** `undefined` turns atmosphere off. */
   onAtmosphereChange(atmosphere: AtmosphereSettings | undefined): void;
 }
@@ -32,7 +34,7 @@ type ShapeFilter = 'all' | 'solid' | 'flat';
 /** Collapsible sections container: Shape / Material / Environment / Effects / Export.
  * Search box filters visible definitions by label/category (roadmap §6). */
 export function ControlPanel(props: ControlPanelProps) {
-  const { collapsed, composition, scene, presentation, onPresentationChange, onSlotSelect, onParamChange, onEffectStageSelect, onEffectParamChange, onApplyComposition, onImportComposition, onMatterChange, onAtmosphereChange } = props;
+  const { collapsed, composition, scene, presentation, onPresentationChange, onSlotSelect, onParamChange, onEffectStageSelect, onEffectParamChange, onApplyComposition, onImportComposition, onMatterChange, onAtmosphereChange, onScrollPreview } = props;
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     presets: false,
     shape: true,
@@ -76,7 +78,7 @@ export function ControlPanel(props: ControlPanelProps) {
   const effectEntries = effectRegistry.list().map((d) => ({ label: d.label, category: 'effect' }));
 
   return (
-    <div id="forma-control-panel" className={`control-panel${collapsed ? ' collapsed' : ''}`} data-testid="control-panel">
+    <div id="forma-control-panel" className={`control-panel${collapsed ? ' collapsed' : ''}`} data-testid="control-panel" {...(collapsed ? { inert: '' } : {})} aria-hidden={collapsed || undefined}>
       <input
         className="search-input"
         type="search"
@@ -120,7 +122,7 @@ export function ControlPanel(props: ControlPanelProps) {
       </Section>
 
       <Section id="matter" title="Matter" open={open.matter} onToggle={toggle}>
-        <MatterControls value={composition.matter} onChange={onMatterChange} />
+        <MatterControls value={composition.matter} onChange={onMatterChange} onScrollPreview={onScrollPreview} />
       </Section>
 
       <Section id="cursor" title="Cursor" open={open.cursor} onToggle={toggle}>
@@ -260,24 +262,37 @@ function Choice<T extends string>({ label, options, value, onChange }: { label: 
 }
 
 const FORM_OPTIONS = [['off', 'Off'], ['solid', 'Solid'], ['liquid', 'Liquid'], ['gas', 'Gas']] as const;
+const MOTION_OPTIONS = [['manual', 'Manual'], ['loop', 'Loop'], ['hover', 'Near'], ['enter', 'Over'], ['scroll', 'Scroll']] as const;
 const MOTION_HELP: Record<MatterSettings['motion'], string> = {
   manual: 'Drag Disperse to take it apart.',
   loop: 'Breathes apart and back together.',
-  hover: 'Comes apart as the pointer nears it.',
+  hover: 'Changes as the pointer nears the object.',
+  enter: 'Changes while the pointer is over it, and settles back when it leaves.',
+  scroll: 'Follows the page: whole as it scrolls in, changed mid-screen, whole again as it leaves.',
 };
 
-function MatterControls({ value, onChange }: { value: MatterSettings | undefined; onChange(m: MatterSettings | undefined): void }) {
+function MatterControls({ value, onChange, onScrollPreview }: { value: MatterSettings | undefined; onChange(m: MatterSettings | undefined): void; onScrollPreview?(progress: number): void }) {
   const set = (patch: Partial<MatterSettings>) => onChange({ ...(value ?? MATTER_DEFAULTS), ...patch });
+  const [scrollPreview, setScrollPreview] = useState(0.5);
+  const previewScroll = (progress: number) => { setScrollPreview(progress); onScrollPreview?.(progress); };
   return <div className="matter-controls">
     <Choice label="Form" options={FORM_OPTIONS} value={value?.form ?? 'off'} onChange={(v) => (v === 'off' ? onChange(undefined) : set({ form: v }))} />
     {!value && <p className="control-help">Turn the object into matter that can shatter, melt or drift apart.</p>}
     {value && <>
       <label className="param-row">
         <span className="param-label"><span>Disperse</span><span className="value">{value.disperse.toFixed(2)}</span></span>
-        <input type="range" min="0" max="1" step="0.01" value={value.disperse} aria-label="Disperse" disabled={value.motion !== 'manual'} onChange={(event) => set({ disperse: Number(event.target.value) })} />
+        <input type="range" min="0" max="1" step="0.01" value={value.disperse} aria-label="Disperse" disabled={value.motion !== 'manual' && value.drive === 'disperse'} onChange={(event) => set({ disperse: Number(event.target.value) })} />
       </label>
-      <Choice label="Motion" options={[['manual', 'Manual'], ['loop', 'Loop'], ['hover', 'Hover']] as const} value={value.motion} onChange={(motion) => set({ motion })} />
+      <Choice label="Motion" options={MOTION_OPTIONS} value={value.motion} onChange={(motion) => { set({ motion }); if (motion === 'scroll') onScrollPreview?.(scrollPreview); }} />
       <p className="control-help">{MOTION_HELP[value.motion]}</p>
+      {value.motion !== 'manual' && <>
+        <Choice label="Drives" options={[['disperse', 'Disperse'], ['form', 'Form']] as const} value={value.drive} onChange={(drive) => set({ drive })} />
+        <p className="control-help">{value.drive === 'disperse' ? 'The trigger takes the form apart.' : value.form === 'solid' ? 'Choose Liquid or Gas: the trigger melts the solid into it.' : `The trigger turns the solid into ${value.form === 'gas' ? 'gas' : 'liquid'}.`}</p>
+      </>}
+      {value.motion === 'scroll' && <label className="param-row">
+        <span className="param-label"><span>Scroll preview</span><span className="value">{Math.round(scrollPreview * 100)}%</span></span>
+        <input type="range" min="0" max="1" step="0.01" value={scrollPreview} aria-label="Scroll preview" onChange={(event) => previewScroll(Number(event.target.value))} />
+      </label>}
       <Choice label="Particles" options={[['low', 'Low'], ['medium', 'Medium'], ['high', 'High']] as const} value={value.density} onChange={(density) => set({ density })} />
     </>}
   </div>;

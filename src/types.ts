@@ -34,7 +34,13 @@ export interface AtmosphereSettings {
 }
 
 export type MatterForm = 'solid' | 'liquid' | 'gas';
-export type MatterMotion = 'manual' | 'loop' | 'hover';
+/** What moves the form: 'manual' (the Disperse slider), 'loop' (a 9 s breathe), 'hover'
+ * (pointer distance from the object), 'enter' (pointer over the canvas at all), 'scroll'
+ * (the page's scroll progress through the element, supplied by the host). */
+export type MatterMotion = 'manual' | 'loop' | 'hover' | 'enter' | 'scroll';
+/** What a trigger drives: how far apart the form is, or the form itself (from Solid to
+ * the chosen Form). */
+export type MatterDrive = 'disperse' | 'form';
 export type MatterCursorName = 'push' | 'attract' | 'vortex' | 'scatter' | 'wake' | 'off';
 export type MatterDensity = 'low' | 'medium' | 'high';
 
@@ -44,6 +50,8 @@ export interface MatterSettings {
   disperse: number;
   /** 'loop' breathes apart and back; 'hover' comes apart as the pointer nears. */
   motion: MatterMotion;
+  /** What `motion` drives when it is a trigger (anything but 'manual'). */
+  drive: MatterDrive;
   cursor: MatterCursorName;
   /** Cursor strength, 0..1.5. */
   strength: number;

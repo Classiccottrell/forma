@@ -1,12 +1,13 @@
 import type { MatterSettings } from '../types.js';
 
 export const MATTER_DEFAULTS: Readonly<MatterSettings> = {
-  form: 'solid', disperse: 0, motion: 'manual', cursor: 'push', strength: 1, radius: 0.22, density: 'medium',
+  form: 'solid', disperse: 0, motion: 'manual', drive: 'disperse', cursor: 'push', strength: 1, radius: 0.22, density: 'medium',
 };
 
 const CHOICES = {
   form: ['solid', 'liquid', 'gas'],
-  motion: ['manual', 'loop', 'hover'],
+  motion: ['manual', 'loop', 'hover', 'enter', 'scroll'],
+  drive: ['disperse', 'form'],
   cursor: ['push', 'attract', 'vortex', 'scatter', 'wake', 'off'],
   density: ['low', 'medium', 'high'],
 } as const;

@@ -178,6 +178,9 @@ textarea:focus-visible {
 }
 .control-panel.collapsed {
   transform: translateX(100%);
+  /* Hidden once it has slid out, so its controls can't take focus off-screen. */
+  visibility: hidden;
+  transition: transform 0.25s ease, visibility 0s linear 0.25s;
 }
 
 .panel-collapse-btn {

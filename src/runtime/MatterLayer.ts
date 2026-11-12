@@ -57,6 +57,8 @@ export class MatterLayer {
   private disperseNow = 0;
   private loopT = 0;
   private elapsed = 0;
+  private triggerNow = 0;
+  private scroll = 0;
   private pointer = new THREE.Vector2(9, 9);
   private pointerActive = false;
   private readonly screenCentre = new THREE.Vector3();
@@ -179,6 +181,16 @@ void main() {
     u.uReachK.value = 1 / (this.settings.radius * this.settings.radius);
   }
 
+  /** Scroll progress through the host element, 0 (just entering) .. 1 (leaving). */
+  setScroll(progress: number): void {
+    this.scroll = clamp01(Number.isFinite(progress) ? progress : 0);
+  }
+
+  /** 0..1: the current trigger value (Loop, Hover, Enter or Scroll), eased. */
+  get trigger(): number {
+    return this.triggerNow;
+  }
+
   setPointer(ndc: { x: number; y: number } | null): void {
     if (!ndc) { this.pointerActive = false; return; }
     this.pointer.set(ndc.x, ndc.y);
@@ -198,21 +210,34 @@ void main() {
     this.resampleIfNeeded(s);
     const u = this.uniforms;
 
-    // Disperse: from the slider, a 9 s breathe, or the pointer's distance from the
-    // object's centre on screen (not the canvas centre: framing can shift it clear of a panel).
-    if (s.motion === 'loop' && !this.reducedMotion) {
+    // The trigger, 0..1: a 9 s breathe, the pointer's distance from the object's centre on
+    // screen (not the canvas centre: framing can shift it clear of a panel), the pointer
+    // being over the canvas at all, or scroll progress. Reduced motion holds it at rest.
+    const triggered = s.motion !== 'manual' && !this.reducedMotion;
+    if (!triggered) {
+      this.triggerNow = 0;
+    } else if (s.motion === 'loop') {
       this.loopT = (this.loopT + dt / 9) % 1;
       const p = this.loopT;
-      this.disperseNow = p < 0.18 ? 0 : p < 0.45 ? ease((p - 0.18) / 0.27) : p < 0.7 ? 1 : p < 0.97 ? 1 - ease((p - 0.7) / 0.27) : 0;
-    } else if (s.motion === 'hover' && !this.reducedMotion) {
-      const centre = this.screenCentre.set(0, 0, 0).project(this.camera);
-      const target = this.pointerActive ? clamp01(1.25 - Math.hypot(this.pointer.x - centre.x, this.pointer.y - centre.y) * 1.6) : 0;
-      this.disperseNow += (target - this.disperseNow) * Math.min(1, dt * 2.2);
+      this.triggerNow = p < 0.18 ? 0 : p < 0.45 ? ease((p - 0.18) / 0.27) : p < 0.7 ? 1 : p < 0.97 ? 1 - ease((p - 0.7) / 0.27) : 0;
     } else {
-      this.disperseNow = s.disperse;
+      let target = 0;
+      if (s.motion === 'hover') {
+        const centre = this.screenCentre.set(0, 0, 0).project(this.camera);
+        target = this.pointerActive ? clamp01(1.25 - Math.hypot(this.pointer.x - centre.x, this.pointer.y - centre.y) * 1.6) : 0;
+      } else if (s.motion === 'enter') {
+        target = this.pointerActive ? 1 : 0;
+      } else {
+        // Scroll: apart in the middle of the pass, together as it enters and leaves.
+        target = ease(clamp01(1 - Math.abs(this.scroll - 0.5) * 2.4));
+      }
+      this.triggerNow += (target - this.triggerNow) * Math.min(1, dt * (s.motion === 'scroll' ? 6 : 2.2));
     }
-    const target = FORM_STATE[s.form];
-    this.formNow += (target - this.formNow) * Math.min(1, dt * 3);
+    const drivesForm = triggered && s.drive === 'form';
+    this.disperseNow = triggered && !drivesForm ? this.triggerNow : s.disperse;
+    const target = drivesForm ? FORM_STATE[s.form] * this.triggerNow : FORM_STATE[s.form];
+    // A trigger already eases; Form changes from the panel ease here.
+    this.formNow = drivesForm ? target : this.formNow + (target - this.formNow) * Math.min(1, dt * 3);
     if (Math.abs(target - this.formNow) < 0.01) this.formNow = target; // arrive exactly: a sliver of Liquid would leave its surface on
     const w = matterFormWeights(this.formNow);
     const d = this.disperseNow;
