@@ -15,7 +15,10 @@ export { serializeComposition, deserializeComposition } from './runtime/serializ
 export { replaceRetiredShape } from './runtime/retiredShapes.js';
 export { MATTER_DEFAULTS, parseMatterSettings } from './runtime/matterSettings.js';
 export { ATMOSPHERE_DEFAULTS, parseAtmosphereSettings } from './runtime/atmosphereSettings.js';
-export { generateEmbedCode } from './runtime/embed.js';
+export { generateEmbedCode, generateStandaloneHtml } from './runtime/embed.js';
+export type { EmbedOptions } from './runtime/embed.js';
+export { embedForma } from './runtime/embedPlayer.js';
+export type { EmbedView, EmbedPlayerOptions, FormaEmbed } from './runtime/embedPlayer.js';
 
 export { exportPNG } from './export/exportPNG.js';
 

@@ -26,6 +26,9 @@ export interface CreateFormaSceneOptions {
    * object sits at `fill` of the visible area, centred clear of `insets`. Overrides
    * `cameraZ`. Omit for a fixed distance (embeds). */
   framing?: Framing;
+  /** Device pixels per CSS pixel. Default min(devicePixelRatio, 2): sharp on high-density
+   * screens without paying for 3× and up. */
+  pixelRatio?: number;
   onContextLost?: () => void;
   onContextRestored?: () => void;
 }
@@ -80,6 +83,8 @@ export function createFormaScene(opts: CreateFormaSceneOptions): FormaScene {
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setClearAlpha(0);
+  // Before the composer exists: it sizes its buffers from the renderer's ratio.
+  renderer.setPixelRatio(opts.pixelRatio ?? Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, 2));
   renderer.setSize(Math.max(el.clientWidth, 1), Math.max(el.clientHeight, 1));
   el.appendChild(renderer.domElement);
 

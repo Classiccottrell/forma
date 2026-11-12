@@ -9,10 +9,17 @@ import { OnboardingHint } from './components/OnboardingHint';
 import HomePage from './HomePage';
 import { EDITOR_PATH } from './base';
 import CreatorPanel from './components/CreatorPanel';
+import { presentationFromView, readSceneLink } from './sceneLink';
 
 /** The editor frames the object with room around it, so dispersed matter (gas, the
  * liquid puddle) stays in view. Module-level: the runtime reads it once at mount. */
 const EDITOR_RUNTIME_OPTIONS = { framing: {} };
+
+/** A scene link (#scene=…) opens that exact scene. Read once at load, outside React (a
+ * StrictMode double render would otherwise see the hash already cleared), then cleared so
+ * a reload or a later copy of the URL doesn't carry a stale scene. */
+const SHARED_SCENE = typeof window !== 'undefined' ? readSceneLink(window.location.hash) : null;
+if (SHARED_SCENE) history.replaceState(null, '', window.location.pathname + window.location.search);
 
 /** True while a shortcut should NOT fire — focus is in a text input, textarea,
  * select, or contenteditable element (search box, SVG-paste textarea, etc.). */
@@ -28,7 +35,9 @@ export default function App() {
     return <HomePage gallery={new URLSearchParams(window.location.search).get('variant') === 'gallery'} />;
   }
   const hostRef = useRef<HTMLDivElement>(null);
-  const { runtime, scene, scheduler, apply: applyRaw, current, contextLost } = useFormaRuntime(hostRef, undefined, EDITOR_RUNTIME_OPTIONS);
+  const shared = SHARED_SCENE;
+  const { runtime, scene, scheduler, apply: applyRaw, current, contextLost } = useFormaRuntime(hostRef, shared?.composition, EDITOR_RUNTIME_OPTIONS);
+  const [spin, setSpin] = useState(0);
   const topbarRef = useRef<HTMLDivElement>(null);
 
   /** The single application boundary. Every path — stage picks, presets,
@@ -40,7 +49,7 @@ export default function App() {
   }
   const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 640);
   const [creatorMode, setCreatorMode] = useState(false);
-  const [presentation, setPresentation] = useState<PresentationState>(DEFAULT_PRESENTATION);
+  const [presentation, setPresentation] = useState<PresentationState>(() => (shared ? presentationFromView(shared.view, DEFAULT_PRESENTATION) : DEFAULT_PRESENTATION));
   const historyRef = useRef<{ past: Composition[]; future: Composition[] }>({ past: [], future: [] });
 
   // The contact shadow is rendered under the object by the runtime; Presentation drives it.
@@ -151,7 +160,7 @@ export default function App() {
 
   return (
     <div className="app-shell" data-environment={current.environmentId} data-backdrop={presentation.backdrop}>
-      <Viewport hostRef={hostRef} scene={scene} scheduler={scheduler} contextLost={contextLost} environmentId={current.environmentId} presentation={presentation} onPresentationChange={(patch) => setPresentation((current) => ({ ...current, ...patch }))} />
+      <Viewport hostRef={hostRef} scene={scene} scheduler={scheduler} contextLost={contextLost} environmentId={current.environmentId} presentation={presentation} onPresentationChange={(patch) => setPresentation((current) => ({ ...current, ...patch }))} onSpinChange={setSpin} />
       <OnboardingHint />
 
       <div className="topbar" ref={topbarRef}>
@@ -200,6 +209,7 @@ export default function App() {
         onPresentationChange={(patch) => setPresentation((current) => ({ ...current, ...patch }))}
         onMatterChange={(matter) => applyTracked({ matter })}
         onScrollPreview={(progress) => runtime?.setMatterScroll(progress)}
+        spin={spin}
         onAtmosphereChange={(atmosphere) => applyTracked({ atmosphere })}
       />
       {creatorMode && <CreatorPanel composition={current} />}
