@@ -14,6 +14,7 @@ export type { SlotName } from './runtime/diff.js';
 export { serializeComposition, deserializeComposition } from './runtime/serialize.js';
 export { replaceRetiredShape } from './runtime/retiredShapes.js';
 export { MATTER_DEFAULTS, parseMatterSettings } from './runtime/matterSettings.js';
+export { ATMOSPHERE_DEFAULTS, parseAtmosphereSettings } from './runtime/atmosphereSettings.js';
 export { generateEmbedCode } from './runtime/embed.js';
 
 export { exportPNG } from './export/exportPNG.js';

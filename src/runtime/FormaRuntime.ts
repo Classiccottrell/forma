@@ -10,6 +10,7 @@ import { ensureGeometryUVs } from './uv.js';
 import { MatterLayer } from './MatterLayer.js';
 import { createReflectionMap } from '../scene/reflections.js';
 import { ContactShadow, SHADOW_CASTER_LAYER, type ContactShadowSettings } from '../scene/ContactShadow.js';
+import { AtmosphereLayer, environmentTint } from '../scene/AtmosphereLayer.js';
 
 interface Slot<H> {
   registry: ResourceRegistry;
@@ -90,6 +91,7 @@ export class FormaRuntime {
   /** V2 matter: inactive (draws nothing) unless the composition has `matter` settings. */
   private readonly matter: MatterLayer;
   private readonly shadow: ContactShadow;
+  private readonly atmosphere: AtmosphereLayer;
 
   constructor(opts: FormaRuntimeOptions) {
     this.scene = opts.scene;
@@ -115,6 +117,7 @@ export class FormaRuntime {
     this.matter = new MatterLayer(this.scene, this.camera, this.renderer, this.composer, this.ensureOutputPassLast);
     this.mesh.layers.enable(SHADOW_CASTER_LAYER);
     this.shadow = new ContactShadow(this.scene);
+    this.atmosphere = new AtmosphereLayer(this.scene);
   }
 
   /** Per-frame work before each render: matter (motion, Form easing, cursor trail) and
@@ -125,6 +128,7 @@ export class FormaRuntime {
     this.mesh.visible = !this.matter.active || this.matter.meshVisible;
     this.shadow.setFade(this.matter.surfaceAmount);
     this.shadow.render(this.renderer, this.scene);
+    this.atmosphere.update(elapsed, this.renderer, this.camera, this.matter.gasAmount);
   }
 
   /** @deprecated Use `update`, which also renders the contact shadow. */
@@ -212,6 +216,7 @@ export class FormaRuntime {
     else if (prev) this.updateEffectsSlotIfHotParamsChanged(prev, next);
 
     this.matter.apply(next.matter);
+    this.atmosphere.apply(next.atmosphere);
     if (!next.matter) this.mesh.visible = true;
     this._current = next;
   }
@@ -228,6 +233,7 @@ export class FormaRuntime {
     this.effectsSlot.registry.disposeAll();
     this.matter.dispose();
     this.shadow.dispose();
+    this.atmosphere.dispose();
     this.resources.disposeAll();
     this.disposeExternal?.();
   }
@@ -403,6 +409,8 @@ export class FormaRuntime {
   private applyReflectionMap(params: Record<string, unknown>): void {
     const key = this.scene.children.find((o): o is THREE.DirectionalLight => o instanceof THREE.DirectionalLight && o.visible);
     const background = this.scene.background as THREE.Color | THREE.Texture | null;
+    const tint = environmentTint(background, key ? key.color : new THREE.Color(1, 1, 1));
+    this.atmosphere.setTint(tint.color, tint.luminance);
     const target = createReflectionMap(this.renderer, background, key ? key.color.clone() : new THREE.Color(1, 1, 1));
     if (!target) return;
     this.scene.environment = target.texture;

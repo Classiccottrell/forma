@@ -259,6 +259,11 @@ void main() {
     return this.points.geometry;
   }
 
+  /** 0..1: how far the form has gone to gas (Gas weight × Disperse; 0 while matter is off). */
+  get gasAmount(): number {
+    return this.settings ? matterFormWeights(this.formNow).gas * this.disperseNow : 0;
+  }
+
   /** 0..1: how much of the solid surface is left (1 while matter is off). */
   get surfaceAmount(): number {
     return this.settings ? Math.max(0, 1 - this.crack.uBreak.value / 1.15) : 1;

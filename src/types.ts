@@ -21,6 +21,16 @@ export interface Composition {
   /** V2 matter: the form as particles that can hold together, shatter, melt or diffuse.
    * Absent means a plain solid object, exactly as before matter existed. */
   matter?: MatterSettings;
+  /** Space around the object: a soft haze it sits inside and a far dust field. Absent
+   * means none, as before atmosphere existed. */
+  atmosphere?: AtmosphereSettings;
+}
+
+export interface AtmosphereSettings {
+  /** 0..1: soft glowing haze around the object, tinted by the environment. */
+  haze: number;
+  /** 0..1: a far field of fine dust points around the scene. */
+  dust: number;
 }
 
 export type MatterForm = 'solid' | 'liquid' | 'gas';

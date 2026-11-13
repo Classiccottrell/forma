@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry, MATTER_DEFAULTS, type Composition, type MatterSettings } from 'forma';
+import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry, MATTER_DEFAULTS, ATMOSPHERE_DEFAULTS, type AtmosphereSettings, type Composition, type MatterSettings } from 'forma';
 import { builtInPresets } from 'forma/content';
 import { DefinitionPicker } from './DefinitionPicker';
 import { ParamGroup } from './ParamGroup';
@@ -22,15 +22,17 @@ export interface ControlPanelProps {
   onPresentationChange(patch: Partial<PresentationState>): void;
   /** `undefined` turns matter off: the object is a plain solid again. */
   onMatterChange(matter: MatterSettings | undefined): void;
+  /** `undefined` turns atmosphere off. */
+  onAtmosphereChange(atmosphere: AtmosphereSettings | undefined): void;
 }
 
-type SectionId = 'presets' | 'shape' | 'matter' | 'cursor' | 'material' | 'texture' | 'environment' | 'effects' | 'camera' | 'export';
+type SectionId = 'presets' | 'shape' | 'matter' | 'cursor' | 'material' | 'texture' | 'environment' | 'atmosphere' | 'effects' | 'camera' | 'export';
 type ShapeFilter = 'all' | 'solid' | 'flat';
 
 /** Collapsible sections container: Shape / Material / Environment / Effects / Export.
  * Search box filters visible definitions by label/category (roadmap §6). */
 export function ControlPanel(props: ControlPanelProps) {
-  const { collapsed, composition, scene, presentation, onPresentationChange, onSlotSelect, onParamChange, onEffectStageSelect, onEffectParamChange, onApplyComposition, onImportComposition, onMatterChange } = props;
+  const { collapsed, composition, scene, presentation, onPresentationChange, onSlotSelect, onParamChange, onEffectStageSelect, onEffectParamChange, onApplyComposition, onImportComposition, onMatterChange, onAtmosphereChange } = props;
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     presets: false,
     shape: true,
@@ -39,6 +41,7 @@ export function ControlPanel(props: ControlPanelProps) {
     material: true,
     texture: false,
     environment: false,
+    atmosphere: false,
     effects: false,
     camera: false,
     export: false,
@@ -165,6 +168,10 @@ export function ControlPanel(props: ControlPanelProps) {
             />
           )}
         </div>
+      </Section>
+
+      <Section id="atmosphere" title="Atmosphere" open={open.atmosphere} onToggle={toggle}>
+        <AtmosphereControls value={composition.atmosphere} onChange={onAtmosphereChange} />
       </Section>
 
       <Section id="effects" title="Effects" open={isOpen('effects', effectEntries)} onToggle={toggle}>
@@ -300,6 +307,24 @@ function CursorControls({ value, onChange }: { value: MatterSettings | undefined
       <label className="param-row">
         <span className="param-label"><span>Radius</span><span className="value">{value.radius.toFixed(2)}</span></span>
         <input type="range" min="0.08" max="0.5" step="0.01" value={value.radius} aria-label="Cursor radius" onChange={(event) => set({ radius: Number(event.target.value) })} />
+      </label>
+    </>}
+  </div>;
+}
+
+function AtmosphereControls({ value, onChange }: { value: AtmosphereSettings | undefined; onChange(a: AtmosphereSettings | undefined): void }) {
+  const set = (patch: Partial<AtmosphereSettings>) => onChange({ ...(value ?? ATMOSPHERE_DEFAULTS), ...patch });
+  return <div className="matter-controls">
+    <Choice label="Atmosphere" options={[['off', 'Off'], ['on', 'On']] as const} value={value ? 'on' : 'off'} onChange={(v) => (v === 'off' ? onChange(undefined) : set({}))} />
+    {!value && <p className="control-help">Surround the object with soft haze and far dust, so it sits in space.</p>}
+    {value && <>
+      <label className="param-row">
+        <span className="param-label"><span>Haze</span><span className="value">{value.haze.toFixed(2)}</span></span>
+        <input type="range" min="0" max="1" step="0.01" value={value.haze} aria-label="Haze" onChange={(event) => set({ haze: Number(event.target.value) })} />
+      </label>
+      <label className="param-row">
+        <span className="param-label"><span>Dust</span><span className="value">{value.dust.toFixed(2)}</span></span>
+        <input type="range" min="0" max="1" step="0.01" value={value.dust} aria-label="Dust" onChange={(event) => set({ dust: Number(event.target.value) })} />
       </label>
     </>}
   </div>;
