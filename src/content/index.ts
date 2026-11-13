@@ -10,6 +10,8 @@ export { registerTextures } from './textures.js';
 export { registerEnvironments } from './environments.js';
 export { registerEffects } from './effects.js';
 export { builtInPresets } from './presets.js';
+export { composedScenes, LINEFIELD_PIECES } from './composedScenes.js';
+export type { ComposedScene, LinefieldPiece } from './composedScenes.js';
 export { surpriseMe, isLegible } from './surpriseMe.js';
 export { texturePackCatalog } from './texturePacks.js';
 export type { TexturePackCatalogEntry } from './texturePacks.js';

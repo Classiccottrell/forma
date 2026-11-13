@@ -7,7 +7,7 @@ import type { Composition, EnvironmentHandle, EffectHandle, TextureHandle } from
 import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry } from '../registry/instances.js';
 import { slotKey, changedHotKeys } from './diff.js';
 import { ensureGeometryUVs } from './uv.js';
-import { MatterLayer } from './MatterLayer.js';
+import { MatterLayer, type FlowSampler } from './MatterLayer.js';
 import { createReflectionMap } from '../scene/reflections.js';
 import { ContactShadow, SHADOW_CASTER_LAYER, type ContactShadowSettings } from '../scene/ContactShadow.js';
 import { AtmosphereLayer, environmentTint } from '../scene/AtmosphereLayer.js';
@@ -155,6 +155,21 @@ export class FormaRuntime {
   /** 0..1: the current matter trigger value (introspection; 0 for Manual). */
   get matterTrigger(): number {
     return this.matter.trigger;
+  }
+
+  /** A flow across the viewport for dispersed matter to ride, or null (see MatterLayer.setFlow). */
+  setMatterFlow(sampler: FlowSampler | null, gain?: number): void {
+    this.matter.setFlow(sampler, gain);
+  }
+
+  /** Colours matter from the page instead of from the material, or null to go back. */
+  setMatterPalette(palette: { a: readonly [number, number, number]; b: readonly [number, number, number] } | null): void {
+    this.matter.setPagePalette(palette);
+  }
+
+  /** Disperse and Form as currently shown (after triggers and easing); null with matter off. */
+  get matterState(): { disperse: number; form: 'solid' | 'liquid' | 'gas' } | null {
+    return this.matter.state;
   }
 
   /** Pointer in normalized device coordinates for the matter cursor, or null when it leaves. */

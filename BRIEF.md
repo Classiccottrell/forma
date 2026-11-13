@@ -363,6 +363,38 @@ two meet on the page rather than in one codebase.
   dispersing form drawn into Event Horizon's well; particles riding Flow Field's current.
 - A composed-scene export: linefield background + Forma object as one embed.
 
+**Progress (2026-11-13):** built, awaiting the owner's look.
+- **The contract** is `src/bridge/current.js`, "the page current": one dependency-free
+  file shipped byte for byte by both projects (linefield's `shared/current.js`), pinned
+  by SHA-256 in a test on each side. It keeps one object on the page that each side
+  joins: the pointer, the cursor (mode, strength, reach), the body (where the object is,
+  how far apart, which Form), the palette (two stops) and the field (a flow sampler).
+  Alone on a page it adds no listeners and does nothing.
+- **Forma's side** is `joinPageCurrent` (`src/bridge/pageBridge.ts`), on by default in the
+  embed player. It publishes the body and cursor, and takes the page pointer, the flow
+  and the palette. The flow reaches the particles through `cc-webgl/matter`'s new
+  `MatterFlow` (cc-webgl #3): gas and crumbled dust travel along it.
+- **linefield's side** (linefield PR): Flow Field opens its void around the object and
+  closes it as the object disperses; Grain Field parts its dust around the object's
+  edge; Funnel puts its mouth under the object and draws its dust down the throat.
+  A piece alone is byte-identical to before.
+- **Vocabulary.** Whisper, Ink, Neon, Drift, Dense are the contract's preset names, and
+  Push, Attract, Vortex, Scatter, Wake, Off its cursor modes. Push, Attract and Vortex
+  now move linefield's marks as they move Forma's particles. Not done: linefield's Wake
+  does not yet answer Forma's Wake mode, and Forma has no preset picker of its own for
+  the five names (it follows whatever palette the page publishes).
+- **Composed scenes** (`src/content/composedScenes.ts`): Riding the Current (Flow Field),
+  Thinning into Dust (Grain Field), Into the Well (Funnel).
+- **Composed export** (`composeScene`, and Export → "On a linefield background"): one
+  HTML file, a baked linefield piece as the background and the object over it,
+  full-viewport and click-through, the bundle pasted in. `EmbedView.anchor` places the
+  object where each piece keeps its focus.
+- **Depends on, in order:** cc-webgl #2 and #3, the linefield PR (its Pages site serves
+  the baked pieces the export fetches), then this. Until linefield's is live the export
+  still works, with a note that the two won't react yet.
+- Also here: matter sprites now size from the projection matrix (`pixelsPerUnit`), so
+  they follow camera zoom; before, only the mesh did.
+
 ### Phase 6 — Finish and release
 - Phone editor, homepage and gallery layouts, keyboard flow, labels, contrast,
   landmarks (the remaining R1 findings).
@@ -585,6 +617,7 @@ bootstrap consolidated to a single owned path.
 
 | Date       | Update |
 |------------|--------|
+| 2026-11-13 | Phase 5 linefield bridge built: the page current contract (shared verbatim with linefield, hash-pinned), Forma's bridge in the embed player, matter riding a published flow (cc-webgl `MatterFlow`), three composed scenes, and a composed-scene export in the editor. Liquid shading skew under the off-centre lens fixed in cc-webgl (#2). 174/174 tests (10 new), M3 browser checks 15/15, composed-export end-to-end 10/10 from a file on disk, all on headless Chrome with SwiftShader. Editor bundle 258 KB gzip against the 250 KB budget. |
 | 2026-11-09 | SVG upload dropped (owner's call after the Phase 1 review): the SVG Import shape, its upload box, the "Yours" filter and the SVG parser are gone; saved files with an uploaded SVG open on Card. 30 shapes. App bundle −22 KB, now inside the gzip budget (248.7 KB / 250 KB); raw JS still over (917.8 KB / 900 KB). |
 | 2026-11-09 | Phase 1 complete, awaiting owner review: framing (#20), inside-out shapes fixed and Sphere/Soft Blob smoothed (#22), near-duplicates made distinct and Bevelled Box removed (#23, 31 shapes), reflections in every environment (#24), chrome Soft Blob opening scene and Holographic Gas preset (#25), real contact shadow. |
 | 2026-11-08 | Phase 1 framing: the editor fits the object to the area left of the panel with room around it; square PNG exports keep the whole object; floor shadow follows it. 137/137 tests (5 new), M3 browser checks 15/15 (now pinned to headless Chrome on SwiftShader with a renderer interlock), screenshots checked on desktop, panel closed, Gas, Liquid puddle, phone and a 1024² export. |

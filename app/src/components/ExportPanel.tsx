@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { deserializeComposition, exportPNG, generateEmbedCode, generateStandaloneHtml, serializeComposition, type Composition, type EmbedOptions, type FormaScene } from 'forma';
+import { bakeJoinsCurrent, composeScene, deserializeComposition, exportPNG, generateEmbedCode, generateStandaloneHtml, serializeComposition, type Composition, type EmbedOptions, type EmbedView, type FormaScene } from 'forma';
+import { composedScenes, LINEFIELD_PIECES, type LinefieldPiece } from 'forma/content';
 import type { PresentationState } from './Viewport';
 import { currentView, sceneLink } from '../sceneLink';
 import { EDITOR_PATH } from '../base';
@@ -26,6 +27,10 @@ function hosted(): Pick<EmbedOptions, 'libraryUrl' | 'assetBase'> {
     assetBase: new URL('./', document.baseURI).href,
   };
 }
+
+/** Where linefield's baked pieces are published. A composed scene is built on one. */
+const LINEFIELD_DOWNLOADS = (import.meta.env.VITE_LINEFIELD_DOWNLOADS as string | undefined) ?? 'https://classiccottrell.github.io/linefield/downloads/';
+const PIECES = Object.entries(LINEFIELD_PIECES) as [LinefieldPiece, (typeof LINEFIELD_PIECES)[LinefieldPiece]][];
 
 function download(blob: Blob, name: string): void {
   const url = URL.createObjectURL(blob);
@@ -55,6 +60,7 @@ export function ExportPanel({ scene, composition, presentation, spin, onImportCo
   const [transparent, setTransparent] = useState(true);
   const [status, setStatus] = useState<{ text: string; error?: boolean } | null>(null);
   const [output, setOutput] = useState('');
+  const [piece, setPiece] = useState<LinefieldPiece>('flow-field');
   const importInputRef = useRef<HTMLInputElement>(null);
   const maxSide = scene?.renderer.capabilities.maxTextureSize ?? 4096;
 
@@ -76,6 +82,65 @@ export function ExportPanel({ scene, composition, presentation, spin, onImportCo
     });
     const page = generateStandaloneHtml(composition, { ...embedOptions(), height: '100vh', inlineLibrary: library, title: 'Forma scene' });
     return background ? page.replace('height:100vh', `background:${GRADIENT_BACKDROP};height:100vh`) : page;
+  }
+
+  /** One page: a linefield piece as the background and a Forma object over it, the
+   * bundle pasted in. `showcase` picks one of the built-in composed scenes; otherwise it
+   * is the scene in the editor, placed where the chosen piece keeps its focus. */
+  async function composedPage(showcase?: string): Promise<{ html: string; reacts: boolean; name: string }> {
+    const show = showcase ? composedScenes().find((s) => s.id === showcase) : undefined;
+    const slug = show?.piece ?? piece;
+    const spot = LINEFIELD_PIECES[slug];
+    const [bake, library] = await Promise.all([
+      fetch(new URL(`${slug}.html`, LINEFIELD_DOWNLOADS)).then((r) => {
+        if (!r.ok) throw new Error(`could not load the linefield piece (${r.status})`);
+        return r.text();
+      }),
+      fetch(hosted().libraryUrl!).then((r) => {
+        if (!r.ok) throw new Error(`could not load the embed bundle (${r.status})`);
+        return r.text();
+      }),
+    ]);
+    const view: EmbedView = show ? show.view : { ...currentView(scene, presentation, spin), anchor: spot.anchor, fill: spot.fill };
+    const html = composeScene(bake, show?.composition ?? composition, {
+      ...hosted(),
+      view,
+      linefield: show?.linefield,
+      flowGain: show?.flowGain ?? spot.flowGain,
+      inlineLibrary: library,
+      title: show?.name ?? `Forma on ${spot.title}`,
+    });
+    return { html, reacts: bakeJoinsCurrent(bake), name: show?.id ?? `forma-on-${slug}` };
+  }
+  const composedNote = (reacts: boolean) => (reacts ? '' : ' This linefield build is older than the bridge, so the two won\'t react to each other yet.');
+
+  async function handleComposedDownload() {
+    setStatus({ text: 'Building the page…' });
+    try {
+      const page = await composedPage();
+      download(new Blob([page.html], { type: 'text/html' }), `${page.name}.html`);
+      setStatus({ text: `Downloaded ${page.name}.html: the background and the object in one file.${composedNote(page.reacts)}` });
+    } catch (err) {
+      setStatus({ text: `Download failed: ${(err as Error).message}`, error: true });
+    }
+  }
+
+  async function handleComposedPreview(showcase?: string) {
+    const tab = window.open('', '_blank');
+    if (!tab) {
+      setStatus({ text: 'Preview was blocked. Allow pop-ups for this site, or use Download HTML.', error: true });
+      return;
+    }
+    try {
+      const page = await composedPage(showcase);
+      const url = URL.createObjectURL(new Blob([page.html], { type: 'text/html' }));
+      tab.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setStatus({ text: `Preview opened in a new tab.${composedNote(page.reacts)}` });
+    } catch (err) {
+      tab.close();
+      setStatus({ text: `Preview failed: ${(err as Error).message}`, error: true });
+    }
   }
 
   async function handleCopyCode() {
@@ -168,6 +233,25 @@ export function ExportPanel({ scene, composition, presentation, spin, onImportCo
           <button type="button" className="btn" onClick={handlePreview} data-testid="preview-embed-btn">Preview</button>
         </div>
         <p className="field-help">Carries this view: camera angle, spin, backdrop and shadow. Animates, follows the pointer and scroll, and pauses when off-screen.</p>
+      </div>
+
+      <div className="export-group" role="group" aria-labelledby="export-composed-title">
+        <div className="export-group-title" id="export-composed-title">On a linefield background</div>
+        <div className="filter-tabs" role="radiogroup" aria-label="linefield piece">
+          {PIECES.map(([slug, info]) => (
+            <button key={slug} type="button" role="radio" aria-checked={piece === slug} className={piece === slug ? 'active' : ''} onClick={() => setPiece(slug)}>{info.title}</button>
+          ))}
+        </div>
+        <div className="export-buttons">
+          <button type="button" className="btn primary" onClick={handleComposedDownload} data-testid="composed-download-btn">Download HTML</button>
+          <button type="button" className="btn" onClick={() => handleComposedPreview()} data-testid="composed-preview-btn">Preview</button>
+        </div>
+        <p className="field-help">One file: the lines as the background, this object over them. With Matter on, what comes apart rides the lines' flow in their colour, and the lines make room for the object.</p>
+        <div className="export-buttons" aria-label="Showcase scenes">
+          {composedScenes().map((s) => (
+            <button key={s.id} type="button" className="btn" title={s.blurb} onClick={() => handleComposedPreview(s.id)} data-testid={`composed-scene-${s.id}`}>{s.name}</button>
+          ))}
+        </div>
       </div>
 
       <div className="export-group" role="group" aria-labelledby="export-image-title">

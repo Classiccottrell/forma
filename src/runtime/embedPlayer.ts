@@ -5,6 +5,7 @@ import { replaceRetiredShape } from './retiredShapes.js';
 import { createFormaScene, type FormaScene } from '../scene/createFormaScene.js';
 import { DEFAULT_FRAMING_FILL } from '../scene/framing.js';
 import type { ContactShadowSettings } from '../scene/ContactShadow.js';
+import { joinPageCurrent, type PageBridge } from '../bridge/pageBridge.js';
 
 /** How the scene is presented in an embed: the editor's Presentation settings that are
  * not part of the composition itself. Every field is optional. */
@@ -26,6 +27,8 @@ export interface EmbedView {
   shadow?: ContactShadowSettings;
   /** Share of the frame the object takes (see `Framing.fill`). */
   fill?: number;
+  /** Where in the element the object sits, 0..1 across and down (see `Framing.anchor`). */
+  anchor?: { x: number; y: number };
 }
 
 export interface EmbedPlayerOptions {
@@ -37,6 +40,11 @@ export interface EmbedPlayerOptions {
   maxPixelRatio?: number;
   /** Build only once the element nears the viewport. Default true. */
   lazy?: boolean;
+  /** Join the page current, so a linefield background on the same page and this object
+   * move together (see `joinPageCurrent`). Costs nothing alone. Default true. */
+  current?: boolean;
+  /** How far the page's flow carries dispersed matter, in viewport heights. Default 0.9. */
+  flowGain?: number;
 }
 
 export interface FormaEmbed {
@@ -58,6 +66,7 @@ export function embedForma(el: HTMLElement, composition: Composition, options: E
   const reducedMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   let formaScene: FormaScene | null = null;
   let runtime: FormaRuntime | null = null;
+  let bridge: PageBridge | null = null;
   let disposed = false;
   let paused = false;
   let onScreen = typeof IntersectionObserver === 'undefined';
@@ -100,6 +109,7 @@ export function embedForma(el: HTMLElement, composition: Composition, options: E
       spinAngle += THREE.MathUtils.degToRad(view.spin) * dt;
       placeCamera(formaScene);
     }
+    bridge?.step();
     runtime.update(dt, elapsed);
     formaScene.render();
     schedule();
@@ -125,7 +135,7 @@ export function embedForma(el: HTMLElement, composition: Composition, options: E
     try {
       formaScene = createFormaScene({
         el,
-        framing: { fill: view.fill ?? DEFAULT_FRAMING_FILL },
+        framing: { fill: view.fill ?? DEFAULT_FRAMING_FILL, anchor: view.anchor },
         pixelRatio: Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, options.maxPixelRatio ?? 2),
         onContextLost: halt,
         onContextRestored: () => { remount(); },
@@ -153,6 +163,10 @@ export function embedForma(el: HTMLElement, composition: Composition, options: E
     camera.updateProjectionMatrix();
     formaScene.reframe();
     placeCamera(formaScene);
+    if (options.current !== false) {
+      bridge = joinPageCurrent({ el, camera, runtime, matter: () => composition.matter, flowGain: options.flowGain });
+      bridge.step();
+    }
     el.dataset.formaReady = '';
     runtime.update(0, elapsed);
     formaScene.render();
@@ -162,6 +176,8 @@ export function embedForma(el: HTMLElement, composition: Composition, options: E
 
   const unmount = () => {
     halt();
+    bridge?.dispose();
+    bridge = null;
     runtime?.dispose(); // also disposes the scene it was given
     runtime = null;
     formaScene = null;

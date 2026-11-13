@@ -9,7 +9,7 @@ const PRESET_VERSION = 1;
  * keeps a preset valid (round-trips through `deserializeComposition`'s key-match
  * check) even as a definition's schema gains/loses params over time, rather than
  * hand-authoring a params object that can silently drift out of sync. */
-function composition(spec: {
+export function composition(spec: {
   shapeId: string;
   shapeOverrides?: Record<string, Composition['shapeParams'][string]>;
   materialId: string;
