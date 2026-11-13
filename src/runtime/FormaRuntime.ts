@@ -411,7 +411,7 @@ export class FormaRuntime {
     const background = this.scene.background as THREE.Color | THREE.Texture | null;
     const tint = environmentTint(background, key ? key.color : new THREE.Color(1, 1, 1));
     this.atmosphere.setTint(tint.color, tint.luminance);
-    const target = createReflectionMap(this.renderer, background, key ? key.color.clone() : new THREE.Color(1, 1, 1));
+    const target = createReflectionMap(this.renderer, background, key ? key.color.clone() : new THREE.Color(1, 1, 1), tint.luminance);
     if (!target) return;
     this.scene.environment = target.texture;
     this.scene.environmentIntensity = Number(params.environmentStrength ?? 1);

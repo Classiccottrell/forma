@@ -309,13 +309,24 @@ dispersed matter (Gas, the puddle) overflows it and the liquid looks lumpier tha
 prototype (its blur is a fixed pixel width; the object is ~3× bigger on screen). Phase 1's
 "room around the object" fixes both.
 
-### Phase 3 — Atmosphere
+### Phase 3 — Atmosphere — DONE, awaiting owner review (2026-11-09)
 Space around the object instead of a backdrop behind it.
 - Depth haze and glow that the particles sit inside; a far dust/star field; film grain
   tuned to sit behind text.
 - Backdrops: transparent (for site embedding), deep space, soft gradient.
 - Effects reviewed against the new look; Surprise Me guarded against unreadable scenes
   (R1 P2).
+
+**Landed:** `Composition.atmosphere {haze, dust}` (`src/scene/AtmosphereLayer.ts`): haze
+tinted from the environment and weaker on dark backdrops so it reads as light, not fog;
+thicker as matter turns to gas. Deep Space environment (seeded nebula and stars, also in
+the reflection map). Dark backdrops add a horizon band and floor glow to the reflection
+map so chrome keeps its body. Film grain scales with brightness, so dark areas (where
+text sits) stay clean. Bloom defaults softened (strength 0.5, radius 0.35). Surprise Me
+`isLegible`: no dark material on a dark backdrop, no bloom on Softbox / Warm Paper; it adds
+atmosphere on dark backdrops half the time. Transparent and soft-gradient backdrops
+already exist as the editor's Presentation → Backdrop; carrying Transparent into the
+composition so embeds get it is Phase 4's embed work.
 
 ### Phase 4 — Interactive web delivery
 What a site actually embeds.
