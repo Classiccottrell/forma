@@ -185,7 +185,9 @@ async function main() {
       const c = window.__formaDebug?.camera;
       return c ? [c.position.x, c.position.z] : null;
     });
-    await pageMotion.waitForTimeout(600);
+    // Long enough for software GL to get past the first frames' shader compiles
+    // (the opening scene has atmosphere on since 2026-11-12).
+    await pageMotion.waitForTimeout(3000);
     const p2 = await pageMotion.evaluate(() => {
       const c = window.__formaDebug?.camera;
       return c ? [c.position.x, c.position.z] : null;

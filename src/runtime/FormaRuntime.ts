@@ -146,6 +146,17 @@ export class FormaRuntime {
     return this.matter.particleGeometry;
   }
 
+  /** Scroll progress through the host element (0 entering the viewport, 1 leaving), for
+   * the 'scroll' trigger. */
+  setMatterScroll(progress: number): void {
+    this.matter.setScroll(progress);
+  }
+
+  /** 0..1: the current matter trigger value (introspection; 0 for Manual). */
+  get matterTrigger(): number {
+    return this.matter.trigger;
+  }
+
   /** Pointer in normalized device coordinates for the matter cursor, or null when it leaves. */
   setMatterPointer(ndc: { x: number; y: number } | null): void {
     this.matter.setPointer(ndc);

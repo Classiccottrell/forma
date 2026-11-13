@@ -6,6 +6,7 @@ import {
   materialRegistry,
   textureRegistry,
   environmentRegistry,
+  ATMOSPHERE_DEFAULTS,
   type Composition,
   type FormaScene,
   type Framing,
@@ -22,7 +23,8 @@ function ensureContentRegistered(): void {
 
 export function defaultComposition(): Composition {
   ensureContentRegistered();
-  // The opening scene: a chrome Soft Blob on Gradient Sky (owner's pick, 2026-11-09).
+  // The opening scene: a chrome Soft Blob on Gradient Sky (owner's pick, 2026-11-09),
+  // with atmosphere on (owner's call at the Phase 3 review, 2026-11-11).
   return {
     shapeId: 'soft-blob',
     shapeParams: { ...shapeRegistry.require('soft-blob').defaultParameters },
@@ -34,6 +36,7 @@ export function defaultComposition(): Composition {
     environmentParams: { ...environmentRegistry.require('gradient-sky').defaultParameters },
     effectIds: [],
     effectParams: {},
+    atmosphere: { ...ATMOSPHERE_DEFAULTS },
   };
 }
 

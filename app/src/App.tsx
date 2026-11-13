@@ -165,7 +165,7 @@ export default function App() {
           type="button"
           className="btn"
           onClick={() => applyComposition(defaultComposition())}
-          title="Reset composition to the default sphere/matte/studio setup"
+          title="Reset to the opening scene"
           data-testid="reset-composition"
         >
           Reset composition
@@ -199,6 +199,7 @@ export default function App() {
         presentation={presentation}
         onPresentationChange={(patch) => setPresentation((current) => ({ ...current, ...patch }))}
         onMatterChange={(matter) => applyTracked({ matter })}
+        onScrollPreview={(progress) => runtime?.setMatterScroll(progress)}
         onAtmosphereChange={(atmosphere) => applyTracked({ atmosphere })}
       />
       {creatorMode && <CreatorPanel composition={current} />}

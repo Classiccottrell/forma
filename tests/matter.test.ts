@@ -120,6 +120,42 @@ describe('matter layer', () => {
     runtime.dispose();
   });
 
+  it('follows scroll progress: together entering and leaving, apart mid-pass', () => {
+    const runtime = matterRuntime();
+    runtime.applyComposition(composition('sphere', low({ motion: 'scroll' })));
+    const settle = (progress: number) => { runtime.setMatterScroll(progress); for (let i = 0; i < 120; i++) runtime.update(1 / 60, i / 60); };
+    settle(0);
+    expect(runtime.matterTrigger).toBeLessThan(0.01);
+    expect(runtime.mesh.visible).toBe(true);
+    settle(0.5);
+    expect(runtime.matterTrigger).toBeGreaterThan(0.99);
+    expect(runtime.mesh.visible).toBe(false); // dispersed, so the surface has cracked away
+    settle(1);
+    expect(runtime.matterTrigger).toBeLessThan(0.01);
+    runtime.dispose();
+  });
+
+  it('drives the form itself when drive is "form": a solid melts toward the chosen form', () => {
+    const runtime = matterRuntime();
+    runtime.applyComposition(composition('sphere', low({ form: 'gas', motion: 'enter', drive: 'form' })));
+    for (let i = 0; i < 120; i++) runtime.update(1 / 60, i / 60);
+    expect(runtime.mesh.visible).toBe(true); // pointer away: still solid
+    runtime.setMatterPointer({ x: 0, y: 0 });
+    for (let i = 0; i < 240; i++) runtime.update(1 / 60, 2 + i / 60);
+    expect(runtime.matterTrigger).toBeGreaterThan(0.95);
+    expect(runtime.mesh.visible).toBe(false); // gone to gas
+    runtime.setMatterPointer(null);
+    for (let i = 0; i < 240; i++) runtime.update(1 / 60, 6 + i / 60);
+    expect(runtime.mesh.visible).toBe(true); // and back together
+    runtime.dispose();
+  });
+
+  it('keeps older files valid and rejects an unknown trigger or drive', () => {
+    expect(parseMatterSettings({ motion: 'hover' }).drive).toBe('disperse');
+    expect(() => parseMatterSettings({ motion: 'shake' })).toThrow();
+    expect(() => parseMatterSettings({ drive: 'colour' })).toThrow();
+  });
+
   it('removes its particles from the scene on dispose', () => {
     const runtime = matterRuntime();
     runtime.applyComposition(composition('sphere', low()));
