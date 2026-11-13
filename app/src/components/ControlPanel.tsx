@@ -4,7 +4,6 @@ import { builtInPresets } from 'forma/content';
 import { DefinitionPicker } from './DefinitionPicker';
 import { ParamGroup } from './ParamGroup';
 import { ExportPanel } from './ExportPanel';
-import { SvgImport } from './SvgImport';
 import { PresetGallery } from './PresetGallery';
 import type { FormaScene } from 'forma';
 import type { PresentationState } from './Viewport';
@@ -17,7 +16,6 @@ export interface ControlPanelProps {
   onParamChange(slot: 'shapeParams' | 'materialParams' | 'textureParams' | 'environmentParams', key: string, value: Composition['shapeParams'][string]): void;
   onEffectStageSelect(stageIds: string[], id: string): void;
   onEffectParamChange(id: string, key: string, value: Composition['shapeParams'][string]): void;
-  onSvgImport(svgText: string): void;
   onApplyComposition(composition: Composition): void;
   onImportComposition(composition: Composition): void;
   presentation: PresentationState;
@@ -27,12 +25,12 @@ export interface ControlPanelProps {
 }
 
 type SectionId = 'presets' | 'shape' | 'matter' | 'cursor' | 'material' | 'texture' | 'environment' | 'effects' | 'camera' | 'export';
-type ShapeFilter = 'all' | 'solid' | 'flat' | 'yours';
+type ShapeFilter = 'all' | 'solid' | 'flat';
 
 /** Collapsible sections container: Shape / Material / Environment / Effects / Export.
  * Search box filters visible definitions by label/category (roadmap §6). */
 export function ControlPanel(props: ControlPanelProps) {
-  const { collapsed, composition, scene, presentation, onPresentationChange, onSlotSelect, onParamChange, onEffectStageSelect, onEffectParamChange, onSvgImport, onApplyComposition, onImportComposition, onMatterChange } = props;
+  const { collapsed, composition, scene, presentation, onPresentationChange, onSlotSelect, onParamChange, onEffectStageSelect, onEffectParamChange, onApplyComposition, onImportComposition, onMatterChange } = props;
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     presets: false,
     shape: true,
@@ -58,7 +56,6 @@ export function ControlPanel(props: ControlPanelProps) {
   const materialDef = materialRegistry.require(composition.materialId);
   const textureDef = textureRegistry.require(composition.textureId ?? 'none');
   const shapeEntries = shapeRegistry.list().filter((entry) => {
-    if (shapeFilter === 'yours') return entry.id === 'svg-extrude';
     if (shapeFilter === 'solid') return ['primitive', 'organic', 'faceted', 'parametric', 'lathe'].includes(entry.category);
     if (shapeFilter === 'flat') return ['ui', 'extruded', 'symbol', 'emoji symbol'].includes(entry.category);
     return true;
@@ -101,7 +98,7 @@ export function ControlPanel(props: ControlPanelProps) {
 
       <Section id="shape" title="Shape" open={isOpen('shape', shapeRegistry.list())} onToggle={toggle}>
         <div className="filter-tabs" role="tablist" aria-label="Shape categories">
-          {(['all', 'solid', 'flat', 'yours'] as ShapeFilter[]).map((filter) => (
+          {(['all', 'solid', 'flat'] as ShapeFilter[]).map((filter) => (
             <button key={filter} type="button" role="tab" aria-selected={shapeFilter === filter} className={shapeFilter === filter ? 'active' : ''} onClick={() => setShapeFilter(filter)}>
               {filter[0].toUpperCase() + filter.slice(1)}
             </button>
@@ -116,9 +113,6 @@ export function ControlPanel(props: ControlPanelProps) {
         />
         <div style={{ marginTop: 10 }}>
           <ParamGroup schema={shapeDef.parameterSchema} values={composition.shapeParams} onChange={(k, v) => onParamChange('shapeParams', k, v)} />
-        </div>
-        <div style={{ marginTop: 14 }}>
-          <SvgImport onImport={onSvgImport} />
         </div>
       </Section>
 

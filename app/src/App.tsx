@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Composition, FormaScene, ParamValue } from 'forma';
 import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, effectRegistry } from 'forma';
-const SVG_EXTRUDE_SHAPE_ID = 'svg-extrude';
 import { useFormaRuntime, defaultComposition } from './hooks/useFormaRuntime';
 import { DEFAULT_PRESENTATION, Viewport, type PresentationState } from './components/Viewport';
 import { ControlPanel, orderByStage } from './components/ControlPanel';
@@ -133,13 +132,6 @@ export default function App() {
     applyTracked({ effectIds, effectParams });
   }
 
-  function onSvgImport(svgText: string) {
-    applyTracked({
-      shapeId: SVG_EXTRUDE_SHAPE_ID,
-      shapeParams: { ...shapeRegistry.require(SVG_EXTRUDE_SHAPE_ID).defaultParameters, svg: svgText },
-    });
-  }
-
   function applyComposition(composition: Composition) {
     applyTracked(composition);
   }
@@ -202,7 +194,6 @@ export default function App() {
         onParamChange={onParamChange}
         onEffectStageSelect={onEffectStageSelect}
         onEffectParamChange={onEffectParamChange}
-        onSvgImport={onSvgImport}
         onApplyComposition={applyComposition}
         onImportComposition={importComposition}
         presentation={presentation}

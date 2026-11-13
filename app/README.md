@@ -201,13 +201,8 @@ Presentation backdrops, floor-shadow controls, and composition undo/redo are als
 
 ## Known limitations
 
-- SVG import (`svg-extrude` shape) caps uploads at 100KB; oversized or
-  malformed SVGs fall back to a built-in default glyph rather than failing
-  silently (M2).
-- `svg-extrude` is excluded from the library's automated leak-check and
-  content-smoke tests — happy-dom's `DOMParser` doesn't support
-  `image/svg+xml` parsing (returns a null `documentElement`), not a Forma bug.
-  Covered instead by the Playwright scripts above, against a real browser DOM.
+- SVG upload was dropped (2026-11-09); every shape is now covered by the
+  library's automated leak-check and content-smoke tests.
 - Production bundle is a single ~812 KB (219 KB gzipped) JS chunk — see the
   root README's "Bundle size" note for why this is treated as expected, not a
   regression to fix.

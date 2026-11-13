@@ -176,7 +176,7 @@ function signedVolume(geometry: THREE.BufferGeometry): number {
 }
 
 describe('every shape faces outward', () => {
-  it.each(['heart', 'plus', 'arrow', 'sparkle', 'svg-extrude', 'star', 'cross', 'sphere', 'box', 'gem', 'pill', 'badge', 'tab'])('%s has positive signed volume', (id) => {
+  it.each(['heart', 'plus', 'arrow', 'sparkle', 'star', 'cross', 'sphere', 'box', 'gem', 'pill', 'badge', 'tab'])('%s has positive signed volume', (id) => {
     const geometry = build(id);
     expect(signedVolume(geometry)).toBeGreaterThan(0);
     geometry.dispose();

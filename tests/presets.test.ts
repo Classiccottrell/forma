@@ -65,12 +65,6 @@ describe('surpriseMe', () => {
     }
   });
 
-  it('never picks the svg-extrude shape (no default svg content to extrude)', () => {
-    for (let i = 0; i < 30; i++) {
-      expect(surpriseMe().shapeId).not.toBe('svg-extrude');
-    }
-  });
-
   it('never pairs wireframe material with a sparse shape', () => {
     const SPARSE = new Set(['soft-blob', 'spiral', 'ring', 'cross']);
     for (let i = 0; i < 50; i++) {

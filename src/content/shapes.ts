@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 import { defineShape, shapeRegistry } from '../registry/instances.js';
 
 // Four shape definitions (blueprint §5.1). All params are rebuild:true — geometry
@@ -587,20 +586,6 @@ const arrow = defineShape({
   create(params, ctx) { return extrudedSymbol(makeArrowShape(), params, ctx); },
 });
 
-function makeFallbackGlyphShape(): THREE.Shape {
-  const shape = new THREE.Shape();
-  shape.absarc(0, 0, 0.85, 0, Math.PI * 2, false);
-  for (const x of [-0.28, 0.28]) {
-    const eye = new THREE.Path();
-    eye.absarc(x, 0.22, 0.1, 0, Math.PI * 2, false);
-    shape.holes.push(eye);
-  }
-  const mouth = new THREE.Path();
-  mouth.absarc(0, -0.05, 0.4, Math.PI * 0.18, Math.PI * 0.82, false);
-  shape.holes.push(mouth);
-  return shape;
-}
-
 function makeSparkleShape(): THREE.Shape {
   return makeStarShape(4, 1, 0.18);
 }
@@ -1134,56 +1119,6 @@ const vase = defineShape({
   },
 });
 
-// Small built-in glyph (a rounded square with a notch) — the svg-extrude default. Kept
-// tiny and always-valid so a freshly-selected shape (before any file is imported) and
-// the leak-check's defaultParameters pass never hit an empty/garbage SVG path.
-const DEFAULT_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
-  '<path d="M20 20 L80 20 L80 60 L60 60 L60 80 L20 80 Z" /></svg>';
-
-function createSvgGeometry(params: { svg: string; size: number; depth: number; bevelEnabled: boolean; bevelSize: number; curveSegments: number }, ctx: Parameters<NonNullable<typeof star['create']>>[1], fallback: string): THREE.BufferGeometry {
-  let geometry: THREE.BufferGeometry;
-  try {
-    const loader = new SVGLoader();
-    const parsed = loader.parse(params.svg);
-    const shapes = parsed.paths.flatMap((path) => path.toShapes());
-    if (shapes.length === 0) throw new Error('no paths parsed from SVG');
-    geometry = new THREE.ExtrudeGeometry(shapes, { depth: params.depth, bevelEnabled: params.bevelEnabled, bevelSize: params.bevelSize, bevelThickness: params.bevelSize, curveSegments: params.curveSegments, steps: 1 });
-  } catch {
-    try {
-      const parsed = new SVGLoader().parse(fallback);
-      geometry = new THREE.ExtrudeGeometry(parsed.paths.flatMap((path) => path.toShapes()), { depth: params.depth, bevelEnabled: params.bevelEnabled, bevelSize: params.bevelSize, bevelThickness: params.bevelSize, curveSegments: params.curveSegments, steps: 1 });
-    } catch {
-      // ponytail: headless DOMParser fallback; browser path remains the real SVG extrusion.
-      geometry = new THREE.ExtrudeGeometry(makeFallbackGlyphShape(), { depth: params.depth, bevelEnabled: params.bevelEnabled, bevelSize: params.bevelSize, bevelThickness: params.bevelSize, curveSegments: params.curveSegments, steps: 1 });
-    }
-  }
-  geometry.computeBoundingBox();
-  const bounds = geometry.boundingBox!;
-  const scale = params.size / Math.max(bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, 1e-6);
-  geometry.scale(scale, scale, scale);
-  turnUpsideDown(geometry); // SVG's y axis points down
-  geometry.center();
-  geometry.computeVertexNormals();
-  ctx.registry.track(geometry);
-  return geometry;
-}
-
-const svgExtrude = defineShape({
-  id: 'svg-extrude',
-  label: 'SVG Import',
-  category: 'svg',
-  parameterSchema: {
-    svg: { kind: 'string', default: DEFAULT_SVG, rebuild: true, multiline: true },
-    size: { kind: 'number', min: 0.5, max: 3, step: 0.1, default: 1.5, rebuild: true },
-    depth: { kind: 'number', min: 0.02, max: 1, step: 0.02, default: 0.25, rebuild: true },
-    bevelEnabled: { kind: 'boolean', default: true, rebuild: true },
-    bevelSize: { kind: 'number', min: 0, max: 0.15, step: 0.005, default: 0.02, rebuild: true },
-    curveSegments: { kind: 'number', min: 4, max: 32, step: 1, default: 12, rebuild: true },
-  },
-  defaultParameters: { svg: DEFAULT_SVG, size: 1.5, depth: 0.25, bevelEnabled: true, bevelSize: 0.02, curveSegments: 12 },
-  create(params, ctx) { return createSvgGeometry(params, ctx, DEFAULT_SVG); },
-});
 
 export function registerShapes(): void {
   for (const def of [
@@ -1217,7 +1152,6 @@ export function registerShapes(): void {
     diamond,
     spring,
     vase,
-    svgExtrude,
   ]) {
     if (!shapeRegistry.get(def.id)) shapeRegistry.register(def);
   }
