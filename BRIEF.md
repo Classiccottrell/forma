@@ -428,7 +428,7 @@ visitor actually hits. Three steps, in order:
 - [ ] **Copied embed code doesn't work from the live site.** It loads
   `./forma.browser.v0.1.0.js`, which the site doesn't serve (404), so a pasted snippet
   renders nothing. Publish the bundle with Pages and point `libraryUrl` at its absolute URL.
-- [ ] **Phone editor is unusable.** The top bar wraps to three rows over the panel and hides
+- [x] **Phone editor is unusable.** Fixed 2026-11-13: the top bar is one row that scrolls sideways, the panel starts under it, and the viewer's own buttons step aside while the panel is open. The top bar wraps to three rows over the panel and hides
   the search box; the open panel covers the whole viewport, so changes can't be seen; the
   hint and Reset view float over the picker grid.
 - [ ] **Gallery page: the 3D object covers the content.** On desktop the card mesh sits on
@@ -443,19 +443,19 @@ visitor actually hits. Three steps, in order:
   object on a near-black environment; another paired Bloom with a bright sky and blew
   the object out to white. Needs a legibility guard (luminance contrast, bloom vs bright
   environments).
-- [ ] **Homepage legibility.** Headline italic, eyebrow, body copy, nav links and callout
+- [ ] **Homepage legibility.** (Editor: fixed 2026-11-13, axe now clean. Homepage and gallery still to do.) Headline italic, eyebrow, body copy, nav links and callout
   labels sit over the moving object at low contrast. axe: toggle text 2.33:1, small
   labels 3.03:1 (homepage, gallery); effect param labels 4.39:1 (editor). AA needs 4.5:1.
 - [ ] **Homepage on phone:** "Open editor" wraps and clips at the right edge; a callout
   card sits off-screen; the viewer toolbar overlaps the "Forma / 2026" footer (which the
   Auto-spin button also covers on desktop).
-- [ ] **Unlabelled form fields (axe critical):** the composition-import file input and the
+- [x] **Unlabelled form fields (axe critical):** the composition-import file input and the
   SVG textarea.
-- [ ] **Editor top bar overlaps panel content** as the panel scrolls.
+- [x] **Editor top bar overlaps panel content** as the panel scrolls.
 - [ ] **Weak first impression in the editor:** the default is a flat lavender matte sphere
   with a visibly faceted outline at default detail; the Matte swatch (violet) doesn't
   match the render.
-- [ ] **Keyboard flow.** Viewer controls (Auto-spin/Speed/Reset view) come first in tab
+- [x] **Keyboard flow.** Fixed 2026-11-13 in the editor: a skip link to the controls, the top bar before the viewer's controls in tab order, and each shape or material grid is one tab stop with arrow keys (Home and End too). Tab stops from load to the Matter section went from 55 to 26. Not done: the homepage and gallery tab order, and dropping the viewer controls on marketing pages. Viewer controls (Auto-spin/Speed/Reset view) come first in tab
   order on every page, before the nav and the main call to action; no skip link; ~50 tabs
   to get past the shape grid in the editor. Consider dropping viewer controls from the
   marketing pages entirely.
@@ -464,9 +464,9 @@ visitor actually hits. Three steps, in order:
 - [ ] Effect stage pickers are unstyled white native selects; Light Color is a full-width
   white bar. Both clash with the dark panel.
 - [ ] Gallery preset thumbnails render as dark blobs, not previews of the presets.
-- [ ] Editor content isn't in landmarks (axe `region` ×22).
-- [ ] No favicon (404 on every page).
-- [ ] Console warning ×2: `toNonIndexed()` called on already non-indexed geometry (Faceted Gem).
+- [x] Editor content isn't in landmarks (axe `region` ×22). Fixed 2026-11-13: header, preview region, controls as an aside.
+- [x] No favicon (404 on every page). Fixed 2026-11-13: an SVG favicon.
+- [x] Console warning ×2 (not seen on the editor page in the 2026-11-13 run, including warnings; the Faceted Gem path itself was not re-checked): `toNonIndexed()` called on already non-indexed geometry (Faceted Gem).
 - [ ] Parameters sit far from the preview: one long panel scroll, with a shape's params
   below the 32-card grid.
 
