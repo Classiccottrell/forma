@@ -187,7 +187,7 @@ textarea:focus-visible {
 }
 .btn.toggle-on {
   border-color: var(--violet);
-  color: var(--violet);
+  color: var(--accent-text);
 }
 
 .control-panel {
@@ -615,6 +615,7 @@ textarea:focus-visible {
   pointer-events: auto;
 }
 .spin-speed {
+  color: var(--text-dim);
   display: flex;
   align-items: center;
   gap: 7px;
@@ -728,7 +729,7 @@ textarea:focus-visible {
 /* Home: editorial object studio. The canvas remains the only hero object. */
 .home-shell { position: relative; min-height: 100vh; overflow: auto; isolation: isolate; color: var(--text); }
 .home-shell .viewport-host { z-index: -2; }
-.home-shell .toolbelt { z-index: 4; opacity: .75; }
+.home-shell .toolbelt { z-index: 4; opacity: .9; }
 .home-shell::after { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(90deg, rgba(8, 9, 16, .78), transparent 48%, rgba(8, 9, 16, .2)); }
 .home-nav { position: relative; z-index: 5; display: flex; align-items: center; justify-content: space-between; padding: 28px 42px; }
 .home-nav .brand { margin: 0; color: var(--text); text-decoration: none; }
@@ -739,7 +740,7 @@ textarea:focus-visible {
 .home-studio-content, .home-gallery-content { position: relative; z-index: 2; min-height: calc(100vh - 134px); padding: clamp(60px, 12vh, 150px) 7vw 120px; pointer-events: none; }
 .home-studio-copy, .home-gallery-intro, .home-control-card, .home-presets { pointer-events: auto; }
 .home-studio-copy { max-width: 560px; animation: home-rise .8s ease both; }
-.eyebrow { margin: 0 0 18px; color: var(--accent); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; }
+.eyebrow { margin: 0 0 18px; color: var(--accent-text); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; }
 .home-shell h1 { margin: 0; font-family: var(--display); font-size: clamp(58px, 8vw, 126px); font-weight: 400; line-height: .88; letter-spacing: -.055em; }
 .home-shell h1 i { color: var(--accent); font-weight: 400; }
 .home-studio-copy > p:not(.eyebrow), .home-gallery-intro > p:not(.eyebrow) { max-width: 340px; margin: 28px 0 30px; color: var(--text-dim); font-size: 13px; line-height: 1.7; }
@@ -779,11 +780,11 @@ textarea:focus-visible {
 .home-nav a:not(.brand) { color: var(--text-dim); }
 .home-nav a:not(.brand):hover, .home-preset:hover, .home-preset.is-active { color: var(--accent); }
 .home-nav-cta { border-color: var(--accent); }
-.eyebrow, .home-card-kicker { color: var(--accent); }
+.eyebrow, .home-card-kicker { color: var(--accent-text); }
 .home-shell h1 i { color: var(--accent); }
 .home-studio-copy > p:not(.eyebrow), .home-gallery-intro > p:not(.eyebrow) { color: var(--text-dim); }
-.home-button { color: var(--bg); background: var(--accent); }
-.home-button:hover { color: var(--bg); background: #6c9a7d; }
+.home-button { color: var(--bg); background: var(--accent-text); }
+.home-button:hover { color: var(--bg); background: #b5dcc4; }
 .home-control-card, .creator-panel { background: rgba(19, 19, 25, .84); border-color: var(--border); }
 .home-control-card label { color: var(--text-dim); }
 .home-control-card output, .home-preset strong { color: var(--text); }
