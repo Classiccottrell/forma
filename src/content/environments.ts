@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { seededRandom } from 'cc-webgl/matter';
 import { defineEnvironment, environmentRegistry } from '../registry/instances.js';
 import type { EnvironmentCreateContext, EnvironmentHandle } from '../types.js';
 
@@ -426,8 +427,104 @@ const aurora = defineEnvironment({
   },
 });
 
+/** Deep blue-black space: a vertical gradient, two faint nebula clouds (violet and
+ * teal) from layered value noise, and a sparse star field. Generated once, the same
+ * every time (seeded), at a size that keeps stars crisp as a fullscreen backdrop and
+ * still works wrapped onto the reflection sphere. Row 0 is the bottom of the screen. */
+export function makeDeepSpaceTexture(width = 512, height = 256): THREE.DataTexture {
+  const rand = seededRandom(1977);
+  const gw = 17, gh = 9;
+  const grid = (): Float32Array => Float32Array.from({ length: gw * gh }, () => rand());
+  const layers = [grid(), grid(), grid(), grid()];
+  const smooth = (v: number) => v * v * (3 - 2 * v);
+  const noise = (g: Float32Array, x: number, y: number): number => {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const fx = smooth(x - xi), fy = smooth(y - yi);
+    const at = (i: number, j: number) => g[(((j % gh) + gh) % gh) * gw + (((i % gw) + gw) % gw)]!;
+    const a = at(xi, yi) + (at(xi + 1, yi) - at(xi, yi)) * fx;
+    const b = at(xi, yi + 1) + (at(xi + 1, yi + 1) - at(xi, yi + 1)) * fx;
+    return a + (b - a) * fy;
+  };
+  const fbm = (u: number, v: number, seed: number): number => {
+    let sum = 0, amp = 0.5, f = 1;
+    for (let o = 0; o < 4; o++) { sum += amp * noise(layers[o]!, u * 4 * f + seed, v * 2 * f + seed * 0.7); amp *= 0.5; f *= 2; }
+    return sum;
+  };
+  const data = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    const v = y / (height - 1);
+    for (let x = 0; x < width; x++) {
+      const u = x / width;
+      // Base: near-black at the top, deep navy toward the bottom.
+      let r = 3 + 7 * (1 - v), g = 4 + 10 * (1 - v), b = 12 + 34 * (1 - v);
+      // Nebulae: thresholded noise so they come in clouds with dark lanes between.
+      const n1 = Math.max(0, fbm(u, v, 0) - 0.48) * 2.2;
+      const n2 = Math.max(0, fbm(u, v, 5.3) - 0.5) * 2.2;
+      r += n1 * 42 + n2 * 5; g += n1 * 13 + n2 * 28; b += n1 * 58 + n2 * 40;
+      const i = (y * width + x) * 4;
+      data[i] = Math.min(255, r); data[i + 1] = Math.min(255, g); data[i + 2] = Math.min(255, b); data[i + 3] = 255;
+    }
+  }
+  // Stars: mostly faint single texels, a few brighter ones with a soft cross.
+  for (let s = 0; s < 450; s++) {
+    const x = Math.floor(rand() * width), y = Math.floor(rand() * height);
+    const bright = rand() < 0.05;
+    const level = bright ? 220 : 40 + rand() * 90;
+    const tint = rand();
+    const put = (px: number, py: number, k: number) => {
+      if (px < 0 || py < 0 || px >= width || py >= height) return;
+      const i = (py * width + px) * 4;
+      data[i] = Math.min(255, data[i]! + level * k * (tint < 0.3 ? 0.8 : 1));
+      data[i + 1] = Math.min(255, data[i + 1]! + level * k * 0.92);
+      data[i + 2] = Math.min(255, data[i + 2]! + level * k * (tint > 0.7 ? 0.8 : 1));
+    };
+    put(x, y, 1);
+    if (bright) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) put(x + dx, y + dy, 0.35);
+  }
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+const deepSpace = defineEnvironment({
+  id: 'deep-space',
+  label: 'Deep Space',
+  category: 'backdrop',
+  parameterSchema: LIGHTING_SCHEMA,
+  defaultParameters: DEFAULT_LIGHTING,
+  update: updateLighting,
+  create(params, ctx) {
+    const texture = makeDeepSpaceTexture();
+    ctx.registry.track(texture);
+    ctx.scene.background = texture;
+    const ambient = new THREE.AmbientLight(0x4a5aa8, 0.3);
+    // A cool white key, like starlight, and a violet rim picked up from the nebula.
+    const key = new THREE.DirectionalLight(0xdfe6ff, 1.15);
+    key.position.set(0.6, 0.7, 0.8);
+    const rim = new THREE.DirectionalLight(0x9a6bff, 1.0);
+    rim.position.set(-0.7, 0.3, -0.7);
+    ctx.scene.add(ambient, key, rim);
+    const directional = createDirectional(ctx, params);
+    const lights = [ambient, key, rim, directional];
+    let disposed = false;
+    const handle: LightHandle = {
+      lights,
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        ctx.scene.remove(...lights);
+        ctx.scene.background = null;
+      },
+    };
+    return handle;
+  },
+});
+
 export function registerEnvironments(): void {
-  for (const def of [studio, gradientSky, neonRoom, sunset, midnight, softbox, aurora, duskRose, paperWarm, forestNight]) {
+  for (const def of [studio, gradientSky, neonRoom, sunset, midnight, softbox, aurora, duskRose, paperWarm, forestNight, deepSpace]) {
     if (!environmentRegistry.get(def.id)) environmentRegistry.register(def);
   }
 }

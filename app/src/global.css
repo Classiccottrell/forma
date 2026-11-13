@@ -370,6 +370,7 @@ textarea:focus-visible {
 .picker-thumb[data-id='sunset']::after { background: linear-gradient(#2b1a3f, #ff8a3d); }
 .picker-thumb[data-id='midnight']::after { background: radial-gradient(circle at 70% 30%, #273a91, #05060c 70%); }
 .picker-thumb[data-id='aurora-atmosphere']::after { background: linear-gradient(160deg, #17215b, #39d6ad 48%, #604bd0 72%, #080d2e); }
+.picker-thumb[data-id='deep-space']::after { background: radial-gradient(ellipse at 30% 40%, rgba(130,70,200,.55), transparent 45%), radial-gradient(ellipse at 72% 62%, rgba(40,140,170,.4), transparent 40%), radial-gradient(circle at 20% 20%, #fff 0 1px, transparent 1.5px), radial-gradient(circle at 80% 30%, #fff 0 1px, transparent 1.5px), radial-gradient(circle at 60% 80%, #cfe 0 1px, transparent 1.5px), linear-gradient(#03040c, #0a1230); }
 .picker-thumb[data-kind='texture'] { border-radius: 10px; overflow: hidden; background: #171a24; }
 .picker-thumb[data-kind='texture']::after { content: ''; position: absolute; inset: 0; opacity: .92; }
 .picker-thumb[data-id='none']::after { background: radial-gradient(circle, rgba(255,255,255,.18) 0 2px, transparent 3px), linear-gradient(135deg, #2a3040, #10131b); background-size: 12px 12px, auto; }

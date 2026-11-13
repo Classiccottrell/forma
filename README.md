@@ -31,7 +31,7 @@ cd app && npm install   # editor product app — its own package.json, React + f
 
 ### Current H3 roadmap status
 
-The catalog is 30 shapes, 21 materials, 8 textures, 10 environments and 9 effects, which
+The catalog is 30 shapes, 21 materials, 8 textures, 11 environments and 9 effects, which
 meets the H3 targets. The reference-driven slices are in: All/Solid/Flat/Yours shape
 filters; Material Library/Settings views with surface presets and a Physical Studio
 material; environment strength, rotation, light colour/intensity and a directional-light
