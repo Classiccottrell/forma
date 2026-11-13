@@ -13,6 +13,8 @@ export interface ViewportProps {
   presentation?: PresentationState;
   onPresentationChange?: (patch: Partial<PresentationState>) => void;
   defaultAutoSpin?: boolean;
+  /** Auto-spin as degrees per second around the object (0 while off), for exports. */
+  onSpinChange?: (degreesPerSecond: number) => void;
 }
 
 export interface PresentationState {
@@ -31,7 +33,7 @@ export const DEFAULT_PRESENTATION: PresentationState = { fov: 50, azimuth: 0, el
 /** Mounts the canvas host div, wires OrbitControls (pointer+touch) + auto-spin once
  * `scene` is ready. `prefers-reduced-motion` forces auto-spin off regardless of the
  * toggle state (roadmap §6). */
-export function Viewport({ hostRef, scene, scheduler, contextLost, environmentId, presentation, onPresentationChange, defaultAutoSpin = false }: ViewportProps) {
+export function Viewport({ hostRef, scene, scheduler, contextLost, environmentId, presentation, onPresentationChange, defaultAutoSpin = false, onSpinChange }: ViewportProps) {
   const reducedMotion = useReducedMotion();
   const [autoSpin, setAutoSpin] = useState(() => defaultAutoSpin && !reducedMotion);
   const [spinSpeed, setSpinSpeed] = useState(2.2);
@@ -100,6 +102,12 @@ export function Viewport({ hostRef, scene, scheduler, contextLost, environmentId
       if (scene.scene.background === null) scene.scene.background = environmentBackground;
     };
   }, [scene, environmentId, activePresentation.backdrop]);
+
+  // OrbitControls turns 2π/60 rad per second per unit of speed, decreasing the camera's
+  // azimuth: 6° per second per unit, negative.
+  useEffect(() => {
+    onSpinChange?.(autoSpin ? -6 * spinSpeed : 0);
+  }, [autoSpin, spinSpeed]);
 
   useEffect(() => {
     const controls = controlsRef.current;

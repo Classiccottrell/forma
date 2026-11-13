@@ -24,6 +24,8 @@ export interface ControlPanelProps {
   onMatterChange(matter: MatterSettings | undefined): void;
   /** Editor-only stand-in for page scroll while the Scroll trigger is chosen, 0..1. */
   onScrollPreview?(progress: number): void;
+  /** Auto-spin in degrees per second, for exports. */
+  spin?: number;
   /** `undefined` turns atmosphere off. */
   onAtmosphereChange(atmosphere: AtmosphereSettings | undefined): void;
 }
@@ -34,7 +36,7 @@ type ShapeFilter = 'all' | 'solid' | 'flat';
 /** Collapsible sections container: Shape / Material / Environment / Effects / Export.
  * Search box filters visible definitions by label/category (roadmap §6). */
 export function ControlPanel(props: ControlPanelProps) {
-  const { collapsed, composition, scene, presentation, onPresentationChange, onSlotSelect, onParamChange, onEffectStageSelect, onEffectParamChange, onApplyComposition, onImportComposition, onMatterChange, onAtmosphereChange, onScrollPreview } = props;
+  const { collapsed, composition, scene, presentation, onPresentationChange, onSlotSelect, onParamChange, onEffectStageSelect, onEffectParamChange, onApplyComposition, onImportComposition, onMatterChange, onAtmosphereChange, onScrollPreview, spin = 0 } = props;
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     presets: false,
     shape: true,
@@ -186,7 +188,7 @@ export function ControlPanel(props: ControlPanelProps) {
       </Section>
 
       <Section id="export" title="Export" open={open.export} onToggle={toggle}>
-        <ExportPanel scene={scene} composition={composition} onImportComposition={onImportComposition} />
+        <ExportPanel scene={scene} composition={composition} presentation={presentation} spin={spin} onImportComposition={onImportComposition} />
       </Section>
     </div>
   );

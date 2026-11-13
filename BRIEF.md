@@ -328,12 +328,28 @@ atmosphere on dark backdrops half the time. Transparent and soft-gradient backdr
 already exist as the editor's Presentation → Backdrop; carrying Transparent into the
 composition so embeds get it is Phase 4's embed work.
 
-### Phase 4 — Interactive web delivery
+### Phase 4 — Interactive web delivery — DONE, awaiting owner review (2026-11-12)
 What a site actually embeds.
 - Self-contained embed that works when pasted anywhere — bundle hosted or inlined (R1 P1).
 - Triggers: scroll position, hover, pointer distance, time loop, each mapped to Disperse
   or State. Reduced-motion and visibility pause respected.
 - Export menu: embed code, PNG at 1×/2×/4×, a link to the exact scene.
+
+**Landed:** `MatterSettings.motion` adds Over (`enter`) and Scroll to Manual / Loop / Near
+(`hover`), and `drive` maps any trigger to Disperse or the Form itself (Solid to the chosen
+Liquid or Gas); reduced motion holds triggers at rest. `embedForma()` / `Forma.embed()`
+(`src/runtime/embedPlayer.ts`): lazy mount near the viewport, its own frame loop that
+pauses off-screen and in background tabs without a clock jump, pointer and scroll wiring,
+the editor's view (live camera angle, lens, zoom, spin, transparent backdrop, shadow),
+pixel ratio capped at 2, a `data-forma-error` mark when WebGL is missing. The app build
+hosts the browser bundle at `embed/forma.v<version>.js` (and `embed/forma.js`); Vercel
+sends CORS for it and for textures/HDRs (GitHub Pages already does). Export menu: embed
+code at 480 / 640 px or full screen, Download HTML (bundle inlined, opens from disk; a
+scroll scene gets room to scroll), Preview, PNG at 1×/2×/4× capped at the device's
+texture limit with a transparency toggle, a scene link (`/editor#scene=…`, composition and
+view in the hash), Save and Import JSON. Opening scene now has atmosphere on (Phase 3
+answer). The collapsed panel is inert. Known: the editor bundle is 255 KB gzip against
+the 250 KB budget (Phase 6's call).
 
 ### Phase 5 — linefield bridge
 linefield stays Canvas 2D with zero dependencies (its brief rules out WebGL), so the
