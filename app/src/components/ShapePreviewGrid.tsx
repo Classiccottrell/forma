@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { optionTabIndex, useOptionKeys } from './optionKeys';
 import * as THREE from 'three';
 import { shapeRegistry } from 'forma';
 import type { ShapeCreateContext } from 'forma';
@@ -82,13 +83,17 @@ export function ShapePreviewGrid({ entries, selectedId, onSelect }: ShapePreview
     return () => { disposed = true; };
   }, [entries.map((entry) => entry.id).join('|')]);
 
+  const gridRef = useRef<HTMLDivElement>(null);
+  const onKeyDown = useOptionKeys(gridRef);
+  const ids = entries.map((entry) => entry.id);
   return (
-    <div className="picker-grid" role="listbox" aria-label="shape options">
+    <div className="picker-grid" role="listbox" aria-label="shape options" ref={gridRef} onKeyDown={onKeyDown}>
       {entries.length === 0 && <div className="empty-state">No shape options match this search.</div>}
-      {entries.map((entry) => (
+      {entries.map((entry, index) => (
         <button
           key={entry.id}
           type="button"
+          tabIndex={optionTabIndex(index, entry.id, selectedId, ids)}
           className={`picker-cell${entry.id === selectedId ? ' selected' : ''}`}
           onClick={() => onSelect(entry.id)}
           title={entry.category}

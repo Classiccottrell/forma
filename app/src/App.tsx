@@ -160,10 +160,11 @@ export default function App() {
 
   return (
     <div className="app-shell" data-environment={current.environmentId} data-backdrop={presentation.backdrop}>
-      <Viewport hostRef={hostRef} scene={scene} scheduler={scheduler} contextLost={contextLost} environmentId={current.environmentId} presentation={presentation} onPresentationChange={(patch) => setPresentation((current) => ({ ...current, ...patch }))} onSpinChange={setSpin} />
-      <OnboardingHint />
+      <a className="skip-link" href="#forma-control-panel" onClick={() => setCollapsed(false)}>Skip to editor controls</a>
 
-      <div className="topbar" ref={topbarRef}>
+      {/* The top bar comes first in the document so keyboard users reach the editor's
+          actions before the viewer's own controls. */}
+      <header className="topbar" ref={topbarRef}>
         <div className="brand">
           for<em>ma</em>
         </div>
@@ -193,7 +194,12 @@ export default function App() {
         >
           {collapsed ? 'Open panel' : 'Close panel'}
         </button>
-      </div>
+      </header>
+
+      <main className="viewport-region" aria-label="Preview">
+        <Viewport hostRef={hostRef} scene={scene} scheduler={scheduler} contextLost={contextLost} environmentId={current.environmentId} presentation={presentation} onPresentationChange={(patch) => setPresentation((current) => ({ ...current, ...patch }))} onSpinChange={setSpin} />
+        <OnboardingHint />
+      </main>
 
       <ControlPanel
         collapsed={collapsed}
@@ -212,7 +218,7 @@ export default function App() {
         spin={spin}
         onAtmosphereChange={(atmosphere) => applyTracked({ atmosphere })}
       />
-      {creatorMode && <CreatorPanel composition={current} />}
+      {creatorMode && <aside className="creator-region" aria-label="Creator tools"><CreatorPanel composition={current} /></aside>}
     </div>
   );
 }

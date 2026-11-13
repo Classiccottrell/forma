@@ -80,7 +80,7 @@ export function ControlPanel(props: ControlPanelProps) {
   const effectEntries = effectRegistry.list().map((d) => ({ label: d.label, category: 'effect' }));
 
   return (
-    <div id="forma-control-panel" className={`control-panel${collapsed ? ' collapsed' : ''}`} data-testid="control-panel" {...(collapsed ? { inert: '' } : {})} aria-hidden={collapsed || undefined}>
+    <aside id="forma-control-panel" tabIndex={-1} aria-label="Editor controls" className={`control-panel${collapsed ? ' collapsed' : ''}`} data-testid="control-panel" {...(collapsed ? { inert: '' } : {})} aria-hidden={collapsed || undefined}>
       <input
         className="search-input"
         type="search"
@@ -190,7 +190,7 @@ export function ControlPanel(props: ControlPanelProps) {
       <Section id="export" title="Export" open={open.export} onToggle={toggle}>
         <ExportPanel scene={scene} composition={composition} presentation={presentation} spin={spin} onImportComposition={onImportComposition} />
       </Section>
-    </div>
+    </aside>
   );
 }
 
