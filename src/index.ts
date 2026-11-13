@@ -48,3 +48,10 @@ export async function mountForma(el: HTMLElement, composition: Composition): Pro
   render();
   return runtime;
 }
+export { joinPageCurrent } from './bridge/pageBridge.js';
+export type { PageBridge, PageBridgeOptions } from './bridge/pageBridge.js';
+export { pageCurrent, CURRENT_PRESETS, CURRENT_CURSOR_MODES } from './bridge/current.js';
+export type { PageCurrent, CurrentBody, CurrentCursor, CurrentPalette, CurrentField, CurrentMember } from './bridge/current.js';
+export type { FlowSampler } from './runtime/MatterLayer.js';
+export { composeScene, isLinefieldBake, bakeJoinsCurrent } from './runtime/compose.js';
+export type { ComposeOptions } from './runtime/compose.js';

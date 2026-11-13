@@ -11,6 +11,8 @@ export interface EmbedOptions {
   view?: EmbedView;
   /** CSS height of the embed box. Default '480px'; width is always 100%. */
   height?: string;
+  /** How far a page current's flow carries dispersed matter (see `EmbedPlayerOptions.flowGain`). */
+  flowGain?: number;
   /** Element id. Default derived from the composition, so two embeds on one page differ. */
   id?: string;
 }
@@ -23,6 +25,7 @@ export function generateEmbedCode(c: Composition, options: EmbedOptions = {}): s
   const settings: Record<string, unknown> = {};
   if (options.view && Object.keys(options.view).length > 0) settings.view = options.view;
   if (options.assetBase) settings.assetBase = options.assetBase;
+  if (typeof options.flowGain === 'number' && Number.isFinite(options.flowGain)) settings.flowGain = options.flowGain;
   const id = escapeAttribute(options.id ?? `forma-${hash(json)}`);
   const height = escapeAttribute(options.height ?? '480px');
   const settingsArg = Object.keys(settings).length > 0 ? `, ${escapeForInlineScript(JSON.stringify(settings))}` : '';
@@ -65,7 +68,7 @@ ${body}
 
 /** Bundle source made safe to paste inside <script>: no closing tag, and no source-map
  * comment pointing at a .map file that isn't next to the page. */
-function inlineSource(source: string): string {
+export function inlineSource(source: string): string {
   return source.replace(/\n\/\/# sourceMappingURL=\S+\s*$/, '\n').replace(/<\/script/gi, '<\\/script');
 }
 

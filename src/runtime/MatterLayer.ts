@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import {
   sampleMatter, seededRandom, createMatterUniforms, createMatterMaterial, FluidPass, matterFormWeights,
-  MatterCursor, MATTER_GLSL, WAKE_TRAIL_LENGTH, type MatterUniforms,
+  MatterCursor, MatterFlow, MATTER_GLSL, WAKE_TRAIL_LENGTH, pixelsPerUnit, type MatterUniforms,
 } from 'cc-webgl/matter';
 import type { MatterSettings } from '../types.js';
 
@@ -32,6 +32,10 @@ function fillFor(shapeId: string, params: Record<string, unknown>, radius: numbe
   if (shapeId === 'ring' || shapeId === 'vase') return { mode: 'normal', depth: 0.1 * radius };
   return { mode: 'center' };
 }
+
+/** A flow across the viewport for dispersed matter to ride: `u`, `v` run 0..1 with `v`
+ * upward; writes a direction (x right, y up, length 0..1) into `out`. */
+export type FlowSampler = (u: number, v: number, out: [number, number]) => void;
 
 const ease = (x: number) => x * x * (3 - 2 * x);
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
@@ -65,6 +69,11 @@ export class MatterLayer {
   private readonly trail: { x: number; y: number; born: number }[] = [];
   private readonly reducedMotion: boolean;
   private readonly size = new THREE.Vector2();
+  private flow: MatterFlow | null = null;
+  private flowFn: FlowSampler | null = null;
+  private flowGain = 0;
+  private lastColor: { color: THREE.Color; palette?: readonly [string, string, string] } | null = null;
+  private pagePalette: { a: THREE.Color; b: THREE.Color } | null = null;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -151,7 +160,17 @@ void main() {
   /** Colours from the current mesh material, so matter matches the object it came from.
    * `palette` (bright, highlight, deep) overrides the colours derived from `color`. */
   setColor(color: THREE.Color, palette?: readonly [string, string, string]): void {
+    this.lastColor = { color: color.clone(), palette };
     const white = new THREE.Color(1, 1, 1);
+    if (this.pagePalette) {
+      // The page's palette (see setPagePalette) wins over the material's own colours.
+      const { a, b } = this.pagePalette;
+      this.uniforms.uColA.value.copy(a);
+      this.uniforms.uColB.value.copy(b);
+      this.uniforms.uColC.value.copy(a).lerp(b, 0.5).multiplyScalar(0.5);
+      this.fluid?.setPalette(a, a.clone().multiplyScalar(0.15), white.clone().multiplyScalar(0.55));
+      return;
+    }
     if (palette) {
       this.uniforms.uColA.value.set(palette[0]);
       this.uniforms.uColB.value.set(palette[1]);
@@ -179,6 +198,33 @@ void main() {
     const u = this.uniforms;
     u.uStrength.value = this.settings.strength;
     u.uReachK.value = 1 / (this.settings.radius * this.settings.radius);
+  }
+
+  /** Colours matter by two stops from the page (sRGB 0..255), overriding the material's
+   * own particle colours, so it reads as the same substance as what surrounds it. Null
+   * returns to the material's colours. */
+  setPagePalette(palette: { a: readonly [number, number, number]; b: readonly [number, number, number] } | null): void {
+    this.pagePalette = palette
+      ? {
+          a: new THREE.Color().setRGB(palette.a[0] / 255, palette.a[1] / 255, palette.a[2] / 255, THREE.SRGBColorSpace),
+          b: new THREE.Color().setRGB(palette.b[0] / 255, palette.b[1] / 255, palette.b[2] / 255, THREE.SRGBColorSpace),
+        }
+      : null;
+    if (this.lastColor) this.setColor(this.lastColor.color, this.lastColor.palette);
+  }
+
+  /** A flow for dispersed matter to ride (gas, and solid matter once crumbled to dust),
+   * sampled every frame; `gain` is how far it carries matter, in viewport heights. Null
+   * stills it. Held still under reduced motion. */
+  setFlow(sampler: FlowSampler | null, gain = 0.9): void {
+    this.flowFn = sampler;
+    this.flowGain = sampler ? gain : 0;
+  }
+
+  /** What the form is doing right now: Disperse 0..1 and the Form it is nearest. */
+  get state(): { disperse: number; form: MatterSettings['form'] } | null {
+    if (!this.settings) return null;
+    return { disperse: this.disperseNow, form: this.formNow < 0.5 ? 'solid' : this.formNow < 1.5 ? 'liquid' : 'gas' };
   }
 
   /** Scroll progress through the host element, 0 (just entering) .. 1 (leaving). */
@@ -243,8 +289,8 @@ void main() {
     const d = this.disperseNow;
 
     this.renderer.getSize(this.size);
-    const tanHalf = this.camera instanceof THREE.PerspectiveCamera ? Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) : 1;
-    u.uScale.value = this.size.y / (2 * tanHalf);
+    // From the projection itself, so sprites follow the camera's zoom and view offset.
+    u.uScale.value = pixelsPerUnit(this.camera.projectionMatrix, this.size.y);
     u.uPixelRatio.value = this.renderer.getPixelRatio();
     u.uAspect.value = this.size.x / Math.max(this.size.y, 1);
     this.renderer.getDrawingBufferSize(this.crack.uBuf.value);
@@ -260,6 +306,16 @@ void main() {
       const mark = this.trail[this.trail.length - 1 - i];
       const life = mark && cursor === 'wake' ? clamp01(1 - (elapsed - mark.born) / TRAIL_LIFE) : 0;
       u.uTrail.value[i]!.set(mark ? mark.x : 9, mark ? mark.y : 9, ease(life));
+    }
+
+    // The page's flow, eased in and out so it never snaps.
+    const wantFlow = this.flowFn && !this.reducedMotion ? this.flowGain : 0;
+    u.uFlowGain.value += (wantFlow - u.uFlowGain.value) * Math.min(1, dt * 2);
+    if (u.uFlowGain.value < 1e-3 && wantFlow === 0) u.uFlowGain.value = 0;
+    if (this.flowFn && wantFlow > 0) {
+      this.flow ??= new MatterFlow();
+      this.flow.fill(this.flowFn);
+      u.uFlow.value = this.flow.texture;
     }
 
     // Solid cracks away over the first third of Disperse; changing Form dissolves it too.
@@ -340,6 +396,7 @@ void main() {
     this.scene.remove(this.points);
     this.points.geometry.dispose();
     this.spriteMaterial.dispose();
+    this.flow?.dispose();
     if (this.fluid) {
       this.composer?.removePass(this.fluid);
       this.fluid.dispose();

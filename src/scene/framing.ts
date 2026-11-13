@@ -17,6 +17,10 @@ export interface Framing {
    * Below 0.5 leaves room for dispersed matter (gas, the liquid puddle) around it. */
   fill?: number;
   insets?: FramingInsets;
+  /** Where in the canvas the object sits, as fractions of its width and height (y down).
+   * Default the middle of the visible area, { x: 0.5, y: 0.5 }. For an object laid over
+   * a larger composition, which has its own place for it. */
+  anchor?: { x: number; y: number };
 }
 
 export const DEFAULT_SUBJECT_RADIUS = 1.2;
@@ -48,7 +52,13 @@ export function computeFraming(fovDeg: number, width: number, height: number, fr
   const tanHalf = Math.tan((fovDeg * Math.PI) / 360);
   // Vertical fov: one world unit at distance d spans h / (2·d·tanHalf) px.
   const distance = (radius * h) / (fill * visible * tanHalf);
-  return { distance, offsetX: (right - left) / 2, offsetY: (bottom - top) / 2 };
+  const ax = clampUnit(framing.anchor?.x, 0.5);
+  const ay = clampUnit(framing.anchor?.y, 0.5);
+  return { distance, offsetX: (right - left) / 2 + (0.5 - ax) * w, offsetY: (bottom - top) / 2 + (0.5 - ay) * h };
+}
+
+function clampUnit(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback;
 }
 
 /** Applies a framing result to the camera: distance along its current direction from
