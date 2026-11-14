@@ -201,7 +201,8 @@ async function main() {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await page.goto(URL);
-    const shown = await page.getByTestId('onboarding-hint').isVisible();
+    // The editor is its own chunk, so wait for the hint to show instead of sampling once.
+    const shown = await page.getByTestId('onboarding-hint').waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false);
     record('onboarding: hint shown on first load', shown);
     await page.screenshot({ path: '/tmp/forma-first-load.png' });
     await page.getByTestId('onboarding-dismiss').click();

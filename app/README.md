@@ -16,11 +16,23 @@ npm install
 npm run dev           # Vite dev server, printed localhost URL
 ```
 
-Homepage routes: `/` (Studio), `/?variant=gallery` (Gallery), and `/editor` (full editor).
+Routes: `/` (homepage) and `/editor` (the editor, its own chunk). The homepage hero plays
+one of the composed scenes (a different one each visit), which the build writes to
+`scenes/<id>.html`.
 
-Editor creator mode is local-only: enable it from `/editor` to save named Studio or
-Gallery compositions and choose which saved composition each homepage uses. Settings
-live in `localStorage`; consumer homepages never show creator controls.
+**Changing the homepage's linefield backgrounds.**
+- *Improve a background:* change the piece in linefield. Forma's build takes each scene's
+  background from linefield's live downloads, so the next deploy carries it. Deploys run
+  on every push and daily; run the deploy workflow by hand for an immediate update.
+- *Swap, add or remove a scene:* edit `composedScenes()` in
+  `src/content/composedScenes.ts` (which piece, its settings, the object). The scene pages,
+  the hero rotation and the scene cards all follow. A new piece also needs an entry in
+  `LINEFIELD_PIECES` (where the object sits in it).
+- *Fallbacks:* `linefield/` holds copies used only when a piece can't be fetched (offline,
+  or removed or broken upstream; the build says so). `npm run linefield:refresh` updates
+  them. `FORMA_LINEFIELD=vendored` builds from the copies alone.
+- *Stills:* the posters and the three-states images live in `public/home/`; run
+  `node scripts/capture-home-stills.mjs` with the dev server up after changing a scene.
 
 **Why `npm run build` first, even for `npm run dev`.** `app/package.json`
 declares `"forma": "file:.."` — a real npm dependency resolved through the
