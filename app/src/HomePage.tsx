@@ -1,129 +1,141 @@
-import { useEffect, useMemo, useRef } from 'react';
-import * as THREE from 'three';
-import type { Composition, ParamValue } from 'forma';
-import { environmentRegistry, materialRegistry, shapeRegistry } from 'forma';
-import { builtInPresets, registerAllContent } from 'forma/content';
-import { useFormaRuntime } from './hooks/useFormaRuntime';
-import { Viewport } from './components/Viewport';
-import { selectedHomepageComposition } from './homepagePresets';
+import { useEffect, useRef, useState } from 'react';
+import { scenes } from 'virtual:forma-scenes';
 import { BASE_URL, EDITOR_PATH } from './base';
+import { useReducedMotion } from './hooks/useReducedMotion';
+import './home.css';
 
-registerAllContent();
+const SOURCE_URL = 'https://github.com/Classiccottrell/forma';
+const LINEFIELD_URL = 'https://classiccottrell.github.io/linefield/';
+const scenePage = (id: string) => `${BASE_URL}scenes/${id}.html`;
+const still = (name: string) => `${BASE_URL}home/${name}.jpg`;
 
-const studioPreset = builtInPresets().find((preset) => preset.id === 'clay-pill-softbox')!;
-const studioComposition: Composition = {
-  ...studioPreset.composition,
-  shapeId: 'knot',
-  shapeParams: { ...shapeRegistry.require('knot').defaultParameters },
-  materialId: 'holographic',
-  materialParams: { ...materialRegistry.require('holographic').defaultParameters },
-  environmentId: 'neon-room',
-  environmentParams: { ...environmentRegistry.require('neon-room').defaultParameters },
-};
-const galleryPresetIds = ['clay-pill-softbox', 'ceramic-card-studio', 'chrome-badge-studio', 'frosted-notched-card-softbox'] as const;
-
-function updateParam(current: Composition, apply: (patch: Partial<Composition>) => void, slot: 'shapeParams' | 'materialParams', key: string, value: ParamValue) {
-  apply({ [slot]: { ...current[slot], [key]: value } } as Partial<Composition>);
-}
-
-function ControlCard({ current, apply }: { current: Composition; apply: (patch: Partial<Composition>) => void }) {
-  const shape = shapeRegistry.require(current.shapeId);
-  const material = materialRegistry.require(current.materialId);
-  const roundness = shape.parameterSchema.roundness;
-  const surface = material.parameterSchema.roughness ?? material.parameterSchema.metalness;
-  if (roundness?.kind !== 'number' || surface?.kind !== 'number') return null;
-  return (
-    <div className="home-control-card" aria-label="Live composition controls">
-      <div className="home-card-kicker">Live controls</div>
-      <label>
-        <span>Roundness <output>{Number(current.shapeParams.roundness).toFixed(2)}</output></span>
-        <input type="range" min={roundness.min} max={roundness.max} step={roundness.step} value={Number(current.shapeParams.roundness)} aria-label="Roundness" onChange={(event) => updateParam(current, apply, 'shapeParams', 'roundness', Number(event.target.value))} />
-      </label>
-      <label>
-        <span>{material.parameterSchema.roughness ? 'Roughness' : 'Metalness'} <output>{Number(current.materialParams[material.parameterSchema.roughness ? 'roughness' : 'metalness']).toFixed(2)}</output></span>
-        <input type="range" min={surface.min} max={surface.max} step={surface.step} value={Number(current.materialParams[material.parameterSchema.roughness ? 'roughness' : 'metalness'])} aria-label={material.parameterSchema.roughness ? 'Roughness' : 'Metalness'} onChange={(event) => updateParam(current, apply, 'materialParams', material.parameterSchema.roughness ? 'roughness' : 'metalness', Number(event.target.value))} />
-      </label>
-      <div className="home-card-meta"><span>{shape.label}</span><span>{material.label}</span><span>{current.environmentId}</span></div>
-    </div>
-  );
-}
-
-const mapAnchors = [
-  { id: 'shape', point: new THREE.Vector3(-0.62, 0.42, 0.3), side: 'left' },
-  { id: 'surface', point: new THREE.Vector3(0.58, 0.18, 0.22), side: 'right' },
-  { id: 'light', point: new THREE.Vector3(0.05, -0.7, 0.1), side: 'right' },
+const FORMS = [
+  { id: 'solid', name: 'Solid', text: 'Holds its shape. Push further and the surface cracks away in patches.' },
+  { id: 'liquid', name: 'Liquid', text: 'Melts, pools and runs back together.' },
+  { id: 'gas', name: 'Gas', text: 'Thins into a cloud that drifts and gathers again.' },
 ] as const;
 
-function ObjectMap({ scene, scheduler, current }: { scene: NonNullable<ReturnType<typeof useFormaRuntime>['scene']>; scheduler: NonNullable<ReturnType<typeof useFormaRuntime>['scheduler']>; current: Composition }) {
-  const refs = useRef<Record<string, HTMLDivElement | null>>({});
-  const labels = {
-    shape: ['SHAPE / 01', shapeRegistry.require(current.shapeId).label],
-    surface: ['SURFACE / 02', materialRegistry.require(current.materialId).label],
-    light: ['LIGHT / 03', environmentRegistry.require(current.environmentId).label],
-  } as const;
+const WAYS_OUT = [
+  { name: 'A transparent PNG', text: 'At 1×, 2× or 4×, with or without the backdrop.' },
+  { name: 'A live embed', text: 'One snippet. It loads when it nears the screen, pauses when it leaves, and follows the pointer and the scroll.' },
+  { name: 'On a field of lines', text: 'One HTML file: a linefield background and your object, moving in the same current.' },
+] as const;
+
+/** The homepage: the composed scenes, running. The hero plays one scene page
+ * (`scenes/<id>.html`, built by app/vite.config.ts) in a frame; the cards under it switch
+ * scenes. The frame is unloaded while the hero is off screen (hiding it would leave both
+ * animation loops running; the still behind it covers the reload), and under reduced
+ * motion the still stands in until the visitor asks for the live scene. This page loads none of the
+ * 3D code itself. */
+export default function HomePage() {
+  const reducedMotion = useReducedMotion();
+  const [sceneId, setSceneId] = useState(scenes[0]!.id);
+  const [live, setLive] = useState(!reducedMotion);
+  const [inView, setInView] = useState(true);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const scene = scenes.find((s) => s.id === sceneId) ?? scenes[0]!;
 
   useEffect(() => {
-    const point = new THREE.Vector3();
-    return scheduler.addTask(() => {
-      const rect = scene.renderer.domElement.getBoundingClientRect();
-      for (const anchor of mapAnchors) {
-        point.copy(anchor.point).project(scene.camera);
-        const el = refs.current[anchor.id];
-        if (!el) continue;
-        const x = (point.x * 0.5 + 0.5) * (rect.width || 1);
-        const y = (-point.y * 0.5 + 0.5) * (rect.height || 1);
-        el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-        el.style.opacity = point.z > -1 && point.z < 1 ? '1' : '0';
-      }
-    });
-  }, [scene, scheduler]);
+    const stage = stageRef.current;
+    if (!stage || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => setInView(entries[entries.length - 1]!.isIntersecting));
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <div className="home-object-map" aria-label="Live object annotations">
-      {mapAnchors.map((anchor) => (
-        <div key={anchor.id} ref={(el) => { refs.current[anchor.id] = el; }} className={`home-map-label home-map-label--${anchor.side}`}>
-          <span>{labels[anchor.id][0]}</span>
-          <strong>{labels[anchor.id][1]}</strong>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export default function HomePage({ gallery = false }: { gallery?: boolean }) {
-  const hostRef = useRef<HTMLDivElement>(null);
-  const presets = useMemo(() => builtInPresets().filter((preset) => galleryPresetIds.includes(preset.id as (typeof galleryPresetIds)[number])), []);
-  const initialFallback = gallery ? presets[1]?.composition ?? studioComposition : studioComposition;
-  const initial = selectedHomepageComposition(gallery ? 'gallery' : 'studio', initialFallback);
-  const { scene, scheduler, current, apply, contextLost } = useFormaRuntime(hostRef, initial);
-
-  return (
-    <main className={`home-shell${gallery ? ' home-gallery' : ' home-studio'}`}>
-      <Viewport hostRef={hostRef} scene={scene} scheduler={scheduler} contextLost={contextLost} defaultAutoSpin />
-      <header className="home-nav">
-        <a className="brand" href={BASE_URL}>for<em>ma</em></a>
-        <nav aria-label="Homepage navigation">
-          <a href={gallery ? BASE_URL : `${BASE_URL}?variant=gallery`}>{gallery ? 'Studio view' : 'Gallery view'}</a>
-          <a className="home-nav-cta" href={EDITOR_PATH}>Open editor <span aria-hidden="true">↗</span></a>
+    <div className="hp">
+      <a className="skip-link" href="#hp-main">Skip to content</a>
+      <header className="hp-nav">
+        <a className="brand" href={BASE_URL} aria-label="Forma home">for<em>ma</em></a>
+        <nav aria-label="Site">
+          <a href="#scenes">Scenes</a>
+          <a href={SOURCE_URL}>Source</a>
+          <a className="hp-nav-cta" href={EDITOR_PATH}>Open the editor <span aria-hidden="true">→</span></a>
         </nav>
       </header>
-      {!gallery && scene && scheduler && <ObjectMap scene={scene} scheduler={scheduler} current={current} />}
 
-      {gallery ? (
-        <section className="home-gallery-content" aria-labelledby="gallery-title">
-          <div className="home-gallery-intro"><p className="eyebrow">Forma / object studies</p><h1 id="gallery-title">Designed in space.</h1><p>Shape, material, light, export. A small system for making dimensional ideas feel inevitable.</p><a className="home-button" href={EDITOR_PATH}>Build your own <span aria-hidden="true">→</span></a></div>
-          <div className="home-presets" aria-label="Curated presets">
-            <p className="eyebrow">Curated presets</p>
-            {presets.map((preset) => <button type="button" className={`home-preset${current.shapeId === preset.composition.shapeId && current.materialId === preset.composition.materialId ? ' is-active' : ''}`} key={preset.id} onClick={() => apply(preset.composition)}><span className="home-preset-swatch" data-shape={preset.composition.shapeId} data-material={preset.composition.materialId} /><span><strong>{preset.name}</strong><small>{preset.composition.shapeId} · {preset.composition.materialId}</small></span><span aria-hidden="true">↗</span></button>)}
+      <main id="hp-main">
+        <section className="hp-hero" aria-labelledby="hp-title">
+          <div className="hp-stage" ref={stageRef} style={{ backgroundImage: `url(${still(`scene-${scene.id}`)})` }}>
+            {live && inView && (
+              <iframe
+                key={scene.id}
+                className="hp-frame"
+                src={scenePage(scene.id)}
+                title={`${scene.name}, a live scene: a Forma object on linefield's ${scene.piece}`}
+                tabIndex={-1}
+              />
+            )}
           </div>
+          <div className="hp-hero-copy">
+            <p className="hp-eyebrow">Forma · a shape lab in the browser</p>
+            <h1 id="hp-title">Shapes that come apart, <i>and come back.</i></h1>
+            <p className="hp-lede">Pick a form and a finish. Make it solid, liquid or gas. Then set it loose on your own page, alone or inside a field of lines.</p>
+            <div className="hp-actions">
+              <a className="hp-button" href={EDITOR_PATH}>Open the editor <span aria-hidden="true">→</span></a>
+              {!live && <button type="button" className="hp-button hp-button--quiet" onClick={() => setLive(true)}>Run the live scene</button>}
+            </div>
+          </div>
+          <p className="hp-now">
+            <span>Now running</span> {scene.name} <a href={scenePage(scene.id)}>Open it on its own <span aria-hidden="true">↗</span></a>
+          </p>
         </section>
-      ) : (
-        <section className="home-studio-content" aria-labelledby="studio-title">
-          <div className="home-studio-copy"><p className="eyebrow">A quiet place for form</p><h1 id="studio-title">Make the invisible<br /><i>feel tangible.</i></h1><p>Forma turns shape, surface, and light into a living design material.</p><a className="home-button" href={EDITOR_PATH}>Enter the studio <span aria-hidden="true">→</span></a></div>
-          <ControlCard current={current} apply={apply} />
+
+        <section className="hp-section" id="scenes" aria-labelledby="hp-scenes-title">
+          <div className="hp-section-head">
+            <h2 id="hp-scenes-title">Three scenes, built with the export menu</h2>
+            <p>Each is a Forma object over a <a href={LINEFIELD_URL}>linefield</a> background. The lines make room for the object, and its matter rides their flow.</p>
+          </div>
+          <ul className="hp-scenes">
+            {scenes.map((s) => (
+              <li key={s.id}>
+                <button type="button" className="hp-scene" aria-pressed={s.id === scene.id} onClick={() => { setSceneId(s.id); stageRef.current?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' }); }}>
+                  <img src={still(`scene-${s.id}`)} alt="" width={1280} height={720} loading="lazy" />
+                  <span className="hp-scene-piece">On {s.piece}</span>
+                  <strong>{s.name}</strong>
+                  <span className="hp-scene-blurb">{s.blurb}</span>
+                  <span className="hp-scene-state">{s.id === scene.id ? 'Showing above' : 'Show this scene'}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </section>
-      )}
-      <footer className="home-footer"><span>FORMA / 2026</span><span>WebGL object studio</span></footer>
-    </main>
+
+        <section className="hp-section" aria-labelledby="hp-forms-title">
+          <div className="hp-section-head">
+            <h2 id="hp-forms-title">One shape, three states</h2>
+            <p>Any of the thirty shapes can turn into matter. A slider takes it apart. So can a loop, the pointer, or the page's scroll.</p>
+          </div>
+          <ul className="hp-forms">
+            {FORMS.map((form) => (
+              <li key={form.id}>
+                <img src={still(`form-${form.id}`)} alt={`A gold blob as a ${form.id}`} width={640} height={640} loading="lazy" />
+                <h3>{form.name}</h3>
+                <p>{form.text}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="hp-section" aria-labelledby="hp-out-title">
+          <div className="hp-section-head">
+            <h2 id="hp-out-title">Three ways out</h2>
+            <p>Nothing uploads, and there is no account. The editor runs on your machine.</p>
+          </div>
+          <ul className="hp-ways">
+            {WAYS_OUT.map((way) => (
+              <li key={way.name}><h3>{way.name}</h3><p>{way.text}</p></li>
+            ))}
+          </ul>
+          <a className="hp-button" href={EDITOR_PATH}>Open the editor <span aria-hidden="true">→</span></a>
+        </section>
+      </main>
+
+      <footer className="hp-footer">
+        <span>Forma · MIT licensed</span>
+        <span><a href={SOURCE_URL}>Source on GitHub</a> · <a href={LINEFIELD_URL}>linefield</a></span>
+      </footer>
+    </div>
   );
 }

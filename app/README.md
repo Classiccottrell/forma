@@ -16,11 +16,11 @@ npm install
 npm run dev           # Vite dev server, printed localhost URL
 ```
 
-Homepage routes: `/` (Studio), `/?variant=gallery` (Gallery), and `/editor` (full editor).
-
-Editor creator mode is local-only: enable it from `/editor` to save named Studio or
-Gallery compositions and choose which saved composition each homepage uses. Settings
-live in `localStorage`; consumer homepages never show creator controls.
+Routes: `/` (homepage) and `/editor` (the editor, its own chunk). The homepage plays the
+composed scenes, which the build writes to `scenes/<id>.html` from the linefield bakes in
+`linefield/` (copies of linefield's published downloads; download them again to refresh).
+Its stills live in `public/home/`; `node scripts/capture-home-stills.mjs` regenerates them
+with the dev server running.
 
 **Why `npm run build` first, even for `npm run dev`.** `app/package.json`
 declares `"forma": "file:.."` — a real npm dependency resolved through the

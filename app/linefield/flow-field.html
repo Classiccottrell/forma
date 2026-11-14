@@ -1,0 +1,1993 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>linefield — flow-field</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+<style id="lf-panel-css">
+/* Fix round 1: the panel is a flex column so the scrollable middle
+   (.lf-body) can't push the footer (.lf-reset) off screen, and section
+   headers are now toggle buttons so the panel fits at rest. */
+.lf-panel { position: fixed; bottom: 12px; right: 12px; width: 300px;
+  background: #0b0b0f; color: #e8e8e8; font: 12px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 16px;
+  z-index: 9999; max-height: 80vh; overflow: hidden; box-sizing: border-box;
+  display: flex; flex-direction: column; }
+.lf-panel.collapsed .lf-body, .lf-panel.collapsed .lf-reset { display: none; }
+.lf-panel h3 { margin: 0; padding: 14px 18px 12px; font: 700 11px/1 ui-monospace,Menlo,monospace;
+  text-transform: uppercase; letter-spacing: .12em; color: #5fa07c; flex: none;
+  display: flex; align-items: center; justify-content: space-between; cursor: grab;
+  user-select: none; touch-action: none; }
+.lf-panel h3:active { cursor: grabbing; }
+.lf-panel h3 .lf-status { display: flex; align-items: center; gap: 5px; font: 500 10px/1 ui-monospace,Menlo,monospace;
+  letter-spacing: .05em; color: #8a8a9a; text-transform: none; }
+.lf-panel h3 .lf-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e;
+  box-shadow: 0 0 6px rgba(34,197,94,0.8); flex: none; }
+/* .lf-body is the ONLY scrolling region — header, footer and the mobile
+   handle sit outside it so they never scroll out of view. min-height: 0 is
+   load-bearing: without it a flex child won't shrink below its content size
+   and this scroller simply never activates. */
+.lf-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 18px 14px; }
+.lf-section-head { all: revert; appearance: none; background: none; border: none; padding: 0;
+  margin: 0 0 10px; width: 100%; box-sizing: border-box; text-align: left; cursor: pointer;
+  font: 700 10px/1 ui-monospace,Menlo,monospace; text-transform: uppercase; letter-spacing: .12em;
+  color: #5fa07c; display: flex; align-items: center; justify-content: space-between; }
+.lf-section-head:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 2px; }
+.lf-chevron { display: inline-block; font: 10px/1 ui-monospace,Menlo,monospace;
+  transition: transform .15s ease; }
+.lf-chevron::before { content: '\25be'; }
+.lf-section.lf-section-collapsed .lf-chevron { transform: rotate(-90deg); }
+.lf-section.lf-section-collapsed .lf-section-body { display: none; }
+.lf-section + .lf-section { margin-top: 14px; }
+.lf-divider { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 16px 0; }
+.lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.lf-row:last-child { margin-bottom: 0; }
+.lf-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.lf-row label { font: 10px/1 ui-monospace,Menlo,monospace; letter-spacing: .08em; text-transform: uppercase; color: #8a8a9a; }
+.lf-readout { font: 600 11px/1 ui-monospace,Menlo,monospace; color: #79af91; }
+.lf-row-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
+.lf-row-checkbox label { order: -1; }
+
+.lf-row select { width: 100%; box-sizing: border-box; appearance: none; -webkit-appearance: none;
+  background: #141419 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M0 0l5 6 5-6z" fill="%238a8a9a"/></svg>') no-repeat right 10px center;
+  color: #e8e8e8; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+  padding: 7px 28px 7px 10px; font: 12px -apple-system,sans-serif; }
+
+/* Ruler-style slider (own design, ROADMAP 3.3): a thin band of tick marks
+   — a repeating-gradient track, minor ticks every 6.25% and a brighter
+   major tick every 25% — with the FILLED portion washed in the accent via
+   a second gradient layer sized by --lf-pct (same custom property
+   setRangeFill already writes on every value change, human-dragged or
+   gate-driven). The thumb is a hairline: a slim bar, not a dot, so it
+   reads as a position marker on the ruler rather than a ball riding a
+   pill. Hit area stays a generous 20px tall — only the drawn band is
+   thin — so touch/pointer accuracy doesn't suffer for the thinner look. */
+.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: pointer; }
+.lf-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.lf-row input[type=range]::-moz-range-track { height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+}
+.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 2px; height: 18px; margin-top: -8.5px; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7);
+  cursor: pointer; }
+.lf-row input[type=range]::-moz-range-thumb { width: 2px; height: 18px; border: none; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7); cursor: pointer; }
+.lf-row input[type=range]:focus-visible { outline: none; }
+.lf-row input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+.lf-row input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+
+.lf-color-row { display: flex; align-items: center; gap: 8px; }
+.lf-color-row input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px; background: none; cursor: pointer; flex: none; }
+.lf-hex { font: 12px ui-monospace,Menlo,monospace; color: #c9c9d4; text-transform: uppercase; }
+
+.lf-segmented { display: flex; gap: 6px; margin-bottom: 8px; }
+.lf-seg-btn { flex: 1; background: #141419; color: #8a8a9a; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; padding: 7px 8px; font: 11px -apple-system,sans-serif; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; justify-content: center; }
+.lf-seg-btn::before { content: ''; width: 9px; height: 9px; border-radius: 50%; border: 1px solid #55556a; flex: none; }
+.lf-seg-btn.lf-seg-btn-active { color: #e8e8e8; border-color: #437057; }
+.lf-seg-btn.lf-seg-btn-active::before { border-color: #437057; background: #437057; }
+.lf-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Sticky footer (fix round 1, finding 1): a flex sibling of .lf-body, not a
+   child of it, so it never scrolls with the sections above it. Its own
+   background covers content scrolling underneath; its top border is the
+   hairline that reads it as a footer rather than a floating button. */
+.lf-reset { flex: none; width: 100%; box-sizing: border-box; margin: 0; background: #0b0b0f;
+  color: #e8e8e8; border: none; border-top: 1px solid rgba(255,255,255,0.08);
+  border-radius: 0 0 16px 16px; padding: 12px 18px; cursor: pointer;
+  font: 11px -apple-system,sans-serif; }
+.lf-reset:hover { background: #141419; }
+.lf-presets { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 14px; }
+.lf-chip { flex: 1 1 auto; background: #141419; color: #c9c9d4; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px; padding: 5px 6px; font: 500 10px/1 ui-monospace,Menlo,monospace;
+  letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+.lf-chip:hover { color: #fff; border-color: #55556a; }
+.lf-chip[aria-pressed="true"] { background: #437057; color: #e8e8e8; border-color: #437057; }
+.lf-chip:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 1px; }
+
+/* Below ~640px: full-width sheet docked to the bottom edge, collapsed to a
+   handle by default so the artwork stays unobstructed. This is scoped
+   entirely to the media query and a separate in-memory flag — never the
+   persisted desktop 'collapsed' state — so it can't leak into desktop. */
+.lf-handle { display: none; }
+@media (max-width: 640px) {
+  .lf-panel { left: 0; right: 0; bottom: 0; width: 100%; max-height: 70vh;
+    border-radius: 16px 16px 0 0; border-bottom: none; }
+  .lf-handle { display: flex; flex: none; justify-content: center; padding: 8px 0; cursor: pointer; }
+  .lf-handle::before { content: ''; width: 36px; height: 4px; border-radius: 999px; background: #3a3a46; }
+  .lf-reset { border-radius: 0; }
+  .lf-panel.mobile-collapsed .lf-body,
+  .lf-panel.mobile-collapsed .lf-reset { display: none; }
+}
+</style></head>
+<body>
+<canvas id="canvas" width="1280" height="800"></canvas>
+
+
+
+
+
+
+<script>window.__LF_BAKED_VALUES__ = {"scale":1.75,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#00aaff","colorB":"#aa00ff","hue":200,"hueB":280,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"mode":false};
+// --- inlined: ../../shared/color.js ---
+// shared/color.js
+
+function hslToRgb(h, s, l) {
+  h = ((h % 360) + 360) % 360 / 360;
+  s = Math.min(1, Math.max(0, s));
+  l = Math.min(1, Math.max(0, l));
+
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return [v, v, v];
+  }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+
+  const r = hue2rgb(p, q, h + 1 / 3);
+  const g = hue2rgb(p, q, h);
+  const b = hue2rgb(p, q, h - 1 / 3);
+
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function hueShift(h, degrees) {
+  return ((h + degrees) % 360 + 360) % 360;
+}
+
+function invertRgb(r, g, b) {
+  return [255 - r, 255 - g, 255 - b];
+}
+
+// Extracts ONLY hue from a hex colour — the picker's own saturation/lightness
+// are discarded, because rendering always sources chroma from the piece's
+// shared `saturation` slider, never from the swatch a user happened to pick.
+// This is a one-way, lossy read (8-bit RGB quantizes hue), used exactly once
+// per user pick — never in a render loop, and never applied to a piece's own
+// seeded defaults, which keep their exact authored degree value untouched.
+// A grey/white/black pick (max === min) has no hue at all; callers must keep
+// the previous hue rather than let this return a meaningless 0 (red).
+function hexToHue(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === min) return null; // achromatic — caller must preserve prior hue
+  const d = max - min;
+  let h;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h *= 60;
+  return h < 0 ? h + 360 : h;
+}
+
+// The shared 0-1 ramp position -> {h, s} for a piece's two-stop palette.
+// Solid mode ignores `f` and always returns stop A; gradient mode lerps hue
+// between the two stops exactly as every piece's own per-element interpolation
+// did before this control existed (`hue + (hueB - hue) * f`). `s` is always
+// the piece's single shared saturation control — colour stops never carry
+// their own saturation. `hue`/`hueB` are the exact, hidden numeric palette
+// values (see shared/controls.js); `colorA`/`colorB` are their hex *view*
+// only and are never read here.
+function paletteHsl(values, f) {
+  const s = values.saturation;
+  if (values.colorMode === 'solid') return { h: values.hue, s };
+  return { h: values.hue + (values.hueB - values.hue) * f, s };
+}
+
+
+// --- inlined: ../../shared/controls.js ---
+// shared/controls.js
+
+// `category` routes a control to one of the panel's tiers — 'interaction',
+// 'color', or the default 'visual' — and is presentation-only: it changes
+// which DOM section a row renders in, never __LF_SPECS__'s declaration
+// order, which every gate that isn't the panel itself still reads flat.
+const SHARED_CONTROLS = [
+  { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+  { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+  { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+  { name: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 1, category: 'color' },
+  // House look default is 0 (docs/house-look.md #1 — monochrome first); a
+  // piece pins its own saturation in its `defaults` block regardless.
+  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0, category: 'color' },
+  // Solid/gradient palette. `colorA`/`colorB` are the authored controls a
+  // user actually sees and drags; `hue`/`hueB` are hidden (no panel row) —
+  // the exact numeric degrees every piece's render math still reads. Picking
+  // a colour writes the hidden field via `linkedHue` (see setValue below);
+  // the reverse never happens, so a piece's own seeded default hue is never
+  // round-tripped through 8-bit hex and stays exactly what the piece declares.
+  { name: 'colorMode', label: 'Color Mode', type: 'select', options: ['solid', 'gradient'], default: 'gradient', category: 'color' },
+  { name: 'colorA', label: 'Color A', type: 'color', default: '#00aaff', linkedHue: 'hue', category: 'color' },
+  { name: 'colorB', label: 'Color B', type: 'color', default: '#aa00ff', linkedHue: 'hueB', category: 'color' },
+  { name: 'hue', label: 'Hue', type: 'hidden', default: 200 },
+  { name: 'hueB', label: 'Hue B', type: 'hidden', default: 280 },
+  { name: 'invert', label: 'Invert', type: 'checkbox', default: false, category: 'color' },
+  { name: 'glow', label: 'Glow', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
+  { name: 'angle', label: 'Angle', type: 'range', min: 0, max: 360, step: 1, default: 0 },
+  { name: 'motion', label: 'Motion', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+  { name: 'phase', label: 'Phase', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
+  { name: 'density', label: 'Density', type: 'range', min: 0.1, max: 2, step: 0.01, default: 1 },
+];
+
+// The shared preset vocabulary. Every piece declares all five; the names mean
+// the same intent everywhere, the values differ per piece. Exported so a
+// future verifier (e.g. tools/build.mjs) can check a piece's presets against
+// this set instead of hardcoding it a second time.
+const PRESET_NAMES = ['whisper', 'ink', 'neon', 'drift', 'dense'];
+
+// Stage C: sectioned, styled panel. Structure is from mock 1 (Interactions /
+// divider / Color+Visual / divider / Reset); appearance is from mock 2 (dark
+// rounded card, mono accent headers, gradient-fill sliders). The
+// PREVIEW_PLANE + VISUAL telemetry boxes in mock 2 are deferred — no data
+// feed for them yet — everything else about its styling is applied.
+const PANEL_CSS = `
+/* Fix round 1: the panel is a flex column so the scrollable middle
+   (.lf-body) can't push the footer (.lf-reset) off screen, and section
+   headers are now toggle buttons so the panel fits at rest. */
+.lf-panel { position: fixed; bottom: 12px; right: 12px; width: 300px;
+  background: #0b0b0f; color: #e8e8e8; font: 12px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 16px;
+  z-index: 9999; max-height: 80vh; overflow: hidden; box-sizing: border-box;
+  display: flex; flex-direction: column; }
+.lf-panel.collapsed .lf-body, .lf-panel.collapsed .lf-reset { display: none; }
+.lf-panel h3 { margin: 0; padding: 14px 18px 12px; font: 700 11px/1 ui-monospace,Menlo,monospace;
+  text-transform: uppercase; letter-spacing: .12em; color: #5fa07c; flex: none;
+  display: flex; align-items: center; justify-content: space-between; cursor: grab;
+  user-select: none; touch-action: none; }
+.lf-panel h3:active { cursor: grabbing; }
+.lf-panel h3 .lf-status { display: flex; align-items: center; gap: 5px; font: 500 10px/1 ui-monospace,Menlo,monospace;
+  letter-spacing: .05em; color: #8a8a9a; text-transform: none; }
+.lf-panel h3 .lf-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e;
+  box-shadow: 0 0 6px rgba(34,197,94,0.8); flex: none; }
+/* .lf-body is the ONLY scrolling region — header, footer and the mobile
+   handle sit outside it so they never scroll out of view. min-height: 0 is
+   load-bearing: without it a flex child won't shrink below its content size
+   and this scroller simply never activates. */
+.lf-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 18px 14px; }
+.lf-section-head { all: revert; appearance: none; background: none; border: none; padding: 0;
+  margin: 0 0 10px; width: 100%; box-sizing: border-box; text-align: left; cursor: pointer;
+  font: 700 10px/1 ui-monospace,Menlo,monospace; text-transform: uppercase; letter-spacing: .12em;
+  color: #5fa07c; display: flex; align-items: center; justify-content: space-between; }
+.lf-section-head:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 2px; }
+.lf-chevron { display: inline-block; font: 10px/1 ui-monospace,Menlo,monospace;
+  transition: transform .15s ease; }
+.lf-chevron::before { content: '\\25be'; }
+.lf-section.lf-section-collapsed .lf-chevron { transform: rotate(-90deg); }
+.lf-section.lf-section-collapsed .lf-section-body { display: none; }
+.lf-section + .lf-section { margin-top: 14px; }
+.lf-divider { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 16px 0; }
+.lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.lf-row:last-child { margin-bottom: 0; }
+.lf-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.lf-row label { font: 10px/1 ui-monospace,Menlo,monospace; letter-spacing: .08em; text-transform: uppercase; color: #8a8a9a; }
+.lf-readout { font: 600 11px/1 ui-monospace,Menlo,monospace; color: #79af91; }
+.lf-row-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
+.lf-row-checkbox label { order: -1; }
+
+.lf-row select { width: 100%; box-sizing: border-box; appearance: none; -webkit-appearance: none;
+  background: #141419 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M0 0l5 6 5-6z" fill="%238a8a9a"/></svg>') no-repeat right 10px center;
+  color: #e8e8e8; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+  padding: 7px 28px 7px 10px; font: 12px -apple-system,sans-serif; }
+
+/* Ruler-style slider (own design, ROADMAP 3.3): a thin band of tick marks
+   — a repeating-gradient track, minor ticks every 6.25% and a brighter
+   major tick every 25% — with the FILLED portion washed in the accent via
+   a second gradient layer sized by --lf-pct (same custom property
+   setRangeFill already writes on every value change, human-dragged or
+   gate-driven). The thumb is a hairline: a slim bar, not a dot, so it
+   reads as a position marker on the ruler rather than a ball riding a
+   pill. Hit area stays a generous 20px tall — only the drawn band is
+   thin — so touch/pointer accuracy doesn't suffer for the thinner look. */
+.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: pointer; }
+.lf-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.lf-row input[type=range]::-moz-range-track { height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+}
+.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 2px; height: 18px; margin-top: -8.5px; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7);
+  cursor: pointer; }
+.lf-row input[type=range]::-moz-range-thumb { width: 2px; height: 18px; border: none; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7); cursor: pointer; }
+.lf-row input[type=range]:focus-visible { outline: none; }
+.lf-row input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+.lf-row input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+
+.lf-color-row { display: flex; align-items: center; gap: 8px; }
+.lf-color-row input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px; background: none; cursor: pointer; flex: none; }
+.lf-hex { font: 12px ui-monospace,Menlo,monospace; color: #c9c9d4; text-transform: uppercase; }
+
+.lf-segmented { display: flex; gap: 6px; margin-bottom: 8px; }
+.lf-seg-btn { flex: 1; background: #141419; color: #8a8a9a; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; padding: 7px 8px; font: 11px -apple-system,sans-serif; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; justify-content: center; }
+.lf-seg-btn::before { content: ''; width: 9px; height: 9px; border-radius: 50%; border: 1px solid #55556a; flex: none; }
+.lf-seg-btn.lf-seg-btn-active { color: #e8e8e8; border-color: #437057; }
+.lf-seg-btn.lf-seg-btn-active::before { border-color: #437057; background: #437057; }
+.lf-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Sticky footer (fix round 1, finding 1): a flex sibling of .lf-body, not a
+   child of it, so it never scrolls with the sections above it. Its own
+   background covers content scrolling underneath; its top border is the
+   hairline that reads it as a footer rather than a floating button. */
+.lf-reset { flex: none; width: 100%; box-sizing: border-box; margin: 0; background: #0b0b0f;
+  color: #e8e8e8; border: none; border-top: 1px solid rgba(255,255,255,0.08);
+  border-radius: 0 0 16px 16px; padding: 12px 18px; cursor: pointer;
+  font: 11px -apple-system,sans-serif; }
+.lf-reset:hover { background: #141419; }
+.lf-presets { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 14px; }
+.lf-chip { flex: 1 1 auto; background: #141419; color: #c9c9d4; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px; padding: 5px 6px; font: 500 10px/1 ui-monospace,Menlo,monospace;
+  letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+.lf-chip:hover { color: #fff; border-color: #55556a; }
+.lf-chip[aria-pressed="true"] { background: #437057; color: #e8e8e8; border-color: #437057; }
+.lf-chip:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 1px; }
+
+/* Below ~640px: full-width sheet docked to the bottom edge, collapsed to a
+   handle by default so the artwork stays unobstructed. This is scoped
+   entirely to the media query and a separate in-memory flag — never the
+   persisted desktop 'collapsed' state — so it can't leak into desktop. */
+.lf-handle { display: none; }
+@media (max-width: 640px) {
+  .lf-panel { left: 0; right: 0; bottom: 0; width: 100%; max-height: 70vh;
+    border-radius: 16px 16px 0 0; border-bottom: none; }
+  .lf-handle { display: flex; flex: none; justify-content: center; padding: 8px 0; cursor: pointer; }
+  .lf-handle::before { content: ''; width: 36px; height: 4px; border-radius: 999px; background: #3a3a46; }
+  .lf-reset { border-radius: 0; }
+  .lf-panel.mobile-collapsed .lf-body,
+  .lf-panel.mobile-collapsed .lf-reset { display: none; }
+}
+`;
+
+function kindOf(spec) {
+  if (spec.type === 'checkbox') return 'boolean';
+  if (spec.type === 'color') return 'color';
+  if (spec.type === 'select') return 'enum';
+  if (spec.type === 'hidden') return 'hidden';
+  return 'number';
+}
+
+function injectCss() {
+  if (document.getElementById('lf-panel-css')) return;
+  const style = document.createElement('style');
+  style.id = 'lf-panel-css';
+  style.textContent = PANEL_CSS;
+  document.head.appendChild(style);
+}
+
+function createControlPanel({ pieceId, onChange, extraControls = [], defaults: defaultOverrides = {}, presets = {} }) {
+  injectCss();
+
+  // Gallery preview iframes load pieces with ?preview=1: same-origin means
+  // they'd otherwise read (and, on interaction, overwrite) the viewer's own
+  // localStorage:<pieceId> — showing a hovered card's saved tuning instead
+  // of its defaults. Under this flag we neither read nor write it. A piece
+  // opened directly, with no query string, is completely unaffected.
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+
+  const storageKey = `linefield:${pieceId}`;
+  const allSpecs = [...SHARED_CONTROLS, ...extraControls];
+  const specByName = {};
+  // kind is the discriminant every gate must branch on, never `type`: a gate
+  // that switches on the type-name string would silently fall a new type
+  // into whichever branch it doesn't match. 'hidden' (hue/hueB) has no panel
+  // row at all and is excluded from control gates entirely — it is not a
+  // user-facing control, just the exact numeric value colorA/colorB drive.
+  for (const spec of allSpecs) {
+    spec.kind = kindOf(spec);
+    specByName[spec.name] = spec;
+  }
+  const defaults = {};
+  for (const spec of allSpecs) {
+    defaults[spec.name] = spec.name in defaultOverrides ? defaultOverrides[spec.name] : spec.default;
+  }
+
+  let saved = {};
+  if (!isPreview) {
+    try {
+      saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    } catch {
+      saved = {};
+    }
+  }
+
+  const values = { ...defaults, ...saved.values };
+  // Saved values bypass setValue(), so validate enum membership on load.
+  // An option removed or renamed since the save falls back to the control's
+  // resolved default, keeping the rendered select and values in sync.
+  for (const spec of allSpecs) {
+    if (spec.kind === 'enum' && !spec.options.includes(values[spec.name])) {
+      values[spec.name] = defaults[spec.name];
+    }
+  }
+  let collapsed = saved.collapsed || false;
+  let panelPosition = saved.position && Number.isFinite(saved.position.left) && Number.isFinite(saved.position.top)
+    ? saved.position
+    : null;
+  // Mobile-sheet collapse is a separate, unpersisted flag: it starts
+  // collapsed every load (handle-only, per the brief) and is scoped to the
+  // <=640px media query in CSS, so toggling it can never affect (or be
+  // affected by) the desktop `collapsed` state above.
+  let mobileCollapsed = true;
+  // Fix round 1, finding 2: sections collapse independently, persisted
+  // alongside `collapsed`/`values`. Interactions starts open (the thing the
+  // separation was for); Color and Visual start closed, so the panel fits
+  // on screen at rest. `saved.sections ?? {}` is deliberately defensive — a
+  // blob written before this change has no `sections` key at all, and
+  // reading it without the fallback would throw on spread below.
+  const DEFAULT_SECTION_OPEN = { interaction: true, color: false, visual: false };
+  const sectionOpen = { ...DEFAULT_SECTION_OPEN, ...(saved.sections ?? {}) };
+
+  const panel = document.createElement('div');
+  panel.className = 'lf-panel mobile-collapsed' + (collapsed ? ' collapsed' : '');
+  panel.setAttribute('data-lf-panel', '');
+
+  // Mobile-only drag handle (CSS hides it above the breakpoint). Tapping it
+  // expands/collapses the bottom sheet without touching desktop's own
+  // click-to-collapse heading below.
+  const handle = document.createElement('div');
+  handle.className = 'lf-handle';
+  handle.addEventListener('click', () => {
+    mobileCollapsed = !mobileCollapsed;
+    panel.classList.toggle('mobile-collapsed', mobileCollapsed);
+  });
+  panel.appendChild(handle);
+
+  const heading = document.createElement('h3');
+  const headingLabel = document.createElement('span');
+  headingLabel.textContent = 'Controls';
+  const status = document.createElement('span');
+  status.className = 'lf-status';
+  status.innerHTML = '<span class="lf-dot"></span>live';
+  heading.append(headingLabel, status);
+  heading.title = 'Drag to move · click to collapse';
+  let dragState = null;
+  let suppressHeadingClick = false;
+  heading.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || window.innerWidth <= 640) return;
+    const rect = panel.getBoundingClientRect();
+    dragState = { id: event.pointerId, startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top, moved: false };
+    heading.setPointerCapture(event.pointerId);
+  });
+  heading.addEventListener('pointermove', (event) => {
+    if (!dragState || event.pointerId !== dragState.id) return;
+    const dx = event.clientX - dragState.startX;
+    const dy = event.clientY - dragState.startY;
+    if (!dragState.moved && Math.hypot(dx, dy) < 4) return;
+    dragState.moved = true;
+    const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+    const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+    panel.style.left = `${Math.min(maxLeft, Math.max(0, dragState.left + dx))}px`;
+    panel.style.top = `${Math.min(maxTop, Math.max(0, dragState.top + dy))}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  });
+  function finishPanelDrag(event) {
+    if (!dragState || event.pointerId !== dragState.id) return;
+    if (heading.hasPointerCapture(event.pointerId)) heading.releasePointerCapture(event.pointerId);
+    if (dragState.moved) {
+      panelPosition = { left: parseFloat(panel.style.left), top: parseFloat(panel.style.top) };
+      suppressHeadingClick = true;
+      persist();
+    }
+    dragState = null;
+  }
+  heading.addEventListener('pointerup', finishPanelDrag);
+  heading.addEventListener('pointercancel', finishPanelDrag);
+  heading.addEventListener('click', () => {
+    if (suppressHeadingClick) {
+      suppressHeadingClick = false;
+      return;
+    }
+    collapsed = !collapsed;
+    panel.classList.toggle('collapsed', collapsed);
+    persist();
+  });
+  panel.appendChild(heading);
+
+  const body = document.createElement('div');
+  body.className = 'lf-body';
+  panel.appendChild(body);
+
+  // The panel configures artwork visuals: camera angles in Interactions,
+  // palette in Color, and the remaining rendering parameters in Visual.
+  // Each section is a toggle-button header plus a body a category routes
+  // rows into — `sectionOf` below is the single place that mapping lives.
+  // Collapsing hides `.lf-section-body` via CSS only: rows stay in the DOM
+  // (never removed), so a gate that drives a control by name or by
+  // `row.querySelector` still finds it whether its section is open or not.
+  function makeSection(key, title) {
+    const section = document.createElement('div');
+    section.className = 'lf-section';
+
+    const headBtn = document.createElement('button');
+    headBtn.type = 'button';
+    headBtn.className = 'lf-section-head';
+    const headLabel = document.createElement('span');
+    headLabel.textContent = title;
+    const chevron = document.createElement('span');
+    chevron.className = 'lf-chevron';
+    headBtn.append(headLabel, chevron);
+
+    const sectionBody = document.createElement('div');
+    sectionBody.className = 'lf-section-body';
+    section.append(headBtn, sectionBody);
+
+    function applyOpenState() {
+      const open = sectionOpen[key];
+      headBtn.setAttribute('aria-expanded', String(open));
+      section.classList.toggle('lf-section-collapsed', !open);
+    }
+    applyOpenState();
+    headBtn.addEventListener('click', () => {
+      sectionOpen[key] = !sectionOpen[key];
+      applyOpenState();
+      persist();
+    });
+
+    return { el: section, body: sectionBody };
+  }
+  const secInteraction = makeSection('interaction', 'Interactions');
+  const secColor = makeSection('color', 'Color');
+  const secVisual = makeSection('visual', 'Visual');
+  body.appendChild(secInteraction.el);
+  body.appendChild(document.createElement('hr')).className = 'lf-divider';
+  body.appendChild(secColor.el);
+  body.appendChild(secVisual.el);
+
+  // category is optional and defaults to 'visual'. Only 'interaction' and
+  // 'color' route a control out of Visual — 'motion'/'form'/'ink' (the
+  // piece-extra sub-tags called out in the brief) are metadata for a future
+  // stage and land in Visual today, same as an uncategorised control.
+  function sectionOf(spec) {
+    if (spec.category === 'interaction') return secInteraction.body;
+    if (spec.category === 'color') return secColor.body;
+    return secVisual.body;
+  }
+
+  // Per-control render hook. Covers <input type=range|checkbox|color> and
+  // <select> uniformly; a future widget that isn't a bare input/select would
+  // register its own render(v) instead, so setValue below stays agnostic to
+  // what is actually on screen.
+  const controllers = {};
+
+  // Clamp to the spec's declared range where numeric, then snap to its step
+  // the same way <input type=range> snaps on a programmatic .value set. That
+  // browser-side snap is exactly what the old DOM round-trip captured (set
+  // .value, then read it back post-sanitization); setValue writes values[]
+  // directly and never reads the DOM back, so without this step a control's
+  // displayed slider position and its rendered value can disagree — the
+  // Pitch/Yaw divergence this stage exists to remove, reintroduced. Not
+  // applied to booleans (kind === 'boolean') or to a name with no known spec.
+  function clampValue(spec, v) {
+    // Enum membership is not optional: a value outside spec.options must be
+    // rejected rather than written, or __LF_VALUES__ and the rendered <select>
+    // diverge (the <select> silently ignores an out-of-range .value while
+    // the state object keeps whatever was passed in). Falls back to the
+    // control's current value, the same "previous value stands" rule a
+    // number's clamp already applies at its min/max.
+    if (spec?.kind === 'enum') {
+      return spec.options.includes(v) ? v : values[spec.name];
+    }
+    if (!spec || spec.kind !== 'number' || typeof spec.min !== 'number' || typeof spec.max !== 'number') {
+      return v;
+    }
+    const clamped = Math.min(spec.max, Math.max(spec.min, v));
+    const step = Number(spec.step);
+    if (!(step > 0)) return clamped;
+    const snapped = spec.min + Math.round((clamped - spec.min) / step) * step;
+    const decimals = (String(step).split('.')[1] || '').length;
+    return decimals ? Number(snapped.toFixed(decimals)) : snapped;
+  }
+
+  // THE write path. Every value change — a drag, a preset, Reset, or a gate
+  // script driving the panel with no DOM at all — goes through this and only
+  // this, so a value set by an audit renders identically to the same value
+  // set by a human: clamp -> write -> render -> clear active chip -> fire
+  // onChange exactly once -> persist if asked.
+  function setValue(name, value, { persist: shouldPersist = true } = {}) {
+    const spec = specByName[name];
+    const v = clampValue(spec, value);
+    values[name] = v;
+    // A colour control's spec names the hidden numeric field it drives
+    // (colorA -> hue, colorB -> hueB). This is the ONLY place that hex gets
+    // decoded — once per pick, never in a render loop — and it never runs
+    // for a programmatic write to the hidden field itself (see applyValues,
+    // which reasserts hue/hueB after this fires so a preset/reset always
+    // lands on the exact declared number, not a lossy decode of colorA/
+    // colorB). An achromatic pick (grey/white/black) has no hue to extract;
+    // hexToHue returns null and the previous hue is left untouched.
+    if (spec?.linkedHue) {
+      const decoded = hexToHue(v);
+      if (decoded !== null) values[spec.linkedHue] = decoded;
+    }
+    controllers[name]?.render(v);
+    if (name === 'colorMode') controllers.colorB?.setRowVisible?.(v === 'gradient');
+    setActiveChip(null);
+    onChange(name, v, values);
+    if (shouldPersist) persist();
+  }
+
+  // Same decimals rule clampValue's step-snap uses, so a slider's readout
+  // never shows more precision than the control itself actually holds.
+  function formatNumber(spec, v) {
+    const decimals = (String(spec.step).split('.')[1] || '').length;
+    return decimals ? Number(v).toFixed(decimals) : String(v);
+  }
+
+  // Mock 2's slider fill is a gradient over the FILLED portion only, unfilled
+  // remainder flat grey — not achievable in pure CSS for a native <input
+  // type=range> (no fill-percentage selector exists), so render() also
+  // writes this custom property every time a value changes, human-dragged or
+  // gate-driven, and the two-stop `background-size` trick in PANEL_CSS reads it.
+  function setRangeFill(input, spec, v) {
+    const pct = spec.max > spec.min ? ((v - spec.min) / (spec.max - spec.min)) * 100 : 0;
+    input.style.setProperty('--lf-pct', `${pct}%`);
+  }
+
+  // Mock 2's "(•) Solid ( ) Gradient" radio pair, without a second real
+  // <input> in colorMode's row: the row's one real control stays the
+  // <select> buildRow already built (kept in the DOM, driven exactly the way
+  // test-interactions.mjs dispatches a real DOM `input` event), visually
+  // hidden, with a composite pair of buttons layered in front of it that
+  // call setValue the same way any other control does. This is the
+  // registration hook, not a second write path: the buttons never touch
+  // `values` themselves.
+  function enhanceColorModeToggle(row, select, spec) {
+    select.classList.add('lf-visually-hidden');
+    const seg = document.createElement('div');
+    seg.className = 'lf-segmented';
+    const buttons = {};
+    for (const opt of spec.options) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'lf-seg-btn';
+      btn.textContent = opt.charAt(0).toUpperCase() + opt.slice(1);
+      btn.addEventListener('click', () => setValue(spec.name, opt));
+      buttons[opt] = btn;
+      seg.appendChild(btn);
+    }
+    row.insertBefore(seg, select);
+    const baseRender = controllers[spec.name].render;
+    controllers[spec.name].render = (v) => {
+      baseRender(v);
+      for (const [opt, btn] of Object.entries(buttons)) btn.classList.toggle('lf-seg-btn-active', opt === v);
+    };
+    controllers[spec.name].render(values[spec.name]);
+  }
+
+  function buildRow(spec) {
+    // 'hidden' (hue/hueB) is not a control — no row, no input, no DOM at all.
+    // It stays in allSpecs/defaults/values so the rest of the machinery
+    // (defaults composition, presets, persistence) treats it like any other
+    // value; it is simply never rendered or driven directly.
+    if (spec.type === 'hidden') return;
+
+    const row = document.createElement('div');
+    row.className = 'lf-row';
+    let input;
+    let readoutEl = null;
+    let hexEl = null;
+
+    if (spec.type === 'checkbox') {
+      // Compact single line — label and box side by side, matching mock 2's
+      // "Invert [ ]" — rather than the label-above-control layout every
+      // other control below uses.
+      row.classList.add('lf-row-checkbox');
+      const label = document.createElement('label');
+      label.textContent = spec.label;
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !!values[spec.name];
+      row.append(label, input);
+    } else {
+      const head = document.createElement('div');
+      head.className = 'lf-row-head';
+      const label = document.createElement('label');
+      label.textContent = spec.label;
+      head.appendChild(label);
+
+      if (spec.type === 'color') {
+        input = document.createElement('input');
+        input.type = 'color';
+        input.value = values[spec.name];
+        row.appendChild(head);
+        const colorRow = document.createElement('div');
+        colorRow.className = 'lf-color-row';
+        hexEl = document.createElement('span');
+        hexEl.className = 'lf-hex';
+        hexEl.textContent = values[spec.name];
+        colorRow.append(input, hexEl);
+        row.appendChild(colorRow);
+      } else if (spec.type === 'select') {
+        input = document.createElement('select');
+        for (const opt of spec.options) {
+          const o = document.createElement('option');
+          o.value = opt;
+          o.textContent = opt;
+          input.appendChild(o);
+        }
+        input.value = values[spec.name];
+        row.append(head, input);
+      } else {
+        readoutEl = document.createElement('span');
+        readoutEl.className = 'lf-readout';
+        readoutEl.textContent = formatNumber(spec, values[spec.name]);
+        head.appendChild(readoutEl);
+        input = document.createElement('input');
+        input.type = 'range';
+        input.min = spec.min;
+        input.max = spec.max;
+        input.step = spec.step;
+        input.value = values[spec.name];
+        row.append(head, input);
+        setRangeFill(input, spec, values[spec.name]);
+      }
+    }
+
+    // Thin adapter: read the raw DOM value and hand it to setValue. It must
+    // not touch values/onChange/persistence itself — setValue is the only
+    // write path (see above).
+    input.addEventListener('input', () => {
+      const v = spec.type === 'checkbox' ? input.checked
+        : (spec.type === 'color' || spec.type === 'select') ? input.value
+        : parseFloat(input.value);
+      setValue(spec.name, v);
+    });
+
+    controllers[spec.name] = {
+      render(v) {
+        if (spec.type === 'checkbox') { input.checked = v; return; }
+        input.value = v;
+        if (readoutEl) readoutEl.textContent = formatNumber(spec, v);
+        if (hexEl) hexEl.textContent = v;
+        if (spec.type !== 'color' && spec.type !== 'select') setRangeFill(input, spec, v);
+      },
+      setRowVisible(visible) {
+        row.style.display = visible ? '' : 'none';
+      },
+    };
+
+    if (spec.name === 'colorMode') enhanceColorModeToggle(row, input, spec);
+
+    sectionOf(spec).appendChild(row);
+  }
+
+  // Presets are the same operation the reset button already performed: write
+  // every control, update its input, fire onChange, persist. The only
+  // difference is which map is written. Composing over `defaults` is what
+  // makes a partial preset safe — a control the preset omits lands on the
+  // piece's own default rather than keeping the previous preset's value.
+  function applyValues(map) {
+    const next = { ...defaults, ...map };
+    for (const spec of allSpecs) setValue(spec.name, next[spec.name], { persist: false });
+    // setValue(colorA/colorB, ...) above may have just overwritten hue/hueB
+    // with a lossy hex decode — order-dependent otherwise, since 'hidden'
+    // specs are plain entries in the same allSpecs array. The exact value
+    // `next` already carries always wins on a programmatic write (preset,
+    // Reset, ?preset= on load): reassert it directly, no side effects, so
+    // these paths render at exactly the declared number, never an
+    // approximation of it.
+    for (const spec of allSpecs) {
+      if (spec.kind === 'hidden') values[spec.name] = next[spec.name];
+    }
+    persist();
+  }
+
+  const presetNames = Object.keys(presets);
+  let chipRow = null;
+  const chips = {};
+
+  function setActiveChip(name) {
+    for (const [n, el] of Object.entries(chips)) {
+      el.setAttribute('aria-pressed', String(n === name));
+    }
+  }
+
+  if (presetNames.length) {
+    chipRow = document.createElement('div');
+    chipRow.className = 'lf-presets';
+    for (const name of presetNames) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'lf-chip';
+      chip.dataset.preset = name;
+      chip.textContent = name;
+      chip.setAttribute('aria-pressed', 'false');
+      chip.addEventListener('click', () => {
+        applyValues(presets[name]);
+        setActiveChip(name);
+      });
+      chips[name] = chip;
+      chipRow.appendChild(chip);
+    }
+    // Presets sit above every section, ahead of the two tiers built earlier
+    // in this function — insertBefore rather than appendChild, since the
+    // section containers are already in `body` by this point.
+    body.insertBefore(chipRow, secInteraction.el);
+  }
+
+  for (const spec of allSpecs) buildRow(spec);
+  // colorB's row only makes sense in gradient mode; setValue toggles it on
+  // every subsequent change, this sets the correct initial state.
+  controllers.colorB?.setRowVisible?.(values.colorMode === 'gradient');
+
+  // Reset is a sticky footer (fix round 1, finding 1): a sibling of `body`,
+  // not a child of it, so the flex layout in PANEL_CSS keeps it pinned to
+  // the panel's bottom edge regardless of how far `body` is scrolled. Still
+  // inside `panel`, which carries `data-lf-panel` — the hard constraint is
+  // about that attribute, not about which direct child holds a row.
+  const resetBtn = document.createElement('button');
+  resetBtn.className = 'lf-reset';
+  resetBtn.textContent = 'Reset to defaults';
+  resetBtn.addEventListener('click', () => {
+    applyValues(defaults);
+    setActiveChip(null);
+  });
+  panel.appendChild(resetBtn);
+
+  document.body.appendChild(panel);
+
+  function applyPanelPosition() {
+    if (window.innerWidth <= 640 || !panelPosition) {
+      panel.style.removeProperty('left');
+      panel.style.removeProperty('top');
+      panel.style.removeProperty('right');
+      panel.style.removeProperty('bottom');
+      return;
+    }
+    const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+    const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+    panelPosition.left = Math.min(maxLeft, Math.max(0, panelPosition.left));
+    panelPosition.top = Math.min(maxTop, Math.max(0, panelPosition.top));
+    panel.style.left = `${panelPosition.left}px`;
+    panel.style.top = `${panelPosition.top}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }
+  applyPanelPosition();
+  window.addEventListener('resize', applyPanelPosition);
+
+  function persist() {
+    if (isPreview) return;
+    localStorage.setItem(storageKey, JSON.stringify({ collapsed, values, sections: sectionOpen, position: panelPosition }));
+  }
+
+  // Declared, uncomposed. tools/build.mjs reads this off the loaded page
+  // instead of regex-parsing the HTML, so there is no second copy of the
+  // preset data to drift out of sync.
+  window.__LF_PRESETS__ = presets;
+  // The resolved control specs (name/type/min/max/step), for gate scripts that
+  // need to validate preset values against declared ranges without parsing HTML.
+  window.__LF_SPECS__ = allSpecs;
+  // The live value object, for gate scripts. Same reference the panel mutates.
+  window.__LF_VALUES__ = values;
+  // The write path itself, for gate scripts that need to drive controls with
+  // no DOM query at all — e.g. tools/audit-controls.mjs, which otherwise
+  // depends on positional row indices no future widget need honour.
+  window.__LF_PANEL__ = { setValue };
+
+  // Highest precedence on load: an explicit ?preset= beats saved localStorage,
+  // which beats the piece's defaults. Applied after every row exists so the
+  // inputs are there to update. An unknown name is ignored deliberately — a
+  // stale shared link should open the piece, not break it.
+  const requested = new URLSearchParams(location.search).get('preset');
+  if (requested && requested in presets) {
+    applyValues(presets[requested]);
+    setActiveChip(requested);
+  }
+
+  return {
+    values,
+    el: panel,
+    setValue,
+    addControl(spec) {
+      spec.kind = kindOf(spec);
+      specByName[spec.name] = spec;
+      allSpecs.push(spec);
+      defaults[spec.name] = spec.default;
+      // Route through setValue — THE write path (see above) — rather than
+      // writing `values` directly. setValue's own render() optional-chains
+      // through `controllers[name]` (undefined until buildRow below runs),
+      // so calling it first is a harmless no-op render and leaves `values`
+      // holding the exact number buildRow then reads for the row's initial
+      // DOM state. Same precedence `{ ...defaults, ...saved.values }` uses
+      // at panel construction: a value already in `values` (e.g. restored
+      // from localStorage before this control existed) wins over the spec's
+      // own default, never silently overwritten.
+      setValue(spec.name, spec.name in values ? values[spec.name] : spec.default);
+      buildRow(spec);
+    },
+  };
+}
+
+
+// --- inlined: ../../shared/anim.js ---
+// shared/anim.js
+
+// Max per-frame dt (seconds) after a tab-switch/GC stall, so a single huge
+// frame doesn't fling particles across the canvas. Ported from
+// cc-webgl/src/core/FrameScheduler.ts's DT_CLAMP_SECONDS.
+const ANIM_DT_CLAMP_SECONDS = 0.1;
+
+function createLoop({ onFrame, speed = 1 }) {
+  let running = false;
+  let paused = false;
+  let lastTime = 0;
+  let elapsed = 0;
+  let rafId = null;
+  let currentSpeed = speed;
+
+  function tick(now) {
+    if (!running || paused) return;
+    const rawDt = lastTime ? (now - lastTime) / 1000 : 0;
+    const clampedDt = Math.min(Math.max(rawDt, 0), ANIM_DT_CLAMP_SECONDS);
+    lastTime = now;
+    const scaledDt = clampedDt * currentSpeed;
+    elapsed += scaledDt;
+    onFrame(scaledDt, elapsed);
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined') return;
+    if (document.hidden) {
+      paused = true;
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    } else if (running && paused) {
+      paused = false;
+      // Reset the sentinel instead of computing a real dt, so resume doesn't
+      // produce a giant catch-up frame — same reasoning as start()'s reset.
+      lastTime = 0;
+      rafId = requestAnimationFrame(tick);
+    }
+  }
+
+  return {
+    start() {
+      if (running) return;
+      running = true;
+      paused = false;
+      lastTime = 0;
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+      }
+      rafId = requestAnimationFrame(tick);
+    },
+    stop() {
+      running = false;
+      paused = false;
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    },
+    setSpeed(n) {
+      currentSpeed = n;
+    },
+    get isRunning() {
+      return running;
+    },
+  };
+}
+
+
+// --- inlined: ../../shared/noise.js ---
+// shared/noise.js
+// Minimal 2D simplex noise, no dependencies. Adapted from the public-domain
+// reference algorithm (Stefan Gustavson).
+
+const GRAD = [
+  [1, 1], [-1, 1], [1, -1], [-1, -1],
+  [1, 0], [-1, 0], [1, 0], [-1, 0],
+  [0, 1], [0, -1], [0, 1], [0, -1],
+];
+
+function buildPermutation(seed = 1337) {
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  let s = seed;
+  const rand = () => {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
+  for (let i = 255; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [p[i], p[j]] = [p[j], p[i]];
+  }
+  const perm = new Uint8Array(512);
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+  return perm;
+}
+
+const perm = buildPermutation();
+
+function dot(g, x, y) {
+  return g[0] * x + g[1] * y;
+}
+
+const F2 = 0.5 * (Math.sqrt(3) - 1);
+const G2 = (3 - Math.sqrt(3)) / 6;
+
+function simplex2(xin, yin) {
+  const s = (xin + yin) * F2;
+  const i = Math.floor(xin + s);
+  const j = Math.floor(yin + s);
+  const t = (i + j) * G2;
+  const X0 = i - t;
+  const Y0 = j - t;
+  const x0 = xin - X0;
+  const y0 = yin - Y0;
+
+  let i1, j1;
+  if (x0 > y0) { i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
+
+  const x1 = x0 - i1 + G2;
+  const y1 = y0 - j1 + G2;
+  const x2 = x0 - 1 + 2 * G2;
+  const y2 = y0 - 1 + 2 * G2;
+
+  const ii = i & 255;
+  const jj = j & 255;
+  const gi0 = perm[ii + perm[jj]] % 12;
+  const gi1 = perm[ii + i1 + perm[jj + j1]] % 12;
+  const gi2 = perm[ii + 1 + perm[jj + 1]] % 12;
+
+  let n0 = 0, n1 = 0, n2 = 0;
+
+  let t0 = 0.5 - x0 * x0 - y0 * y0;
+  if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(GRAD[gi0], x0, y0); }
+
+  let t1 = 0.5 - x1 * x1 - y1 * y1;
+  if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(GRAD[gi1], x1, y1); }
+
+  let t2 = 0.5 - x2 * x2 - y2 * y2;
+  if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(GRAD[gi2], x2, y2); }
+
+  return 70 * (n0 + n1 + n2);
+}
+
+
+// --- inlined: ../../shared/current.js ---
+// current.js — the page current, version 1.
+//
+// A contract between independent things that move on the same page, so that
+// they move in the same current: a field of lines drawn on a 2D canvas and a
+// form made of particles in WebGL, for instance. Neither imports the other.
+// Each joins the one object this module keeps on `globalThis`, publishes what
+// it knows, and reads what the others published.
+//
+// THIS FILE IS SHARED VERBATIM between linefield (`shared/current.js`) and
+// Forma (`src/bridge/current.js`). Both repos pin its SHA-256 in a test; a
+// change must land in both, and anything that changes meaning must bump
+// CURRENT_VERSION (two different versions on one page ignore each other).
+//
+// Its top-level names all start with `current`/`CURRENT_`: linefield's bake
+// inlines every shared module into one script, where a common name would
+// collide. No imports, no state outside the one object, nothing drawn, and no
+// listeners at all until a second member joins: something alone on a page
+// behaves exactly as if this file did not exist.
+//
+// Everything is in CSS pixels of the viewport ("client" coordinates, y down),
+// the one space every element on a page shares.
+//
+//   pointer  { x, y, active }            the cursor, wherever it is on the page
+//   cursor   { mode, strength, reach }   what the cursor does to matter:
+//            mode 'push' | 'attract' | 'vortex' | 'scatter' | 'wake' | 'off',
+//            strength 0..1.5, reach in px (the falloff radius)
+//   body     { x, y, r, disperse, form } an object sitting in the field:
+//            centre and radius in px, disperse 0 (whole) .. 1 (fully apart),
+//            form 'solid' | 'liquid' | 'gas'
+//   palette  { a, b, dark, name }        two colour stops as [r, g, b] 0..255,
+//            dark true for light marks on a dark ground, name an optional
+//            preset from CURRENT_PRESETS
+//   field    { sample(x, y, t, out) }    the flow: writes a direction into
+//            out[0], out[1] (y down), length 0..1 where 1 is the publisher's
+//            own full speed, and returns out. Must be cheap and must not
+//            allocate: it is called hundreds of times a frame.
+
+const CURRENT_VERSION = 1;
+const CURRENT_CHANNELS = ['cursor', 'body', 'palette', 'field'];
+/** Preset names that mean the same intent on both sides. */
+const CURRENT_PRESETS = ['whisper', 'ink', 'neon', 'drift', 'dense'];
+/** Cursor modes that mean the same thing on both sides. */
+const CURRENT_CURSOR_MODES = ['push', 'attract', 'vortex', 'scatter', 'wake', 'off'];
+
+const CURRENT_KEY = '__pageCurrent__';
+
+function createCurrent() {
+  const members = new Map(); // id -> name
+  const owners = {}; // channel -> member id
+  let nextId = 1;
+  let listening = false;
+
+  const current = {
+    version: CURRENT_VERSION,
+    pointer: { x: 0, y: 0, active: false },
+    cursor: null,
+    body: null,
+    palette: null,
+    field: null,
+
+    /** Seconds on a clock every member shares. */
+    now() {
+      return performance.now() / 1000;
+    },
+
+    /** Names of the members on the page right now. */
+    get members() {
+      return [...members.values()];
+    },
+
+    /** True while a member called `name` is on the page. */
+    has(name) {
+      for (const n of members.values()) if (n === name) return true;
+      return false;
+    },
+
+    /** Joins the current. Publish through the returned handle, and `leave()`
+     * when torn down: that clears whatever this member had published. */
+    join(name) {
+      const id = nextId++;
+      members.set(id, String(name));
+      listen();
+      return {
+        name: String(name),
+        /** True while a member with another name is on the page. A member
+         * that is alone should behave as if there were no current. */
+        get accompanied() {
+          for (const [other, n] of members) if (other !== id && n !== name) return true;
+          return false;
+        },
+        /** Sets a channel (see the list at the top), or clears it with null.
+         * The last publisher owns the channel. */
+        publish(channel, value) {
+          if (!CURRENT_CHANNELS.includes(channel) || !members.has(id)) return;
+          if (value == null) {
+            if (owners[channel] === id) { current[channel] = null; delete owners[channel]; }
+            return;
+          }
+          current[channel] = value;
+          owners[channel] = id;
+        },
+        leave() {
+          if (!members.delete(id)) return;
+          for (const channel of CURRENT_CHANNELS) {
+            if (owners[channel] === id) { current[channel] = null; delete owners[channel]; }
+          }
+          listen();
+        },
+      };
+    },
+
+    /** What the cursor alone does at a point: adds to `out` ([vx, vy], y down)
+     * and returns it. Push, Attract and Vortex move things; the other modes
+     * break a form apart where it stands and add nothing here. */
+    cursorAt(x, y, out) {
+      const cursor = current.cursor;
+      const p = current.pointer;
+      if (!cursor || !p.active || !(cursor.reach > 0)) return out;
+      const mode = cursor.mode;
+      if (mode !== 'push' && mode !== 'attract' && mode !== 'vortex') return out;
+      const dx = x - p.x, dy = y - p.y;
+      const d2 = dx * dx + dy * dy;
+      const fall = Math.exp(-d2 / (cursor.reach * cursor.reach)) * (cursor.strength ?? 1);
+      if (fall < 1e-3) return out;
+      const d = Math.sqrt(d2) || 1;
+      const ax = dx / d, ay = dy / d; // away from the cursor
+      if (mode === 'push') { out[0] += ax * fall; out[1] += ay * fall; }
+      else if (mode === 'attract') {
+        const near = Math.min(1, d / (cursor.reach * 0.3)); // settle at the cursor, don't overshoot
+        out[0] -= ax * fall * near; out[1] -= ay * fall * near;
+      } else { // vortex: around the cursor, drawn slightly in
+        out[0] += (ay * 0.75 - ax * 0.15) * fall;
+        out[1] += (-ax * 0.75 - ay * 0.15) * fall;
+      }
+      return out;
+    },
+
+    /** The flow at a point: the published field plus what the cursor does
+     * there. Lines and particles that both follow this move together.
+     * `t` is `now()`; a publisher that animates on its own clock may ignore
+     * it. Writes into and returns `out`. */
+    flowAt(x, y, t, out) {
+      out[0] = 0; out[1] = 0;
+      const field = current.field;
+      if (field) field.sample(x, y, t, out);
+      return current.cursorAt(x, y, out);
+    },
+  };
+
+  // One pointer for the page, tracked only while there is company: an overlay
+  // on top of a canvas would otherwise hide the cursor from whatever is under it.
+  function onMove(e) { const p = current.pointer; p.x = e.clientX; p.y = e.clientY; p.active = true; }
+  function onGone() { current.pointer.active = false; }
+  function listen() {
+    if (typeof addEventListener !== 'function') return;
+    const want = new Set(members.values()).size > 1;
+    if (want === listening) return;
+    listening = want;
+    if (want) {
+      addEventListener('pointermove', onMove, { passive: true });
+      addEventListener('pointerdown', onMove, { passive: true });
+      addEventListener('blur', onGone);
+      document.documentElement.addEventListener('pointerleave', onGone);
+    } else {
+      removeEventListener('pointermove', onMove);
+      removeEventListener('pointerdown', onMove);
+      removeEventListener('blur', onGone);
+      document.documentElement.removeEventListener('pointerleave', onGone);
+      current.pointer.active = false;
+    }
+  }
+
+  return current;
+}
+
+/** The page's one current. Another copy of this file, loaded by something
+ * else on the page, returns the same object. */
+function pageCurrent() {
+  const existing = globalThis[CURRENT_KEY];
+  if (existing) {
+    // A different version is a different contract: don't half-understand it.
+    return existing.version === CURRENT_VERSION ? existing : createCurrent();
+  }
+  const made = createCurrent();
+  Object.defineProperty(globalThis, CURRENT_KEY, { value: made, configurable: true });
+  return made;
+}
+
+
+// --- inlined: ../../shared/companion.js ---
+// shared/companion.js
+// A piece's side of the page current (shared/current.js): what a piece needs
+// when a Forma object shares its page. Everything here works in the piece's
+// own canvas pixels; the current itself speaks viewport pixels.
+//
+// Alone on a page (every gallery page, thumbnail, and plain baked export)
+// `step()` returns null, nothing is published, and the piece must draw
+// exactly what it draws without this module.
+
+function createCompanion({ canvas }) {
+  const current = pageCurrent();
+  const me = current.join('linefield');
+  // Canvas px = (client px - origin) * scale.
+  const map = { left: 0, top: 0, sx: 1, sy: 1 };
+  // The object in the field, eased so it arrives and leaves without a snap.
+  const body = { x: 0, y: 0, r: 0, disperse: 0, form: 'solid', presence: 0 };
+  const scratch = [0, 0];
+  let lastT = 0;
+  let published = false;
+
+  function measure() {
+    const r = canvas.getBoundingClientRect();
+    map.left = r.left; map.top = r.top;
+    map.sx = r.width ? canvas.width / r.width : 1;
+    map.sy = r.height ? canvas.height / r.height : 1;
+  }
+
+  return {
+    /** Call first thing every frame. Returns the object sharing the page, in
+     * canvas px ({ x, y, r, disperse, form, presence 0..1 }), or null when
+     * the piece is alone. */
+    step() {
+      const now = performance.now();
+      const dt = lastT ? Math.min((now - lastT) / 1000, 0.1) : 0;
+      lastT = now;
+      const there = me.accompanied ? current.body : null;
+      if (!there && body.presence <= 0) return null;
+      measure();
+      const k = Math.min(1, dt * 5);
+      if (there) {
+        const x = (there.x - map.left) * map.sx, y = (there.y - map.top) * map.sy, r = there.r * map.sx;
+        if (body.presence <= 0) { body.x = x; body.y = y; body.r = r; body.disperse = there.disperse; }
+        else {
+          body.x += (x - body.x) * k; body.y += (y - body.y) * k; body.r += (r - body.r) * k;
+          body.disperse += (there.disperse - body.disperse) * Math.min(1, dt * 8);
+        }
+        body.form = there.form;
+      }
+      body.presence += ((there ? 1 : 0) - body.presence) * Math.min(1, dt * 2.5);
+      if (!there && body.presence < 0.002) { body.presence = 0; return null; }
+      return body;
+    },
+
+    /** Publishes this piece's flow while it has company: `fn(x, y, out)` in
+     * canvas px, writing a direction of length 0..1 into `out`. */
+    field(fn) {
+      if (!me.accompanied) {
+        if (published) { me.publish('field', null); me.publish('palette', null); published = false; }
+        return;
+      }
+      if (published) return;
+      published = true;
+      me.publish('field', {
+        sample(x, y, t, out) {
+          fn((x - map.left) * map.sx, (y - map.top) * map.sy, out);
+          return out;
+        },
+      });
+    },
+
+    /** Publishes the piece's two colour stops ([r, g, b] 0..255). */
+    palette(a, b, dark, name = null) {
+      if (!me.accompanied) return;
+      const p = current.palette;
+      if (p && p.owner === me && p.a[0] === a[0] && p.a[1] === a[1] && p.a[2] === a[2]
+        && p.b[0] === b[0] && p.b[1] === b[1] && p.b[2] === b[2] && p.dark === dark) return;
+      me.publish('palette', { a: [...a], b: [...b], dark, name, owner: me });
+    },
+
+    /** What the cursor does at a canvas point, as a direction of length 0..1
+     * (zero when alone). Returns a shared scratch array: read it at once. */
+    cursor(x, y) {
+      scratch[0] = 0; scratch[1] = 0;
+      if (!me.accompanied) return scratch;
+      return current.cursorAt(x / map.sx + map.left, y / map.sy + map.top, scratch);
+    },
+
+    destroy() { me.leave(); },
+  };
+}
+
+
+// --- inlined: ../../shared/export.js ---
+// shared/export.js
+
+function download(filename, blobOrUrl, mime) {
+  const url = blobOrUrl instanceof Blob ? URL.createObjectURL(blobOrUrl) : blobOrUrl;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  if (blobOrUrl instanceof Blob) URL.revokeObjectURL(url);
+}
+
+function exportPng(canvas, { multiplier = 1 } = {}) {
+  if (multiplier === 1) {
+    canvas.toBlob((blob) => download('linefield.png', blob), 'image/png');
+    return;
+  }
+  const scaled = document.createElement('canvas');
+  scaled.width = canvas.width * multiplier;
+  scaled.height = canvas.height * multiplier;
+  const ctx = scaled.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(canvas, 0, 0, scaled.width, scaled.height);
+  scaled.toBlob((blob) => download('linefield.png', blob), 'image/png');
+}
+
+// `texts` is optional and additive — glyph-mark pieces (matrix-code) pass
+// SVG native <text> elements instead of polylines, since a glyph has no
+// meaningful line-segment geometry to export. Stroke-path pieces never pass
+// it, so their output is byte-identical to before this option existed.
+function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [], circles = [] } = {}) {
+  const polylines = paths
+    .map((pts) => {
+      const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+      return `<polyline points="${pointsAttr}" fill="none" stroke="black" stroke-width="1" />`;
+    })
+    .join('\n');
+
+  const textEls = texts
+    .map(({ x, y, ch, size, fontFamily, anchor, baseline, rotation, strokeWidth }) => {
+      const safeCh = String(ch).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const safeFont = String(fontFamily || 'monospace').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const placement = `${['start', 'middle', 'end'].includes(anchor) ? ` text-anchor="${anchor}"` : ''}${['central', 'middle', 'alphabetic', 'hanging'].includes(baseline) ? ` dominant-baseline="${baseline}"` : ''}${Number.isFinite(rotation) ? ` transform="rotate(${rotation} ${x} ${y})"` : ''}`;
+      const stroke = Number.isFinite(strokeWidth) && strokeWidth > 0 ? ` stroke="black" stroke-width="${strokeWidth}"` : '';
+      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${safeFont}" font-size="${size.toFixed(2)}" fill="black"${placement}${stroke}>${safeCh}</text>`;
+    })
+    .join('\n');
+
+  // Filled-mark pieces supply already-transformed corners; existing path
+  // and text callers retain their exact serialization when this is empty.
+  const polygonEls = polygons.map(({ points, fill = 'black', opacity = 1 }) => {
+    const pointsAttr = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  // Halftone pieces pass filled dots as circles. Every other caller leaves
+  // this empty, so its serialization is byte-identical to before.
+  const circleEls = circles.map(({ cx, cy, r, fill = 'black', opacity = 1 }) => {
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls, circleEls].filter(Boolean).join('\n');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  download('linefield.svg', blob);
+}
+
+async function exportSource({ filename = 'linefield-source.html' } = {}) {
+  const url = location.href.split(/[?#]/)[0];
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`exportSource: could not fetch source (${res.status})`);
+  const blob = await res.blob();
+  download(filename, blob);
+  return blob;
+}
+
+// The piece's own import statements are the registration. A hand-maintained
+// list is a silent-failure surface: omit an entry and the baked file is
+// valid, loads without error, and renders nothing. That shipped once.
+const SHARED_IMPORT_RE =
+  /^\s*import\s*\{[^}]*\}\s*from\s*['"](\.\.\/\.\.\/shared\/[^'"]+\.js)['"];?\s*$/gm;
+
+// A shared module importing ANOTHER shared module (e.g. controls.js reading
+// hexToHue from color.js) addresses it as './color.js' — same directory,
+// different relative base than the piece's '../../shared/color.js'. Matched
+// separately and normalised back to the piece-style path below so the same
+// `seen` dedupe applies to both forms of the same file.
+const INNER_SHARED_IMPORT_RE =
+  /^\s*import\s*\{[^}]*\}\s*from\s*['"]\.\/([^'"]+\.js)['"];?\s*$/gm;
+
+function stripExports(src) {
+  // `export function foo` / `export const foo` -> drop the `export ` keyword.
+  return src.replace(/^export\s+/gm, '');
+}
+
+function stripInnerImports(src) {
+  return src.replace(INNER_SHARED_IMPORT_RE, '');
+}
+
+// Topological sort (post-order DFS) over the shared-module import graph, not
+// just the piece's own top-level imports, and NOT discovery (BFS) order.
+// Scanning only the piece script is exactly the hand-maintained-list failure
+// this function's own comment already warns about, one level removed: a
+// shared module's OWN imports were invisible to it, so a new cross-shared-
+// module import survived verbatim into a classic (non-module) inline script.
+//
+// BFS discovery order is not enough once a shared module reads another
+// shared module's binding at TOP LEVEL (module-evaluation time), not just
+// inside a function body called later. controls.js is always a piece's
+// first import, so BFS always placed it first in the concatenated output —
+// fine for `hexToHue` (from color.js), which is only called inside
+// `setValue`, deferred to call time. A shared module that reads an imported
+// binding at top level instead must have that dependency emitted first.
+//
+// A post-order DFS guarantees every module's dependencies appear before it
+// in the emitted output, independent of whether the consumer reads the
+// dependency's binding at top level or lazily inside a function — the
+// general fix, not a per-call-site workaround. See
+// skills/building-generative-backgrounds/SKILL.md, "Inlining and bundling".
+async function inlineSharedModules(pieceScriptSrc) {
+  const strippedPieceSrc = pieceScriptSrc.replace(SHARED_IMPORT_RE, '');
+  const initial = [...pieceScriptSrc.matchAll(SHARED_IMPORT_RE)].map((m) => m[1]);
+  if (!initial.length) {
+    throw new Error('bakeHtml: the piece imports no shared modules — refusing to bake a file that would render blank');
+  }
+
+  const srcByPath = new Map();
+  const order = []; // post-order: a module's dependencies land before it
+  const done = new Set();
+  const visiting = new Set(); // cycle guard — a real cycle would recurse forever otherwise
+
+  async function visit(path) {
+    if (done.has(path)) return;
+    if (visiting.has(path)) {
+      throw new Error(`bakeHtml: circular shared-module import detected at ${path}`);
+    }
+    visiting.add(path);
+    const res = await fetch(path);
+    if (!res.ok) throw new Error(`bakeHtml: could not fetch ${path} (${res.status})`);
+    const src = await res.text();
+    srcByPath.set(path, src);
+    // Normalise './foo.js' found INSIDE a shared module to the same
+    // '../../shared/foo.js' form the piece-level regex produces, so a module
+    // reached both ways (e.g. color.js: directly by the piece, and via
+    // controls.js) is only ever inlined once.
+    const inner = [...src.matchAll(INNER_SHARED_IMPORT_RE)].map((m) => `../../shared/${m[1]}`);
+    for (const p of inner) await visit(p);
+    visiting.delete(path);
+    done.add(path);
+    order.push(path);
+  }
+
+  for (const path of initial) await visit(path);
+
+  const bodies = order.map((path) => {
+    const src = srcByPath.get(path);
+    return `// --- inlined: ${path} ---\n${stripInnerImports(stripExports(src))}`;
+  });
+
+  return `${bodies.join('\n\n')}\n\n// --- piece script ---\n${strippedPieceSrc}`;
+}
+
+async function bakeHtml({ sourceHtml, values }) {
+  const doc = new DOMParser().parseFromString(sourceHtml, 'text/html');
+  doc.querySelectorAll('[data-lf-panel]').forEach((el) => el.remove());
+
+  const pieceScript = doc.querySelector('script[type="module"]');
+  const pieceScriptSrc = pieceScript ? pieceScript.textContent : '';
+  if (pieceScript) pieceScript.remove();
+
+  const inlinedSrc = await inlineSharedModules(pieceScriptSrc);
+
+  const safeJson = JSON.stringify(values).replace(/</g, '\\u003c');
+  const inject = doc.createElement('script');
+  inject.textContent = `window.__LF_BAKED_VALUES__ = ${safeJson};\n${inlinedSrc}`;
+  doc.body.appendChild(inject);
+
+  const baked = `<!doctype html>\n${doc.documentElement.outerHTML}`;
+  const blob = new Blob([baked], { type: 'text/html' });
+  download('linefield-baked.html', blob);
+  return baked;
+}
+
+function describeForAI({ pieceName, values }) {
+  const parts = Object.entries(values)
+    .map(([k, v]) => `${k}=${typeof v === 'number' ? v.toFixed(2) : v}`)
+    .join(', ');
+  const text = `A generative line-art background piece called "${pieceName}", rendered on an HTML canvas with parameters: ${parts}.`;
+  if (navigator.clipboard) navigator.clipboard.writeText(text);
+  return text;
+}
+
+
+// --- inlined: ../../shared/resize.js ---
+// shared/resize.js
+//
+// Ported from cc-webgl/src/input/ResizeManager.ts's batch-then-evaluate
+// pattern: a ResizeObserver only sets a pending flag; the actual work runs
+// from `evaluate()`, which callers invoke once per frame tick (no own rAF).
+// Keeps the `clientWidth === 0 || clientHeight === 0` bail.
+
+/** onResize({ width, height, dpr, aspect }) is called from evaluate(), never
+ * from the ResizeObserver callback directly. */
+function createResizeBatcher(container, onResize, maxDPR = 2) {
+  let pending = true; // evaluate once on construction
+  let currentMaxDPR = maxDPR;
+
+  const observer = new ResizeObserver(() => {
+    pending = true;
+  });
+  observer.observe(container);
+
+  return {
+    setMaxDPR(next) {
+      currentMaxDPR = next;
+    },
+    // Call once per frame tick; only does work if a resize is pending.
+    evaluate() {
+      if (!pending) return;
+      pending = false;
+      const { clientWidth, clientHeight } = container;
+      if (clientWidth === 0 || clientHeight === 0) return;
+      const dpr = Math.min(window.devicePixelRatio, currentMaxDPR);
+      onResize({ width: clientWidth, height: clientHeight, dpr, aspect: clientWidth / clientHeight });
+    },
+    destroy() {
+      observer.disconnect();
+    },
+  };
+}
+
+
+// --- piece script ---
+
+
+
+
+
+
+
+  // flow-field — particles confined to one soft organic region around a
+  // quiet central void, trailing hairlines that gather brightness only
+  // where their paths happen to cross.
+  //
+  // Text-safe zone (default framing, Scale 1.75): the quiet centre, where
+  // the void sits; the field fills the rest of the canvas. At Scale 1 the
+  // field is a ring right of centre and the left third is clear instead.
+  // Anchor: the brightest braid, upper right of the void — checked by
+  // measuring the rendered brightest cluster, not assumed from the field's
+  // formula, since the noise-driven current doesn't distribute evenly.
+  const PIECE_ID = 'flow-field';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Base count deliberately modest — Density (up to 2x) is the loud knob.
+  // House-look ink 0.03-0.15 needed a real cut from the old 280/56-point-
+  // trail/0.045-fade version (which measured 0.27): fewer particles,
+  // shorter trails, and a full clear each frame (see drawFrame) so trails
+  // never accumulate brightness across frames under `lighter`, only within
+  // one frame where paths actually cross.
+  // The page current (shared/current.js): when a Forma object shares the
+  // page it sits in this piece's quiet void, and the flow is published so its
+  // particles ride the same current. Alone, none of this does anything.
+  const companion = createCompanion({ canvas });
+  const BASE_COUNT = 580;
+  const TRAIL_MAX = 40; // points captured per particle; also the ink budget
+  let particles = [];
+  let paths = [];
+
+  // Composition: one soft organic ring around a quiet central void — not a
+  // filled disc. Particles respawn the moment they drift into the void or
+  // off the ring's outer edge, so the hole in the middle stays genuinely
+  // empty instead of just thin.
+  const FOCUS = { x: 0.58, y: 0.46 };
+  const VOID_R = 0.10;   // true zero inside this normalized radius (the void)
+  const RING_PEAK = 0.22; // mask reaches 1 here
+  const RING_OUTER = 0.36; // true zero at/beyond this radius
+
+  function smoothstep(a, b, x) {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  }
+
+  // Framing: Scale sets how much of the frame the region spans. Below 1
+  // the whole ring (void included) shrinks in place toward a small,
+  // contained knot. Above 1 the centre slides to frame-centre and the outer
+  // edge opens into a wide ellipse at the frame's own aspect, so at 2 the
+  // field runs off every edge; the void grows far less than the ring, so it
+  // stays a quiet centre rather than becoming a hollow vignette. At Scale 1
+  // every factor is exactly 1 and every offset 0: the default is unchanged.
+  function frameOf(scale) {
+    const hi = Math.max(0, scale - 1);
+    const k = 1 + Math.min(0, scale - 1) * 0.45;
+    return {
+      x: FOCUS.x + hi * (0.5 - FOCUS.x),
+      y: FOCUS.y + hi * (0.5 - FOCUS.y),
+      ex: k * (1 + hi * 3.0),
+      ey: k * (1 + hi * 1.6),
+      v: k * (1 + hi * 0.6),
+      // More particles over more area, so the wide field isn't thinner.
+      count: k * (1 + hi * 1.2),
+    };
+  }
+
+  // With an object on the page, the void becomes the space that object
+  // occupies: centred on it and just clear of its edge, with the ring at its
+  // usual proportion around it. As the object comes apart (disperse -> 1) the
+  // void closes and the lines run through where it stood. `presence` eases
+  // the whole reframing in and out, so at 0 this returns `f` untouched.
+  function frameAround(f, body, width, height) {
+    if (!body) return f;
+    const r = Math.min(width, height);
+    const full = (body.r * 1.12) / (VOID_R * r);
+    const open = full * (1 - 0.8 * body.disperse);
+    const ring = Math.max(1, full * 0.78);
+    const k = body.presence;
+    const mix = (a, b) => a + (b - a) * k;
+    return {
+      x: mix(f.x, body.x / width),
+      y: mix(f.y, body.y / height),
+      ex: mix(f.ex, ring),
+      ey: mix(f.ey, ring),
+      v: mix(f.v, Math.max(0.05, open)),
+      count: mix(f.count, Math.min(2.4, Math.max(1, ring * 0.9))),
+    };
+  }
+  let liveFrame = null; // the frame last drawn, for the published field
+  let liveElapsed = 0;
+
+  function particleCount(values, f = frameOf(values.scale)) {
+    return Math.round(BASE_COUNT * values.density * f.count);
+  }
+
+  function maskValue(x, y, width, height, f) {
+    const r = Math.min(width, height);
+    const dx = (x - width * f.x) / r;
+    const dy = (y - height * f.y) / r;
+    // The void's inner edge is round; the outer edge is the framing ellipse.
+    const dv = Math.sqrt(dx * dx + dy * dy) / f.v;
+    if (dv <= VOID_R) return 0;
+    const ux = dx / f.ex, uy = dy / f.ey;
+    const de = Math.sqrt(ux * ux + uy * uy);
+    if (de >= RING_OUTER) return 0;
+    return smoothstep(VOID_R, RING_PEAK, dv) * (1 - smoothstep(RING_PEAK, RING_OUTER, de));
+  }
+
+  function sampleFocusPoint(width, height, f) {
+    const r = Math.min(width, height);
+    for (let i = 0; i < 8; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = Math.sqrt(Math.random()) * RING_OUTER * r;
+      const x = width * f.x + Math.cos(ang) * rad * f.ex;
+      const y = height * f.y + Math.sin(ang) * rad * f.ey;
+      if (x >= 0 && x <= width && y >= 0 && y <= height && maskValue(x, y, width, height, f) > 0) {
+        return { x, y };
+      }
+    }
+    return { x: width * f.x, y: Math.max(0, height * (f.y - RING_PEAK * f.ey)) };
+  }
+
+  function spawn(f) {
+    const spot = sampleFocusPoint(canvas.width, canvas.height, f);
+    return { x: spot.x, y: spot.y, trail: [] };
+  }
+
+  function seedParticles(values) {
+    const f = frameOf(values.scale);
+    particles = Array.from({ length: particleCount(values) }, () => spawn(f));
+  }
+
+  const PRESETS = {
+    whisper: { opacity: 0.9, stroke: 0.55, density: 0.4, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.2, density: 0.9, glow: 0 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1, saturation: 0.85, glow: 1.2 },
+    drift:   { opacity: 0.8, stroke: 0.75, density: 0.75, speed: 0.4, motion: 1.8 },
+    dense:   { opacity: 0.85, stroke: 0.9, density: 1.7, glow: 0.6 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: (name, value, values) => {
+      if (name === 'density') seedParticles(values);
+    },
+    extraControls: [
+      // Off by default: full trails are this piece's identity. On, each
+      // particle draws only its bright head — a sparser, dottier read.
+      { name: 'mode', label: 'Particle mode', type: 'checkbox', default: false, category: 'visual' },
+    ],
+    // Pinned deliberately, not inherited — keeps flow-field's hue TAKEN to
+    // the next contributor even if the shared defaults ever move.
+    // saturation: 0 per house look §1; colour lives in the neon preset.
+    defaults: { hue: 200, hueB: 280, saturation: 0, scale: 1.75, colorMode: 'gradient', colorA: '#00aaff', colorB: '#aa00ff' },
+  });
+  const currentValues = baked || panel.values;
+
+  function applyResize({ width, height }) {
+    canvas.width = width;
+    canvas.height = height;
+    seedParticles(currentValues);
+  }
+  // dpr fixed at 1: flow-field draws in CSS-pixel space (canvas.width ===
+  // window.innerWidth), and particle coords / exportPng's multiplier both
+  // assume that — a real devicePixelRatio backing store would break both.
+  const resizeBatcher = createResizeBatcher(document.body, applyResize, 1);
+  resizeBatcher.evaluate(); // sizes the canvas + seeds particles before the first frame
+
+  function fieldAngle(x, y, elapsed, values) {
+    const noiseScale = 0.002 * (0.2 + values.scale);
+    const n = simplex2(
+      x * noiseScale + elapsed * 0.05 * values.motion,
+      y * noiseScale + values.phase
+    );
+    // Give the noise a shared travelling current. Without it the field's
+    // local directions close into a vortex, which overlaps funnel's
+    // orbital read; this keeps the ribbons moving through the frame.
+    const wave = Math.sin(
+      (y / canvas.height) * Math.PI * 2.2 +
+      (x / canvas.width) * 1.4 +
+      elapsed * 0.05 * values.motion
+    );
+    const current = 0.45 + wave * 0.55;
+    return current + n * 0.9 + (values.angle * Math.PI) / 180;
+  }
+
+  // The flow as others on the page see it: the same direction the lines
+  // take, full strength in the ring and a slower drift outside it.
+  const CURSOR_PULL = 150; // px/s at the cursor's full strength
+  function publishedFlow(x, y, out) {
+    const a = fieldAngle(x, y, liveElapsed, currentValues);
+    const m = 0.35 + 0.65 * maskValue(x, y, canvas.width, canvas.height, liveFrame);
+    out[0] = Math.cos(a) * m;
+    out[1] = Math.sin(a) * m;
+  }
+
+  function drawFrame(dt, elapsed, values) {
+    const W = canvas.width, H = canvas.height;
+    const light = values.invert ? 0.14 : 0.86 - 0.24 * values.saturation;
+    const stopA = paletteHsl(values, 0);
+    const [r, g, b] = hslToRgb(stopA.h, stopA.s, light);
+    const stopB = paletteHsl(values, 1);
+    const [rB, gB, bB] = hslToRgb(stopB.h, stopB.s, light);
+
+    // Full clear, not a low-alpha fade: under `lighter` compositing (below)
+    // a partial fade would re-stroke nearly the same trail geometry on top
+    // of itself every frame and blow out to white. A full clear means ink
+    // coverage is exactly what this frame draws, not an unbounded
+    // accumulation across frames — reset to source-over for it regardless
+    // of what the previous frame left the context in.
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    ctx.lineCap = 'round';
+
+    paths = [];
+    // Hairline floor 0.4-0.9px at stroke:1; slower than the old 260px/s —
+    // that number was tuned for a 2.5px stroke, and at this hairline width
+    // 90px/s already clears displacement-over-stroke-width by a wide margin.
+    const lineWidth = 0.4 + values.stroke * 0.5;
+    const baseAlpha = values.opacity * (values.invert ? 0.42 : 0.32);
+    const body = companion.step();
+    const f = frameAround(frameOf(values.scale), body, W, H);
+    liveFrame = f; liveElapsed = elapsed;
+    companion.field(publishedFlow);
+    companion.palette([r, g, b], [rB, gB, bB], !values.invert);
+    // Scale changes the count without a reseed, so dragging it tops up or
+    // trims the field instead of wiping every trail at once.
+    const want = particleCount(values, f);
+    while (particles.length < want) particles.push(spawn(f));
+    if (particles.length > want) particles.length = want;
+
+    for (const p of particles) {
+      // Mask read at the pre-move position: this frame's stroke belongs to
+      // where the particle currently is, not where it's about to land.
+      const m = maskValue(p.x, p.y, W, H, f);
+      const angle = fieldAngle(p.x, p.y, elapsed, values);
+      const speed = 90 * values.speed * (dt || 0.016);
+      // The cursor's pull, in the modes the object's own particles obey
+      // (zero unless an object shares the page).
+      const pull = companion.cursor(p.x, p.y);
+      const nx = p.x + Math.cos(angle) * speed + pull[0] * CURSOR_PULL * (dt || 0.016);
+      const ny = p.y + Math.sin(angle) * speed + pull[1] * CURSOR_PULL * (dt || 0.016);
+
+      if (m > 0) p.trail.push([p.x, p.y]);
+      if (p.trail.length > TRAIL_MAX) p.trail.shift();
+
+      p.x = nx;
+      p.y = ny;
+
+      // Respawn on leaving the canvas OR the mask (not the canvas alone) —
+      // otherwise the field advects particles back out to uniform coverage
+      // within a few seconds and the void/negative space collapses.
+      const outOfMask = maskValue(p.x, p.y, W, H, f) <= 0;
+      if (p.x < 0 || p.x > W || p.y < 0 || p.y > H || outOfMask) {
+        const spot = sampleFocusPoint(W, H, f);
+        p.x = spot.x;
+        p.y = spot.y;
+        p.trail = [];
+        continue;
+      }
+
+      if (p.trail.length < 2) continue;
+
+      // Tied to the field's own local direction instead of an arbitrary
+      // position/time sine — the colour is the flow, a compass rather than
+      // decorative banding unrelated to what's moving.
+      const mix = (Math.sin(angle) + 1) / 2;
+      const cr = (r + (rB - r) * mix) | 0;
+      const cg = (g + (gB - g) * mix) | 0;
+      const cb = (b + (bB - b) * mix) | 0;
+
+      const drawPoly = (pts) => {
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.stroke();
+      };
+
+      ctx.lineWidth = lineWidth;
+      if (values.mode) {
+        // Particle mode: only the bright head, a sparser dotty read.
+        const head = p.trail.slice(-4);
+        if (values.glow > 0) {
+          ctx.lineWidth = lineWidth + values.glow * 2.5;
+          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, baseAlpha * m * values.glow * 0.3)})`;
+          drawPoly(head);
+          ctx.lineWidth = lineWidth;
+        }
+        ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, baseAlpha * m * 1.8)})`;
+        drawPoly(head);
+        paths.push(head);
+      } else {
+        if (values.glow > 0) {
+          ctx.lineWidth = lineWidth + values.glow * 2.5;
+          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, baseAlpha * m * values.glow * 0.3)})`;
+          drawPoly(p.trail);
+          ctx.lineWidth = lineWidth;
+        }
+        ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, baseAlpha * m)})`;
+        drawPoly(p.trail);
+        // Brighter head on the last few points, so motion reads as a
+        // travelling mark rather than a static line.
+        const head = p.trail.slice(-6);
+        if (head.length > 1) {
+          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, baseAlpha * m * 1.6)})`;
+          drawPoly(head);
+        }
+        paths.push(p.trail.slice());
+      }
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      resizeBatcher.evaluate();
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script></body></html>
