@@ -401,8 +401,11 @@ two meet on the page rather than in one codebase.
 the composed scenes, running: the hero plays `scenes/<id>.html` (built at build time by
 `composedScenePages` in `app/vite.config.ts` with the same `composeScene` the export menu
 uses, from linefield bakes vendored in `app/linefield/`) in a frame, and three scene cards
-switch it. Under it: the three states (stills from `app/scripts/capture-home-stills.mjs`)
-and the three ways out. The frame is unloaded while the hero is off screen, and under
+switch it; the hero opens on a different scene each visit. Under it: the three states
+(metal; stills from `app/scripts/capture-home-stills.mjs`) and the three ways out. The
+scene backgrounds are taken from linefield's live downloads at build time, with the
+vendored copies as a fallback, and the deploy also runs daily, so changing, removing or
+improving a linefield piece reaches the homepage without a Forma change (app/README.md). The frame is unloaded while the hero is off screen, and under
 reduced motion a still stands in until asked. The editor is now its own chunk
 (`main.tsx`): the homepage loads 49 KB gzip of script instead of the editor's 259 KB.
 Removed with the old homepage: the `?variant=gallery` page, the homepage's viewer

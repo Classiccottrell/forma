@@ -49,7 +49,7 @@ await wide.close();
 const forms = { solid: { form: 'solid', disperse: 0 }, liquid: { form: 'liquid', disperse: 0.3 }, gas: { form: 'gas', disperse: 0.45 } };
 const square = await browser.newPage({ viewport: { width: 640, height: 640 } });
 for (const [name, matter] of Object.entries(forms)) {
-  const scene = { ...composition({ shapeId: 'soft-blob', materialId: process.env.FORM_MATERIAL ?? 'gold', environmentId: 'deep-space', matter: { ...matter, motion: 'manual', cursor: 'off' } }), atmosphere: { haze: 0.5, dust: 0.5 } };
+  const scene = { ...composition({ shapeId: 'soft-blob', materialId: process.env.FORM_MATERIAL ?? 'metal', environmentId: 'deep-space', matter: { ...matter, motion: 'manual', cursor: 'off' } }), atmosphere: { haze: 0.5, dust: 0.5 } };
   const snippet = generateEmbedCode(scene, { libraryUrl: `${ORIGIN}/embed/forma.js`, assetBase: `${ORIGIN}/`, height: '100vh', view: { fill: 0.5, azimuth: 24, elevation: 8 } });
   await square.setContent(`<!doctype html><body style="margin:0;background:#05060c">${snippet}</body>`, { waitUntil: 'load' });
   await square.waitForSelector('[data-forma-ready]', { state: 'attached', timeout: 90_000 });

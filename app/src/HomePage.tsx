@@ -9,6 +9,16 @@ const LINEFIELD_URL = 'https://classiccottrell.github.io/linefield/';
 const scenePage = (id: string) => `${BASE_URL}scenes/${id}.html`;
 const still = (name: string) => `${BASE_URL}home/${name}.jpg`;
 
+/** The hero opens on a different scene each visit: a random one other than the last
+ * shown (remembered in localStorage; without it, simply random). */
+const LAST_SCENE_KEY = 'forma-home-last-scene';
+function openingScene(): string {
+  let last: string | null = null;
+  try { last = localStorage.getItem(LAST_SCENE_KEY); } catch { /* storage blocked */ }
+  const pool = scenes.length > 1 ? scenes.filter((s) => s.id !== last) : scenes;
+  return pool[Math.floor(Math.random() * pool.length)]!.id;
+}
+
 const FORMS = [
   { id: 'solid', name: 'Solid', text: 'Holds its shape. Push further and the surface cracks away in patches.' },
   { id: 'liquid', name: 'Liquid', text: 'Melts, pools and runs back together.' },
@@ -22,18 +32,22 @@ const WAYS_OUT = [
 ] as const;
 
 /** The homepage: the composed scenes, running. The hero plays one scene page
- * (`scenes/<id>.html`, built by app/vite.config.ts) in a frame; the cards under it switch
- * scenes. The frame is unloaded while the hero is off screen (hiding it would leave both
+ * (`scenes/<id>.html`, built by app/vite.config.ts) in a frame, a random one per visit;
+ * the cards under it switch scenes. The frame is unloaded while the hero is off screen (hiding it would leave both
  * animation loops running; the still behind it covers the reload), and under reduced
  * motion the still stands in until the visitor asks for the live scene. This page loads none of the
  * 3D code itself. */
 export default function HomePage() {
   const reducedMotion = useReducedMotion();
-  const [sceneId, setSceneId] = useState(scenes[0]!.id);
+  const [sceneId, setSceneId] = useState(openingScene);
   const [live, setLive] = useState(!reducedMotion);
   const [inView, setInView] = useState(true);
   const stageRef = useRef<HTMLDivElement>(null);
   const scene = scenes.find((s) => s.id === sceneId) ?? scenes[0]!;
+
+  useEffect(() => {
+    try { localStorage.setItem(LAST_SCENE_KEY, sceneId); } catch { /* storage blocked */ }
+  }, [sceneId]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -70,8 +84,8 @@ export default function HomePage() {
           </div>
           <div className="hp-hero-copy">
             <p className="hp-eyebrow">Forma · a shape lab in the browser</p>
-            <h1 id="hp-title">Shapes that come apart, <i>and come back.</i></h1>
-            <p className="hp-lede">Pick a form and a finish. Make it solid, liquid or gas. Then set it loose on your own page, alone or inside a field of lines.</p>
+            <h1 id="hp-title">3D shapes your visitors <i>can't stop poking.</i></h1>
+            <p className="hp-lede">They melt, scatter and pull themselves back together under the cursor. Pick a shape and a finish, then drop it into any page, alone or inside a field of lines.</p>
             <div className="hp-actions">
               <a className="hp-button" href={EDITOR_PATH}>Open the editor <span aria-hidden="true">→</span></a>
               {!live && <button type="button" className="hp-button hp-button--quiet" onClick={() => setLive(true)}>Run the live scene</button>}
@@ -110,7 +124,7 @@ export default function HomePage() {
           <ul className="hp-forms">
             {FORMS.map((form) => (
               <li key={form.id}>
-                <img src={still(`form-${form.id}`)} alt={`A gold blob as a ${form.id}`} width={640} height={640} loading="lazy" />
+                <img src={still(`form-${form.id}`)} alt={`A metal blob as a ${form.id}`} width={640} height={640} loading="lazy" />
                 <h3>{form.name}</h3>
                 <p>{form.text}</p>
               </li>

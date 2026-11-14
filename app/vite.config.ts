@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const formaVersion: string = JSON.parse(readFileSync(resolve(__dirname, '../package.json'), 'utf-8')).version;
 
@@ -32,14 +32,41 @@ function hostEmbedBundle(): Plugin {
 
 interface ScenePage { id: string; name: string; blurb: string; piece: string; html: string }
 
+/** Where linefield publishes its baked pieces. The export menu reads the same place. */
+const LINEFIELD_DOWNLOADS = process.env.VITE_LINEFIELD_DOWNLOADS ?? 'https://classiccottrell.github.io/linefield/downloads/';
+
+/** A linefield piece's baked page, as published now. linefield owns its backgrounds, so
+ * the build takes them from its live downloads: change or improve a piece in linefield
+ * and the next Forma build (every push, and daily: deploy-gh-pages.yml) carries it.
+ * The copy in `app/linefield/` is the fallback for an offline build, or a piece that
+ * has been removed or broken upstream; `npm run linefield:refresh` updates those copies.
+ * FORMA_LINEFIELD=vendored skips the network. */
+async function linefieldBake(piece: string, isBake: (html: string) => boolean): Promise<{ html: string; from: string }> {
+  const vendored = resolve(__dirname, 'linefield', `${piece}.html`);
+  if (process.env.FORMA_LINEFIELD !== 'vendored') {
+    const url = new URL(`${piece}.html`, LINEFIELD_DOWNLOADS).href;
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      const html = response.ok ? await response.text() : '';
+      if (isBake(html)) return { html, from: url };
+      console.warn(`[forma] ${url} is ${response.ok ? 'not a linefield bake' : `HTTP ${response.status}`}; using app/linefield/${piece}.html`);
+    } catch (error) {
+      console.warn(`[forma] could not fetch ${url} (${(error as Error).message}); using app/linefield/${piece}.html`);
+    }
+  }
+  if (!existsSync(vendored)) throw new Error(`[forma] no linefield bake for "${piece}": not published, and no app/linefield/${piece}.html`);
+  return { html: readFileSync(vendored, 'utf-8'), from: `app/linefield/${piece}.html` };
+}
+
 /** Builds the composed showcase scenes as real pages, `scenes/<id>.html`: a linefield
  * piece behind a Forma object, made with the same `composeScene` the export menu uses.
  * The homepage plays them in its hero, and each is a page to link to on its own.
  *
- * The linefield bakes are vendored in `app/linefield/` (copies of
- * https://classiccottrell.github.io/linefield/downloads/<piece>.html; refresh them by
- * downloading again). The scene pages link the hosted bundle next to them, so the
- * library build must exist, as for `hostEmbedBundle`.
+ * Which scenes exist, and which linefield piece and settings each uses, is
+ * `composedScenes()` in src/content/composedScenes.ts: add, remove or re-point a scene
+ * there and the pages and the homepage follow. The backgrounds themselves come from
+ * linefield (see `linefieldBake`). The scene pages link the hosted bundle next to them,
+ * so the library build must exist, as for `hostEmbedBundle`.
  *
  * `virtual:forma-scenes` gives the homepage the scenes' names and blurbs without it
  * importing the library (and with it three.js). */
@@ -49,11 +76,12 @@ function composedScenePages(): Plugin {
   const build = async (): Promise<ScenePage[]> => {
     const dist = (file: string) => import(/* @vite-ignore */ pathToFileURL(resolve(__dirname, '../dist', file)).href);
     const content = await dist('content/index.js');
-    const { composeScene } = await dist('runtime/compose.js');
+    const { composeScene, isLinefieldBake } = await dist('runtime/compose.js');
     content.registerAllContent();
-    return content.composedScenes().map((scene: { id: string; name: string; blurb: string; piece: string; linefield: Record<string, unknown>; composition: unknown; view: unknown; flowGain: number }) => {
-      const bake = readFileSync(resolve(__dirname, 'linefield', `${scene.piece}.html`), 'utf-8');
-      const html = composeScene(bake, scene.composition, {
+    return Promise.all(content.composedScenes().map(async (scene: { id: string; name: string; blurb: string; piece: string; linefield: Record<string, unknown>; composition: unknown; view: unknown; flowGain: number }) => {
+      const bake = await linefieldBake(scene.piece, isLinefieldBake);
+      console.log(`[forma] scene ${scene.id}: ${scene.piece} from ${bake.from}`);
+      const html = composeScene(bake.html, scene.composition, {
         libraryUrl: `../embed/forma.v${formaVersion}.js`,
         assetBase: '../',
         view: scene.view,
@@ -64,7 +92,7 @@ function composedScenePages(): Plugin {
       // Without its own icon a scene page asks the site root for one, which 404s on a project site.
       const page = html.replace('</head>', '<link rel="icon" type="image/svg+xml" href="../favicon.svg">\n</head>');
       return { id: scene.id, name: scene.name, blurb: scene.blurb, piece: content.LINEFIELD_PIECES[scene.piece].title, html: page };
-    });
+    }));
   };
   const get = () => (pages ??= build());
   return {

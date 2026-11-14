@@ -25,6 +25,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # The homepage's composed scenes take their backgrounds from linefield's live
+  # downloads at build time (app/vite.config.ts), so a daily build carries linefield
+  # changes without a Forma push. Run the workflow by hand for an immediate update.
+  schedule:
+    - cron: '17 9 * * *'
 
 permissions:
   contents: read
