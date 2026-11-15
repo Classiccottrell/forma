@@ -1,0 +1,160 @@
+/* Homepage. Layout: a full-bleed live scene with the copy on its darkened left side
+   (the scenes keep their object right of centre), then three plain sections on the
+   same near-black. Hairlines and the one green accent, as in the editor and linefield.
+   Tokens come from global.css. */
+.hp {
+  --hp-gutter: max(20px, env(safe-area-inset-left, 0px), 5vw);
+  --hp-line: rgba(255, 255, 255, 0.1);
+  --hp-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* The scroller, and the box the nav is placed in, so the nav scrolls away with the hero. */
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--hp-sans);
+  font-size: 16px;
+  line-height: 1.55;
+}
+.hp a { color: inherit; }
+.hp :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }
+
+.hp-nav {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px var(--hp-gutter);
+}
+.hp-nav .brand { margin: 0; text-decoration: none; }
+.hp-nav nav { display: flex; align-items: center; gap: clamp(14px, 3vw, 28px); font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+.hp-nav nav a { text-decoration: none; color: var(--text-dim); padding-block: 6px; }
+.hp-nav nav a:hover { color: var(--text); }
+.hp-nav nav .hp-nav-cta { color: var(--text); border-bottom: 1px solid var(--accent-text); }
+
+/* Hero */
+.hp-hero {
+  position: relative;
+  display: grid;
+  align-content: center;
+  min-height: min(88vh, 820px);
+  padding: 110px var(--hp-gutter) 84px;
+  isolation: isolate;
+  border-bottom: 1px solid var(--hp-line);
+}
+.hp-stage {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: #0a0a0d center / cover no-repeat;
+}
+.hp-frame { display: block; width: 100%; height: 100%; border: 0; }
+/* Darkens the left so the copy reads over moving lines; the object's side stays clear.
+   pointer-events: none keeps the scene under it reachable. */
+.hp-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(10, 10, 13, 0.94) 0%, rgba(10, 10, 13, 0.86) 28%, rgba(10, 10, 13, 0) 52%);
+}
+.hp-hero-copy { max-width: 31rem; pointer-events: none; }
+.hp-hero-copy a, .hp-hero-copy button { pointer-events: auto; }
+.hp-eyebrow { margin: 0 0 18px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-text); }
+.hp h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(44px, 6.4vw, 92px); line-height: 0.96; letter-spacing: -0.03em; text-wrap: balance; }
+.hp h1 i { color: var(--accent-text); }
+.hp-lede { margin: 24px 0 30px; max-width: 27rem; color: #c9c9d2; }
+.hp-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.hp-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  padding: 13px 18px;
+  border: 1px solid var(--accent-text);
+  background: var(--accent-text);
+  color: #0a0a0d;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.hp a.hp-button { color: #0a0a0d; }
+.hp-button:hover { background: #b9dec7; }
+.hp-button--quiet { background: transparent; color: var(--text); }
+.hp-button--quiet:hover { background: rgba(156, 205, 175, 0.14); }
+.hp-now {
+  position: absolute;
+  left: var(--hp-gutter);
+  right: var(--hp-gutter);
+  bottom: 22px;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+.hp-now span:first-child { color: var(--text-dim); letter-spacing: 0.08em; text-transform: uppercase; }
+.hp-now a { color: var(--accent-text); }
+
+/* Sections */
+.hp-section { padding: clamp(56px, 9vw, 112px) var(--hp-gutter); border-bottom: 1px solid var(--hp-line); display: grid; gap: 36px; justify-items: start; }
+.hp-section-head { display: grid; gap: 12px; max-width: 40rem; }
+.hp h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.05; letter-spacing: -0.02em; text-wrap: balance; }
+.hp h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 24px; line-height: 1.15; }
+.hp-section-head p, .hp-forms p, .hp-ways p { margin: 0; color: #b9b9c4; }
+.hp-section-head a { color: var(--accent-text); }
+.hp-scenes, .hp-forms, .hp-ways { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 20px; }
+
+.hp-scene {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  align-content: start;
+  padding: 0 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--hp-line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hp-scene img { display: block; width: 100%; height: auto; margin-bottom: 8px; border: 1px solid var(--hp-line); transition: border-color 0.2s ease; }
+.hp-scene:hover img { border-color: rgba(156, 205, 175, 0.6); }
+.hp-scene[aria-pressed='true'] { border-bottom-color: var(--accent-text); }
+.hp-scene[aria-pressed='true'] img { border-color: var(--accent-text); }
+.hp-scene strong { font-family: var(--display); font-weight: 400; font-size: 26px; line-height: 1.1; }
+.hp-scene-piece, .hp-scene-state { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+.hp-scene-blurb { color: #b9b9c4; font-size: 15px; }
+.hp-scene-state { margin-top: 4px; color: var(--accent-text); }
+
+.hp-forms li { display: grid; gap: 8px; align-content: start; }
+.hp-forms img { display: block; width: 100%; height: auto; margin-bottom: 8px; border: 1px solid var(--hp-line); }
+.hp-ways li { display: grid; gap: 8px; align-content: start; padding-top: 18px; border-top: 1px solid var(--accent-text); }
+
+.hp-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; padding: 28px var(--hp-gutter) calc(28px + env(safe-area-inset-bottom, 0px)); font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+.hp-footer a { color: var(--text); }
+
+/* Phone: the scene on top as its own block, the copy under it on solid ground. */
+@media (max-width: 760px) {
+  .hp-nav nav a:not(.hp-nav-cta) { display: none; }
+  .hp-hero { display: block; min-height: 0; padding: 0 0 26px; }
+  .hp-hero::before { display: none; }
+  .hp-stage { position: relative; height: min(64vh, 520px); z-index: 0; background-position: 62% center; }
+  .hp-hero-copy { padding: 28px var(--hp-gutter) 0; pointer-events: auto; }
+  .hp-now { position: static; padding: 22px var(--hp-gutter) 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hp-button, .hp-scene img { transition: none; }
+}

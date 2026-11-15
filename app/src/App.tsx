@@ -6,9 +6,6 @@ import { DEFAULT_PRESENTATION, Viewport, type PresentationState } from './compon
 import { ControlPanel, orderByStage } from './components/ControlPanel';
 import { SurpriseMeButton } from './components/SurpriseMeButton';
 import { OnboardingHint } from './components/OnboardingHint';
-import HomePage from './HomePage';
-import { EDITOR_PATH } from './base';
-import CreatorPanel from './components/CreatorPanel';
 import { presentationFromView, readSceneLink } from './sceneLink';
 
 /** The editor frames the object with room around it, so dispersed matter (gas, the
@@ -28,12 +25,10 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return !!el?.closest?.('input, textarea, select, [contenteditable]');
 }
 
-/** Top-level layout: viewport + ControlPanel + top bar (roadmap §6). Holds
- * Composition state via useFormaRuntime, passes apply(patch) down. */
+/** The editor: viewport + ControlPanel + top bar (roadmap §6). Holds Composition state
+ * via useFormaRuntime, passes apply(patch) down. Loaded only on the editor route
+ * (main.tsx), so the homepage doesn't carry the 3D code. */
 export default function App() {
-  if (typeof window !== 'undefined' && window.location.pathname !== EDITOR_PATH) {
-    return <HomePage gallery={new URLSearchParams(window.location.search).get('variant') === 'gallery'} />;
-  }
   const hostRef = useRef<HTMLDivElement>(null);
   const shared = SHARED_SCENE;
   const { runtime, scene, scheduler, apply: applyRaw, current, contextLost } = useFormaRuntime(hostRef, shared?.composition, EDITOR_RUNTIME_OPTIONS);
@@ -48,7 +43,6 @@ export default function App() {
     applyRaw(patch.effectIds === undefined ? patch : { ...patch, effectIds: orderByStage(patch.effectIds) });
   }
   const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 640);
-  const [creatorMode, setCreatorMode] = useState(false);
   const [presentation, setPresentation] = useState<PresentationState>(() => (shared ? presentationFromView(shared.view, DEFAULT_PRESENTATION) : DEFAULT_PRESENTATION));
   const historyRef = useRef<{ past: Composition[]; future: Composition[] }>({ past: [], future: [] });
 
@@ -180,9 +174,6 @@ export default function App() {
         >
           Reset composition
         </button>
-        <button type="button" className={`btn${creatorMode ? ' toggle-on' : ''}`} onClick={() => setCreatorMode((v) => !v)} aria-pressed={creatorMode} data-testid="creator-mode-toggle">
-          Creator mode: {creatorMode ? 'On' : 'Off'}
-        </button>
         <button
           type="button"
           className="btn panel-collapse-btn"
@@ -218,7 +209,6 @@ export default function App() {
         spin={spin}
         onAtmosphereChange={(atmosphere) => applyTracked({ atmosphere })}
       />
-      {creatorMode && <aside className="creator-region" aria-label="Creator tools"><CreatorPanel composition={current} /></aside>}
     </div>
   );
 }

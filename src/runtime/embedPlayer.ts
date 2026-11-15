@@ -145,7 +145,8 @@ export function embedForma(el: HTMLElement, composition: Composition, options: E
       rejectReady(error);
       return;
     }
-    const base = options.assetBase;
+    // A relative base ("../") is relative to the page, as a relative script src would be.
+    const base = options.assetBase && typeof document !== 'undefined' ? new URL(options.assetBase, document.baseURI).href : options.assetBase;
     runtime = new FormaRuntime({
       scene: formaScene.scene, camera: formaScene.camera, renderer: formaScene.renderer, composer: formaScene.composer,
       ensureOutputPassLast: formaScene.ensureOutputPassLast, disposeExternal: formaScene.dispose,

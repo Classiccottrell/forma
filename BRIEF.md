@@ -396,6 +396,22 @@ two meet on the page rather than in one codebase.
   they follow camera zoom; before, only the mesh did.
 
 ### Phase 6 — Finish and release
+
+**Progress (2026-11-14): homepage rewritten, awaiting the owner's look.** The homepage is
+the composed scenes, running: the hero plays `scenes/<id>.html` (built at build time by
+`composedScenePages` in `app/vite.config.ts` with the same `composeScene` the export menu
+uses, from linefield bakes vendored in `app/linefield/`) in a frame, and three scene cards
+switch it; the hero opens on a different scene each visit. Under it: the three states
+(metal; stills from `app/scripts/capture-home-stills.mjs`) and the three ways out. The
+scene backgrounds are taken from linefield's live downloads at build time, with the
+vendored copies as a fallback, and the deploy also runs daily, so changing, removing or
+improving a linefield piece reaches the homepage without a Forma change (app/README.md). The frame is unloaded while the hero is off screen, and under
+reduced motion a still stands in until asked. The editor is now its own chunk
+(`main.tsx`): the homepage loads 49 KB gzip of script instead of the editor's 259 KB.
+Removed with the old homepage: the `?variant=gallery` page, the homepage's viewer
+toolbar and live-control card, and Creator mode (it only saved homepage presets to
+localStorage for the old homepage to read). Left: the bundle budget (the check still sums
+both chunks: 259 KB gzip against 250 KB), full QA, v1.0 tag.
 - Phone editor, homepage and gallery layouts, keyboard flow, labels, contrast,
   landmarks (the remaining R1 findings).
 - Homepage rewritten around the matter idea, built from composed scenes.
@@ -431,7 +447,7 @@ visitor actually hits. Three steps, in order:
 - [x] **Phone editor is unusable.** Fixed 2026-11-13: the top bar is one row that scrolls sideways, the panel starts under it, and the viewer's own buttons step aside while the panel is open. The top bar wraps to three rows over the panel and hides
   the search box; the open panel covers the whole viewport, so changes can't be seen; the
   hint and Reset view float over the picker grid.
-- [ ] **Gallery page: the 3D object covers the content.** On desktop the card mesh sits on
+- [x] **Gallery page: the 3D object covers the content.** Fixed 2026-11-14: the gallery variant is gone; the homepage's scene cards replace it (see Phase 6). On desktop the card mesh sits on
   top of the Curated Presets list and the intro copy (names cut off); on phone it renders
   as a white glare band across the text.
 - [ ] **Object framing.** Shapes are scaled to nearly fill the frame and centred on the full
@@ -443,10 +459,10 @@ visitor actually hits. Three steps, in order:
   object on a near-black environment; another paired Bloom with a bright sky and blew
   the object out to white. Needs a legibility guard (luminance contrast, bloom vs bright
   environments).
-- [ ] **Homepage legibility.** (Editor: fixed 2026-11-13, axe now clean. Homepage and gallery still to do.) Headline italic, eyebrow, body copy, nav links and callout
+- [x] **Homepage legibility.** Fixed 2026-11-14 by the homepage rewrite: copy sits on a darkened side clear of the object; axe clean. (Editor: fixed 2026-11-13, axe now clean. Homepage and gallery still to do.) Headline italic, eyebrow, body copy, nav links and callout
   labels sit over the moving object at low contrast. axe: toggle text 2.33:1, small
   labels 3.03:1 (homepage, gallery); effect param labels 4.39:1 (editor). AA needs 4.5:1.
-- [ ] **Homepage on phone:** "Open editor" wraps and clips at the right edge; a callout
+- [x] **Homepage on phone:** Fixed 2026-11-14: the scene is its own block on top, the copy under it on solid ground. "Open editor" wraps and clips at the right edge; a callout
   card sits off-screen; the viewer toolbar overlaps the "Forma / 2026" footer (which the
   Auto-spin button also covers on desktop).
 - [x] **Unlabelled form fields (axe critical):** the composition-import file input and the
