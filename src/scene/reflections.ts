@@ -8,17 +8,14 @@ import * as THREE from 'three';
  *
  * Returns null where it can't be built (a headless renderer without WebGL), so callers
  * simply keep the environment's lights as the only lighting. */
-export function createReflectionMap(
-  renderer: THREE.WebGLRenderer,
+function buildReflectionWorld(
   background: THREE.Color | THREE.Texture | null,
   keyColor: THREE.Color,
-  /** 0..1 lightness of the backdrop. Dark backdrops get a horizon band and floor glow,
-   * or a mirror finish reflects nothing and the object's body disappears. */
-  backdropLuminance = 0.5,
-): THREE.WebGLRenderTarget | null {
+  backdropLuminance: number,
+): { scene: THREE.Scene; disposables: { dispose(): void }[] } {
   const scene = new THREE.Scene();
   const disposables: { dispose(): void }[] = [];
-  try {
+  {
     const skyMaterial = new THREE.MeshBasicMaterial({ side: THREE.BackSide, toneMapped: false });
     if (background instanceof THREE.Texture) skyMaterial.map = background;
     else skyMaterial.color.copy(background ?? new THREE.Color(0x3a3d48));
@@ -57,14 +54,51 @@ export function createReflectionMap(
       floor.position.y = -4;
       scene.add(band, floor);
     }
+  }
+  return { scene, disposables };
+}
 
+export function createReflectionMap(
+  renderer: THREE.WebGLRenderer,
+  background: THREE.Color | THREE.Texture | null,
+  keyColor: THREE.Color,
+  /** 0..1 lightness of the backdrop. Dark backdrops get a horizon band and floor glow,
+   * or a mirror finish reflects nothing and the object's body disappears. */
+  backdropLuminance = 0.5,
+): THREE.WebGLRenderTarget | null {
+  let world: ReturnType<typeof buildReflectionWorld> | null = null;
+  try {
+    world = buildReflectionWorld(background, keyColor, backdropLuminance);
     const pmrem = new THREE.PMREMGenerator(renderer);
-    const target = pmrem.fromScene(scene, 0.03);
+    const target = pmrem.fromScene(world.scene, 0.03);
     pmrem.dispose();
     return target;
   } catch {
     return null;
   } finally {
-    for (const d of disposables) d.dispose();
+    for (const d of world?.disposables ?? []) d.dispose();
+  }
+}
+
+/** The same world as a mip-mapped cube map, for the liquid: it reflects this directly
+ * (sharp for a mirror, blurred for rough or painted liquid, and its blurriest level
+ * stands in for ambient light). Returns null where it can't be built. */
+export function createReflectionCube(
+  renderer: THREE.WebGLRenderer,
+  background: THREE.Color | THREE.Texture | null,
+  keyColor: THREE.Color,
+  backdropLuminance = 0.5,
+  size = 128,
+): THREE.WebGLCubeRenderTarget | null {
+  let world: ReturnType<typeof buildReflectionWorld> | null = null;
+  try {
+    world = buildReflectionWorld(background, keyColor, backdropLuminance);
+    const target = new THREE.WebGLCubeRenderTarget(size, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+    new THREE.CubeCamera(0.1, 50, target).update(renderer, world.scene);
+    return target;
+  } catch {
+    return null;
+  } finally {
+    for (const d of world?.disposables ?? []) d.dispose();
   }
 }

@@ -6,6 +6,7 @@ import { DEFAULT_PRESENTATION, Viewport, type PresentationState } from './compon
 import { ControlPanel, orderByStage } from './components/ControlPanel';
 import { SurpriseMeButton } from './components/SurpriseMeButton';
 import { OnboardingHint } from './components/OnboardingHint';
+import { registerAllContent } from 'forma/content';
 import { presentationFromView, readSceneLink } from './sceneLink';
 
 /** The editor frames the object with room around it, so dispersed matter (gas, the
@@ -15,6 +16,8 @@ const EDITOR_RUNTIME_OPTIONS = { framing: {} };
 /** A scene link (#scene=…) opens that exact scene. Read once at load, outside React (a
  * StrictMode double render would otherwise see the hash already cleared), then cleared so
  * a reload or a later copy of the URL doesn't carry a stale scene. */
+// The library must be registered first: reading the link checks every id against it.
+registerAllContent();
 const SHARED_SCENE = typeof window !== 'undefined' ? readSceneLink(window.location.hash) : null;
 if (SHARED_SCENE) history.replaceState(null, '', window.location.pathname + window.location.search);
 

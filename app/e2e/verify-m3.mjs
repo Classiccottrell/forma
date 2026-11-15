@@ -243,6 +243,31 @@ async function main() {
     await ctx.close();
   }
 
+  // --- 8. A copied scene link reopens the same scene (it needs the library registered
+  // before the link is read, which broke once when the homepage stopped doing it) ---
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await ctx.addInitScript(() => { try { localStorage.setItem('forma:onboarding-dismissed', '1'); } catch {} });
+    const page = await ctx.newPage();
+    await page.goto(URL);
+    await page.waitForSelector('[data-testid="viewport-host"] canvas', { state: 'attached', timeout: 60000 });
+    const deepSpace = page.locator('[role="listbox"][aria-label="environment options"] [aria-label^="Deep Space, "]').first();
+    if ((await deepSpace.count()) === 0) await page.getByTestId('section-header-environment').click();
+    await deepSpace.click();
+    await page.getByTestId('section-header-export').scrollIntoViewIfNeeded();
+    if (!(await page.getByTestId('copy-link-btn').isVisible())) await page.getByTestId('section-header-export').click();
+    await page.getByTestId('copy-link-btn').click();
+    const link = await page.getByTestId('embed-output').inputValue();
+    await page.close(); // two live WebGL pages at once starve each other on software GL
+    const other = await ctx.newPage();
+    await other.goto(link);
+    await other.waitForSelector('.app-shell', { timeout: 60000 });
+    const env = await other.locator('.app-shell').getAttribute('data-environment');
+    const cleared = await other.evaluate(() => location.hash === '');
+    record('scene link: a copied link reopens the same scene and clears the hash', env === 'deep-space' && cleared, `environment=${env} hashCleared=${cleared}`);
+    await ctx.close();
+  }
+
   await browser.close();
 
   const failed = results.filter((r) => !r.ok);
