@@ -8,7 +8,7 @@ import { shapeRegistry, materialRegistry, textureRegistry, environmentRegistry, 
 import { slotKey, changedHotKeys } from './diff.js';
 import { ensureGeometryUVs } from './uv.js';
 import { MatterLayer, type FlowSampler } from './MatterLayer.js';
-import { createReflectionMap } from '../scene/reflections.js';
+import { createReflectionMap, createReflectionCube } from '../scene/reflections.js';
 import { ContactShadow, SHADOW_CASTER_LAYER, type ContactShadowSettings } from '../scene/ContactShadow.js';
 import { AtmosphereLayer, environmentTint } from '../scene/AtmosphereLayer.js';
 
@@ -314,6 +314,16 @@ export class FormaRuntime {
   }
 
   private syncMatterColor(material: THREE.Material, materialId: string): void {
+    const physical = material as THREE.Material & { color?: THREE.Color; metalness?: number; roughness?: number; transmission?: number };
+    // Liquid takes its finish from the material: chrome melts to mercury, glass to water,
+    // matte to paint. Materials without these properties keep the default clear liquid.
+    const metal = typeof physical.metalness === 'number' ? physical.metalness : 0;
+    const transmission = typeof physical.transmission === 'number' ? physical.transmission : 0;
+    this.matter.setLiquidLook({
+      metal,
+      opacity: metal > 0.5 ? 1 : 1 - transmission,
+      roughness: typeof physical.roughness === 'number' ? physical.roughness : 0.2,
+    });
     const color = (material as THREE.Material & { color?: THREE.Color }).color;
     this.matter.setColor(color instanceof THREE.Color ? color : new THREE.Color(0xffffff), materialRegistry.get(materialId)?.particleColors);
   }
@@ -446,6 +456,22 @@ export class FormaRuntime {
       if (this.scene.environment === target.texture) this.scene.environment = null;
       target.dispose();
     });
+    // The liquid reflects the same world, as a cube map it can sample directly.
+    const cube = createReflectionCube(this.renderer, background, key ? key.color.clone() : new THREE.Color(1, 1, 1), tint.luminance);
+    if (cube) {
+      this.liquidWorld = cube.texture;
+      this.syncLiquidEnvironment();
+      this.environmentSlot.registry.track(() => {
+        if (this.liquidWorld === cube.texture) { this.liquidWorld = null; this.matter.setLiquidEnvironment(null); }
+        cube.dispose();
+      });
+    }
+  }
+
+  /** The cube map the liquid reflects, with the environment's current strength and turn. */
+  private liquidWorld: THREE.CubeTexture | null = null;
+  private syncLiquidEnvironment(): void {
+    this.matter.setLiquidEnvironment(this.liquidWorld, this.scene.environmentIntensity, this.scene.environmentRotation.y);
   }
 
   private invalidateEnvironmentLoad(): void {
@@ -466,6 +492,7 @@ export class FormaRuntime {
     def.update(this.environmentSlot.handle, params as any);
     this.scene.environmentIntensity = Number(params.environmentStrength ?? 1);
     this.scene.environmentRotation.y = THREE.MathUtils.degToRad(Number(params.environmentRotation ?? 0));
+    this.syncLiquidEnvironment();
   }
 
   // --- effects -------------------------------------------------------------

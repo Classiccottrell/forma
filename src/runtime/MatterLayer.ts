@@ -184,6 +184,18 @@ void main() {
     this.fluid?.setPalette(tint, tint.clone().multiplyScalar(0.15), white.clone().multiplyScalar(0.55));
   }
 
+  /** What the liquid is made of, from the mesh material (metalness, transmission,
+   * roughness), so each material melts into its own kind of liquid. */
+  setLiquidLook(look: { metal: number; opacity: number; roughness: number }): void {
+    this.fluid?.setLook(look);
+  }
+
+  /** The world the liquid reflects: a cube map (see `createReflectionCube`), its gain and
+   * rotation. Null returns it to the plain gradient. */
+  setLiquidEnvironment(cube: THREE.CubeTexture | null, gain = 1, rotationY = 0): void {
+    this.fluid?.setEnvironment(cube, gain, rotationY);
+  }
+
   apply(settings: MatterSettings | undefined): void {
     const wasActive = this.settings !== null;
     this.settings = settings ?? null;
