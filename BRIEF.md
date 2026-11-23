@@ -410,12 +410,22 @@ reduced motion a still stands in until asked. The editor is now its own chunk
 (`main.tsx`): the homepage loads 49 KB gzip of script instead of the editor's 259 KB.
 Removed with the old homepage: the `?variant=gallery` page, the homepage's viewer
 toolbar and live-control card, and Creator mode (it only saved homepage presets to
-localStorage for the old homepage to read). Left: the bundle budget (the check still sums
-both chunks: 259 KB gzip against 250 KB), full QA, v1.0 tag.
-- Phone editor, homepage and gallery layouts, keyboard flow, labels, contrast,
-  landmarks (the remaining R1 findings).
-- Homepage rewritten around the matter idea, built from composed scenes.
-- Bundle budget, favicon, full QA against this list, tag v1.0.
+localStorage for the old homepage to read).
+
+**2026-11-23 release pass:** Film Grain now uses the host frame clock, so it pauses
+with hidden tabs. The combined homepage/editor bundle passes a deliberately updated
+975 KB / 265 KB gzip gate (actual 945,650 / 258,943). Library typecheck, build, and
+173 tests pass. Production editor QA: 15/15; composed HTML export and preview:
+10/10; homepage desktop/phone smoke, including the live hero and scene switch:
+pass. Share metadata and a matching favicon are in the static shell. These checks
+ran in headless Chrome with SwiftShader; a real-device/GPU pass,
+the broader R1 import/export and accessibility sweep, owner visual review, and a
+v1.0 tag remain before declaring a release.
+- [x] Phone editor and homepage layouts, keyboard flow, labels, contrast,
+  landmarks, and favicon (the remaining R1 user interface findings).
+- [x] Homepage rewritten around the matter idea, built from composed scenes.
+- [x] Bundle budget passes.
+- [ ] Complete full release QA, owner review, and v1.0 tag.
 
 ## R1 findings (2026-10-10) — folded into V2
 
@@ -441,7 +451,8 @@ visitor actually hits. Three steps, in order:
 ### Review findings — 2026-10-10
 
 **P1 — broken; blocks a core task**
-- [ ] **Copied embed code doesn't work from the live site.** It loads
+- [x] **Copied embed code doesn't work from the live site.** Fixed in Phase 4: the
+  published site hosts the versioned browser bundle and copied snippets use its URL. It used to load
   `./forma.browser.v0.1.0.js`, which the site doesn't serve (404), so a pasted snippet
   renders nothing. Publish the bundle with Pages and point `libraryUrl` at its absolute URL.
 - [x] **Phone editor is unusable.** Fixed 2026-11-13: the top bar is one row that scrolls sideways, the panel starts under it, and the viewer's own buttons step aside while the panel is open. The top bar wraps to three rows over the panel and hides
@@ -450,12 +461,12 @@ visitor actually hits. Three steps, in order:
 - [x] **Gallery page: the 3D object covers the content.** Fixed 2026-11-14: the gallery variant is gone; the homepage's scene cards replace it (see Phase 6). On desktop the card mesh sits on
   top of the Curated Presets list and the intro copy (names cut off); on phone it renders
   as a white glare band across the text.
-- [ ] **Object framing.** Shapes are scaled to nearly fill the frame and centred on the full
+- [x] **Object framing.** Fixed in Phase 1 with room for dispersed matter and editor panel insets. Shapes used to fill the full
   canvas, which runs under the editor panel — so the panel cuts the object off, and PNG
   exports (square) crop it.
 
 **P2 — clearly wrong; hurts the experience**
-- [ ] **Surprise Me can produce unreadable results:** one of three runs was a near-black
+- [x] **Surprise Me can produce unreadable results:** Phase 3 added the legibility guard. One of three review runs was a near-black
   object on a near-black environment; another paired Bloom with a bright sky and blew
   the object out to white. Needs a legibility guard (luminance contrast, bloom vs bright
   environments).
@@ -468,37 +479,34 @@ visitor actually hits. Three steps, in order:
 - [x] **Unlabelled form fields (axe critical):** the composition-import file input and the
   SVG textarea.
 - [x] **Editor top bar overlaps panel content** as the panel scrolls.
-- [ ] **Weak first impression in the editor:** the default is a flat lavender matte sphere
+- [x] **Weak first impression in the editor:** Phase 1 changed the opening scene to a chrome Soft Blob on Gradient Sky. The old default was a flat lavender matte sphere
   with a visibly faceted outline at default detail; the Matte swatch (violet) doesn't
   match the render.
-- [x] **Keyboard flow.** Fixed 2026-11-13 in the editor: a skip link to the controls, the top bar before the viewer's controls in tab order, and each shape or material grid is one tab stop with arrow keys (Home and End too). Tab stops from load to the Matter section went from 55 to 26. Not done: the homepage and gallery tab order, and dropping the viewer controls on marketing pages. Viewer controls (Auto-spin/Speed/Reset view) come first in tab
+- [x] **Keyboard flow.** Fixed 2026-11-13 in the editor: a skip link to the controls, the top bar before the viewer's controls in tab order, and each shape or material grid is one tab stop with arrow keys (Home and End too). Tab stops from load to the Matter section went from 55 to 26. The rewritten homepage has a skip link and no viewer controls; the gallery route was removed. Viewer controls (Auto-spin/Speed/Reset view) used to come first in tab
   order on every page, before the nav and the main call to action; no skip link; ~50 tabs
   to get past the shape grid in the editor. Consider dropping viewer controls from the
   marketing pages entirely.
 
 **P3 — polish**
-- [ ] Effect stage pickers are unstyled white native selects; Light Color is a full-width
-  white bar. Both clash with the dark panel.
-- [ ] Gallery preset thumbnails render as dark blobs, not previews of the presets.
+- [x] Effect stage pickers and color inputs now use the dark panel styles and compact swatches.
+- [x] The gallery route and its dark preset thumbnails were replaced by scene cards with authored stills.
 - [x] Editor content isn't in landmarks (axe `region` ×22). Fixed 2026-11-13: header, preview region, controls as an aside.
 - [x] No favicon (404 on every page). Fixed 2026-11-13: an SVG favicon.
 - [x] Console warning ×2 (not seen on the editor page in the 2026-11-13 run, including warnings; the Faceted Gem path itself was not re-checked): `toNonIndexed()` called on already non-indexed geometry (Faceted Gem).
-- [ ] Parameters sit far from the preview: one long panel scroll, with a shape's params
-  below the 32-card grid.
+- [x] Shape parameters now sit above the shape grid, next to the selected shape name.
 
-**Carried from earlier sections:** bundle budget over (H4), Film Grain RAF loop (H1).
+**Carried from earlier sections:** bundle budget (H4) and Film Grain RAF loop (H1) closed in the 2026-11-23 release pass.
 
 ## Product hardening roadmap
 
-### H1 — Lifecycle and delivery correctness (one item open)
+### H1 — Lifecycle and delivery correctness (complete)
 
 - [x] Make every public mount disposable, including renderer and resize-observer ownership.
 - [x] Remove duplicate context-loss wiring and define one recovery owner.
 - [x] Make FALLBACK a real remount boundary; never leave a live WebGL scene mislabeled FALLBACK.
 - [x] Use the shared `cc-webgl` `FrameScheduler` in the product app for visibility pause and delta clamping.
-- Keep OrbitControls updates inside that scheduler; no second product RAF loop. OrbitControls
-  is done; the Film Grain effect (#6) still drives its `time` uniform from its own
-  `requestAnimationFrame` loop (`src/content/effects.ts`), which the scheduler cannot pause.
+- [x] Keep OrbitControls and Film Grain updates inside the host frame scheduler; no
+  second product RAF loop. Film Grain now receives the runtime's elapsed time.
 - [x] Make generated embed output browser-runnable through a published browser bundle, not bare package imports.
 
 ### H2 — Resource and export safety
@@ -620,9 +628,9 @@ horizontal and vertical placement remain available through keyboard-operable sli
 - [x] Publish versioned browser bundles and embeddable examples.
 - [x] Add executable performance budgets, bundle-size policy, and release checklist.
 - Re-run full browser QA before marking the project shipped.
-- Get `app/npm run check:bundle` passing again: `main` is at 905,065 JavaScript bytes against
-  the 900,000 budget (gzip is within budget). Raise the budget deliberately or trim; don't
-  let it drift.
+- [x] Rebaseline `app/npm run check:bundle` for the Phase 6 two-route app. Both
+  JavaScript assets total 945,650 bytes / 258,943 gzip; budgets are now
+  975,000 / 265,000, leaving limited headroom for future growth.
 - [x] First successful GitHub Pages deploy (2026-10-06).
 
 `npm run typecheck` / `typecheck:harness` / `test` (17/17) / `build` all pass. Embed

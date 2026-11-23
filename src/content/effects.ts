@@ -500,12 +500,8 @@ const filmGrainShader = {
   `,
 };
 
-/** Starts and stops a film-grain handle's clock. The animation loop lives in
- * `create()`'s closure, which `update()` otherwise has no way to reach — so a
- * live `animate` toggle used to zero `time` for a single frame and then be
- * overwritten by the loop still running, and switching animation on for grain
- * created static never started a loop at all. Weakly keyed so a disposed
- * handle takes its entry with it. */
+/** Film Grain uses the runtime's frame clock, which pauses with the page and
+ * avoids a second animation loop. Hot parameter updates use this handle setter. */
 const grainClocks = new WeakMap<EffectHandle, (on: boolean) => void>();
 
 const filmGrain = defineEffect({
@@ -531,40 +527,28 @@ const filmGrain = defineEffect({
     });
     ctx.composer?.addPass(pass);
 
-    // Static grain looks like a texture; moving grain looks like film. Drive it
-    // off the clock rather than the frame counter so it is framerate-independent.
-    let raf = 0;
-    let animating = false;
+    // Static grain looks like a texture; moving grain looks like film.
+    let animating: boolean = params.animate;
     let disposed = false;
-    const tick = () => {
-      if (!animating) return;
-      pass.uniforms.time!.value = performance.now() / 1000;
-      raf = requestAnimationFrame(tick);
-    };
     const setAnimate = (on: boolean): void => {
-      if (disposed || on === animating) return;
+      if (disposed) return;
       animating = on;
-      if (on) {
-        if (typeof requestAnimationFrame === 'function') raf = requestAnimationFrame(tick);
-        return;
-      }
-      if (raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf);
-      raf = 0;
-      pass.uniforms.time!.value = 0;
+      if (!on) pass.uniforms.time!.value = 0;
     };
 
     const handle: EffectHandle = {
       pass,
+      updateFrame(_dt, elapsed) {
+        if (!disposed && animating) pass.uniforms.time!.value = elapsed;
+      },
       dispose() {
         if (disposed) return;
-        setAnimate(false);
         disposed = true;
         ctx.composer?.removePass(pass);
         pass.dispose();
       },
     };
     grainClocks.set(handle, setAnimate);
-    setAnimate(params.animate);
     return handle;
   },
   update(handle, params) {

@@ -150,6 +150,8 @@ export interface EnvironmentHandle {
 
 export interface EffectHandle {
   dispose(): void;
+  /** Optional per-frame update, driven by the host's existing render clock. Seconds. */
+  updateFrame?(dt: number, elapsed: number): void;
   /** The composer pass this effect added, if any (M1 addition) — exposed so the
    * runtime/export path can confirm a pass-based effect is actually wired into the
    * shared composer rather than silently doing nothing. Not required to be read by

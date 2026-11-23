@@ -111,6 +111,10 @@ export function ControlPanel(props: ControlPanelProps) {
             </button>
           ))}
         </div>
+        <div className="shape-settings">
+          <div className="selected-definition">{shapeDef.label}<span>Selected shape</span></div>
+          <ParamGroup schema={shapeDef.parameterSchema} values={composition.shapeParams} onChange={(k, v) => onParamChange('shapeParams', k, v)} />
+        </div>
         <DefinitionPicker
           entries={shapeEntries}
           selectedId={composition.shapeId}
@@ -118,9 +122,6 @@ export function ControlPanel(props: ControlPanelProps) {
           filter={search}
           kind="shape"
         />
-        <div style={{ marginTop: 10 }}>
-          <ParamGroup schema={shapeDef.parameterSchema} values={composition.shapeParams} onChange={(k, v) => onParamChange('shapeParams', k, v)} />
-        </div>
       </Section>
 
       <Section id="matter" title="Matter" open={open.matter} onToggle={toggle}>

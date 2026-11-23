@@ -1,37 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { effectRegistry } from '../src/index.js';
 import { ensureHarnessContentRegistered } from './testUtils.js';
 
-// `animate` is a hot parameter (rebuild: false), so toggling it goes through
-// update() on the live handle rather than recreating the effect. The loop that
-// drives the grain clock is owned by create(), so update() has to be able to
-// reach it — which it originally could not. Frames are driven by hand here so
-// the test decides exactly when the loop gets a chance to run.
-describe('film-grain animate toggle', () => {
+describe('film-grain frame clock', () => {
   ensureHarnessContentRegistered();
-
-  let frames: FrameRequestCallback[] = [];
-  let now = 1000;
-  const runFrame = (): void => {
-    const pending = frames;
-    frames = [];
-    for (const cb of pending) cb(now);
-  };
-
-  beforeEach(() => {
-    frames = [];
-    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => frames.push(cb));
-    vi.stubGlobal('cancelAnimationFrame', () => {
-      frames = [];
-    });
-    vi.spyOn(performance, 'now').mockImplementation(() => (now += 16));
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-  });
 
   function grain(animate: boolean) {
     const def = effectRegistry.require('film-grain');
@@ -46,39 +19,31 @@ describe('film-grain animate toggle', () => {
     return {
       handle,
       time: () => pass.uniforms.time.value,
+      frame: (elapsed: number) => handle.updateFrame?.(0.016, elapsed),
       setAnimate: (on: boolean) => def.update!(handle, { ...params, animate: on } as typeof params),
     };
   }
 
-  it('switching animation off stops the clock, and it stays stopped', () => {
+  it('advances only when the host updates, and clears the time when disabled', () => {
     const g = grain(true);
-    runFrame();
-    expect(g.time()).toBeGreaterThan(0);
-
+    g.frame(1.25);
+    expect(g.time()).toBe(1.25);
     g.setAnimate(false);
     expect(g.time()).toBe(0);
-    runFrame();
-    runFrame();
-    // Regression: the loop kept running and overwrote this on the next tick.
+    g.frame(2);
     expect(g.time()).toBe(0);
     g.handle.dispose();
   });
 
-  it('switching animation on for grain created static starts the clock', () => {
+  it('can be enabled after creation and stops on disposal', () => {
     const g = grain(false);
-    runFrame();
+    g.frame(1);
     expect(g.time()).toBe(0);
-
     g.setAnimate(true);
-    runFrame();
-    // Regression: no loop was ever started, so this stayed at 0.
-    expect(g.time()).toBeGreaterThan(0);
+    g.frame(2.5);
+    expect(g.time()).toBe(2.5);
     g.handle.dispose();
-  });
-
-  it('dispose stops the loop', () => {
-    const g = grain(true);
-    g.handle.dispose();
-    expect(frames).toHaveLength(0);
+    g.frame(3);
+    expect(g.time()).toBe(2.5);
   });
 });

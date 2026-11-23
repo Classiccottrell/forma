@@ -286,6 +286,18 @@ textarea:focus-visible {
 .effect-stage { display: grid; gap: 7px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: rgba(255,255,255,.018); }
 .effect-stage-heading { display: flex; justify-content: space-between; color: var(--text-dim); font: 10px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
 .effect-stage-heading span:last-child { opacity: .55; }
+.effect-stage select {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 10px;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font: 12px var(--mono);
+}
+.effect-stage select:hover { border-color: var(--border-hover); }
+.shape-settings { margin: 10px 0 14px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-soft); }
 .control-help {
   margin: 2px 0 0;
   color: var(--text-dim);
@@ -446,7 +458,7 @@ textarea:focus-visible {
   border-color: var(--accent);
   color: var(--accent-text);
   background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px rgba(255, 157, 92, 0.12), 0 8px 24px rgba(0, 0, 0, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(156, 205, 175, 0.12), 0 8px 24px rgba(0, 0, 0, 0.14);
 }
 
 .param-row {
@@ -528,11 +540,12 @@ textarea:focus-visible {
   resize: vertical;
 }
 .param-row input[type='color'] {
-  width: 100%;
-  height: 28px;
+  width: 64px;
+  height: 34px;
+  padding: 2px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: none;
+  background: var(--surface-raised);
   cursor: pointer;
 }
 

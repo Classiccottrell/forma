@@ -87,8 +87,15 @@ npm run typecheck
 cd .. && npm test && npm run typecheck && npm run typecheck:harness && npm run build
 ```
 
+For browser checks, serve the production app with
+`npm run preview -- --host 127.0.0.1 --port 5183 --strictPort`, then run
+`node e2e/verify-home.mjs` and `node e2e/verify-m3.mjs` from `app/`.
+`node e2e/verify-composed.mjs` also exercises a downloaded composition from disk;
+it needs the sibling `linefield/downloads` checkout described in that script.
+
 `check:bundle` measures the existing `dist/assets/*.js` output and fails above
-900,000 JavaScript bytes or 250,000 summed gzip bytes. It does not build.
+975,000 JavaScript bytes or 265,000 summed gzip bytes. It covers the homepage
+and its separately loaded editor chunk together; it does not build.
 
 | Target | Status | Caveat |
 | --- | --- | --- |
@@ -96,7 +103,7 @@ cd .. && npm test && npm run typecheck && npm run typecheck:harness && npm run b
 | GitHub Pages project site | Supported | Build with `FORMA_BASE=/<repo>/` |
 | Cloudflare Pages | Supported | Root directory must include library and app |
 | Vercel | Supported | Root directory must include library and app |
-| Browser QA | Required before release | Local Chromium is currently blocked by macOS `bootstrap_check_in` permissions |
+| Browser QA | In progress | Headless Chrome on SwiftShader passed editor, composed export, and homepage smoke checks on 2026-11-23; real-device/GPU and full accessibility sweep remain |
 
 ## Browser bundle example
 

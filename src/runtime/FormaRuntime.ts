@@ -125,6 +125,7 @@ export class FormaRuntime {
   update(dt: number, elapsed: number): void {
     if (this.disposed) return;
     this.matter.update(dt, elapsed);
+    for (const effect of this.effectsSlot.handle ?? []) effect.updateFrame?.(dt, elapsed);
     this.mesh.visible = !this.matter.active || this.matter.meshVisible;
     this.shadow.setFade(this.matter.surfaceAmount);
     this.shadow.render(this.renderer, this.scene);

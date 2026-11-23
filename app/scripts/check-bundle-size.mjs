@@ -3,8 +3,11 @@ import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
 const assetsDir = new URL('../dist/assets/', import.meta.url);
-const jsBudget = 900_000;
-const gzipBudget = 250_000;
+// The site now has a lightweight homepage and a separate, lazy editor route.
+// These totals cover both assets, including their shared runtime, with modest
+// headroom above the Phase 6 baseline (946 KB / 259 KB gzip).
+const jsBudget = 975_000;
+const gzipBudget = 265_000;
 
 let files;
 try {
