@@ -156,6 +156,11 @@ Current content: 30 shapes / 21 materials / 8 textures / 10 environments / 9 eff
 
 ## V2 — Matter (current)
 
+The [React Bits production roadmap](REACT_BITS_PRODUCTION_ROADMAP.md) is a
+proposed, evidence-based quality and release backlog for both the current V2
+work and its next pass. It preserves this brief's owner acceptance gate and
+30-shape catalog decision.
+
 Six phases, in order. Each phase ships as its own PR(s) and ends with a live-site
 review in headless Chrome on SwiftShader (never the owner's Chrome on the iMac — see
 the GPU note in the agent memory) plus the owner's own look. A phase is done when the
