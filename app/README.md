@@ -34,6 +34,14 @@ one of the composed scenes (a different one each visit), which the build writes 
 - *Stills:* the posters and the three-states images live in `public/home/`; run
   `node scripts/capture-home-stills.mjs` with the dev server up after changing a scene.
 
+**Preset previews.** The editor's ten preset cards use real scene captures in
+`public/presets/`. After changing `src/content/presets.ts` or its rendering, build
+the library, run the app dev server on port 5183, then run
+`npm run presets:capture` in `app/`. This captures all ten with headless Chrome
+on SwiftShader and writes `/tmp/forma-preset-sheet.png` for visual review.
+Use `npm run presets:capture -- --only <preset-id>` for a focused recapture.
+Commit the changed PNGs with the preset change.
+
 **Why `npm run build` first, even for `npm run dev`.** `app/package.json`
 declares `"forma": "file:.."` — a real npm dependency resolved through the
 library's `package.json` `exports` map, which points at `./dist/index.js` and

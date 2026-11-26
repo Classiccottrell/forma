@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "check:bundle": "node scripts/check-bundle-size.mjs",
     "linefield:refresh": "node scripts/refresh-linefield.mjs",
+    "presets:capture": "node scripts/capture-preset-thumbs.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview"
   },
