@@ -29,15 +29,7 @@ export function PresetGallery({ presets, onSelect }: PresetGalleryProps) {
           aria-label={`${p.name}: ${shape.label}, ${material.label}, ${environment.label}${effect !== 'none' ? `, ${effect}` : ''}`}
           data-testid={`preset-${p.id}`}
         >
-          <span
-            className="preset-thumb"
-            data-preset={p.id}
-            data-shape={shapeId}
-            data-material={materialId}
-            data-environment={environmentId}
-            data-effect={effect}
-            aria-hidden="true"
-          />
+          <img className="preset-thumb" src={`${import.meta.env.BASE_URL}presets/${p.id}.png`} alt="" loading="lazy" />
           <span className="picker-name">{p.name}</span>
           <span className="picker-category">{shape.label} · {material.label}</span>
         </button>
